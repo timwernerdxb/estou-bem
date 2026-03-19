@@ -1051,6 +1051,7 @@ function refreshContactsFromAPI() {
 
 function renderContacts() {
   refreshContactsFromAPI();
+  console.log('[Contacts] authToken:', !!authToken, 'contacts:', state.contacts.length, 'user:', state.user?.email, 'auth:', state.auth?.email);
   return `
     <div class="screen active screen-padtop">
       <h1>📞 Contatos de Emergência</h1>
