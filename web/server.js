@@ -87,6 +87,27 @@ async function initDB() {
       CREATE INDEX IF NOT EXISTS idx_health_entries_user ON health_entries(user_id);
     `);
     console.log('Database initialized');
+
+    // Backfill: create contacts for all existing family→elder links
+    const linked = await client.query(`
+      SELECT f.id as family_id, f.name as family_name, f.phone as family_phone, f.linked_elder_id
+      FROM users f
+      WHERE f.linked_elder_id IS NOT NULL AND f.phone IS NOT NULL AND f.phone != ''
+    `);
+    for (const row of linked.rows) {
+      const exists = await client.query(
+        `SELECT id FROM contacts WHERE user_id = $1 AND phone = $2`,
+        [row.linked_elder_id, row.family_phone]
+      );
+      if (exists.rows.length === 0) {
+        const nextP = await client.query(`SELECT COALESCE(MAX(priority),0)+1 as p FROM contacts WHERE user_id = $1`, [row.linked_elder_id]);
+        await client.query(
+          `INSERT INTO contacts (user_id, name, phone, relationship, priority) VALUES ($1, $2, $3, $4, $5)`,
+          [row.linked_elder_id, row.family_name, row.family_phone, 'Familiar (vinculado)', nextP.rows[0].p]
+        );
+        console.log(`Backfilled contact: ${row.family_name} → elder ${row.linked_elder_id}`);
+      }
+    }
   } finally {
     client.release();
   }
