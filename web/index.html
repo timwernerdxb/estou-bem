@@ -5,26 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#4A90D9">
+<meta name="theme-color" content="#2563EB">
 <title>Estou Bem</title>
 <link rel="manifest" href="manifest.json">
 <style>
 /* ─── Reset & Base ─────────────────────────────────────── */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F5F7FA;color:#1A1A2E}
+html,body{height:100%;overflow:hidden;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;color:#0F172A;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 body{display:flex;flex-direction:column}
 input,button,select,textarea{font-family:inherit;font-size:inherit}
 button{cursor:pointer;border:none;background:none}
 
 /* ─── CSS Variables ────────────────────────────────────── */
 :root{
-  --primary:#4A90D9;--primary-dark:#2E6DB4;--primary-light:#7CB3E8;
-  --success:#4CAF50;--success-light:#C8E6C9;
-  --warning:#FF9800;--warning-light:#FFE0B2;
-  --danger:#F44336;--danger-light:#FFCDD2;
-  --bg:#F5F7FA;--card:#FFF;--border:#E0E6ED;
-  --text:#1A1A2E;--text2:#6B7280;--text3:#9CA3AF;
-  --disabled:#D1D5DB;
+  --primary:#2563EB;--primary-dark:#1D4ED8;--primary-light:#3B82F6;
+  --primary-gradient:linear-gradient(135deg,#2563EB 0%,#3B82F6 100%);
+  --accent:#F59E0B;--accent-light:#FEF3C7;
+  --success:#16A34A;--success-light:#DCFCE7;
+  --warning:#F59E0B;--warning-light:#FEF3C7;
+  --danger:#DC2626;--danger-light:#FEE2E2;
+  --bg:#F8FAFC;--card:#FFFFFF;--border:#E2E8F0;
+  --text:#0F172A;--text2:#475569;--text3:#94A3B8;
+  --disabled:#CBD5E1;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04),0 1px 3px rgba(0,0,0,.06);
+  --shadow-md:0 2px 4px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.06);
+  --shadow-lg:0 4px 6px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.08);
+  --shadow-xl:0 8px 16px rgba(0,0,0,.06),0 16px 48px rgba(0,0,0,.1);
   --safe-top:env(safe-area-inset-top,20px);
   --safe-bottom:env(safe-area-inset-bottom,0px);
   --tab-height:72px;
@@ -32,36 +38,39 @@ button{cursor:pointer;border:none;background:none}
 
 /* ─── App Shell ────────────────────────────────────────── */
 #app{display:flex;flex-direction:column;height:100%;width:100%;max-width:430px;margin:0 auto;background:var(--bg);position:relative;overflow:hidden}
-.screen{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px calc(var(--tab-height) + var(--safe-bottom) + 16px);display:none;flex-direction:column}
+.screen{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 20px calc(var(--tab-height) + var(--safe-bottom) + 20px);display:none;flex-direction:column}
 .screen.active{display:flex}
-.screen-padtop{padding-top:calc(var(--safe-top) + 12px)}
+.screen-padtop{padding-top:calc(var(--safe-top) + 16px)}
 
 /* ─── Tab Bar ──────────────────────────────────────────── */
-.tab-bar{display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;height:calc(var(--tab-height) + var(--safe-bottom));padding-bottom:var(--safe-bottom);background:#FFF;border-top:1px solid var(--border);z-index:100;flex-direction:row}
+.tab-bar{display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;height:calc(var(--tab-height) + var(--safe-bottom));padding-bottom:var(--safe-bottom);background:rgba(255,255,255,.72);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-top:1px solid rgba(226,232,240,.6);z-index:100;flex-direction:row}
 .tab-bar.visible{display:flex}
-.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--text3);font-size:11px;font-weight:600;transition:color .2s}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--text3);font-size:11px;font-weight:600;transition:color .2s,transform .15s;letter-spacing:.01em}
 .tab.active{color:var(--primary)}
+.tab.active svg{filter:drop-shadow(0 1px 3px rgba(37,99,235,.3))}
 .tab.sos-tab{color:var(--danger)}
-.tab svg{width:26px;height:26px;fill:currentColor}
+.tab svg{width:26px;height:26px;fill:currentColor;transition:filter .2s}
 
 /* ─── Common ───────────────────────────────────────────── */
-.card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:12px}
-.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 28px;border-radius:12px;font-weight:700;font-size:16px;color:#FFF;background:var(--primary);box-shadow:0 2px 6px rgba(0,0,0,.12);transition:transform .15s,opacity .15s;width:100%}
-.btn:active{transform:scale(.97);opacity:.9}
-.btn-success{background:var(--success)}
-.btn-danger{background:var(--danger)}
+.card{background:var(--card);border-radius:20px;padding:20px;box-shadow:var(--shadow-md);border:1px solid rgba(226,232,240,.5);margin-bottom:16px;transition:transform .2s ease,box-shadow .2s ease}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 28px;border-radius:14px;font-weight:700;font-size:16px;letter-spacing:.01em;color:#FFF;background:var(--primary-gradient);box-shadow:0 2px 8px rgba(37,99,235,.25),0 1px 3px rgba(0,0,0,.08);transition:transform .15s,opacity .15s,box-shadow .2s;width:100%}
+.btn:active{transform:scale(.97);opacity:.9;box-shadow:0 1px 4px rgba(37,99,235,.2)}
+.btn-success{background:linear-gradient(135deg,#16A34A 0%,#22C55E 100%);box-shadow:0 2px 8px rgba(22,163,74,.25)}
+.btn-danger{background:linear-gradient(135deg,#DC2626 0%,#EF4444 100%);box-shadow:0 2px 8px rgba(220,38,38,.25)}
 .btn-outline{background:transparent;color:var(--primary);border:2px solid var(--primary);box-shadow:none}
+.btn-outline:active{background:rgba(37,99,235,.06)}
 .btn-ghost{background:transparent;color:var(--primary);box-shadow:none}
+.btn-ghost:active{background:rgba(37,99,235,.06)}
 .btn-elder{padding:20px 40px;font-size:22px;border-radius:16px}
-.btn-small{padding:10px 18px;font-size:14px}
-.badge{display:inline-flex;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
-.badge-success{background:var(--success-light);color:var(--success)}
-.badge-warning{background:var(--warning-light);color:var(--warning)}
-.badge-danger{background:var(--danger-light);color:var(--danger)}
-h1{font-size:28px;font-weight:700;margin-bottom:4px}
-h2{font-size:20px;font-weight:600;margin-bottom:8px}
-.subtitle{color:var(--text2);font-size:15px;margin-bottom:16px}
-.caption{color:var(--text2);font-size:13px}
+.btn-small{padding:10px 18px;font-size:14px;border-radius:12px}
+.badge{display:inline-flex;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.02em}
+.badge-success{background:linear-gradient(135deg,#DCFCE7 0%,#BBF7D0 100%);color:#15803D}
+.badge-warning{background:linear-gradient(135deg,#FEF3C7 0%,#FDE68A 100%);color:#B45309}
+.badge-danger{background:linear-gradient(135deg,#FEE2E2 0%,#FECACA 100%);color:#B91C1C}
+h1{font-size:28px;font-weight:800;margin-bottom:4px;letter-spacing:-.02em;color:var(--text)}
+h2{font-size:20px;font-weight:700;margin-bottom:8px;letter-spacing:-.01em}
+.subtitle{color:var(--text2);font-size:15px;margin-bottom:16px;line-height:1.5}
+.caption{color:var(--text2);font-size:13px;line-height:1.4}
 .text-center{text-align:center}
 .mt-sm{margin-top:8px}.mt-md{margin-top:16px}.mt-lg{margin-top:24px}.mt-xl{margin-top:32px}
 .mb-md{margin-bottom:16px}
@@ -70,62 +79,63 @@ h2{font-size:20px;font-weight:600;margin-bottom:8px}
 .flex1{flex:1}
 .w100{width:100%}
 input[type="text"],input[type="tel"],input[type="number"],input[type="time"],input[type="email"],input[type="password"],select{
-  width:100%;padding:14px;border:1px solid var(--border);border-radius:12px;font-size:17px;
-  background:#FFF;color:var(--text);outline:none;transition:border-color .2s}
-input:focus,select:focus{border-color:var(--primary)}
-.input-label{font-weight:600;font-size:15px;margin:12px 0 6px;color:var(--text)}
+  width:100%;padding:14px 16px;border:1.5px solid var(--border);border-radius:14px;font-size:17px;
+  background:#FFF;color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s}
+input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.input-label{font-weight:700;font-size:14px;margin:16px 0 6px;color:var(--text);letter-spacing:.02em;text-transform:uppercase}
 
 /* ─── Onboarding ───────────────────────────────────────── */
 .onboarding-slides{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .onboarding-slides::-webkit-scrollbar{display:none}
 .onboarding-slide{min-width:100%;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 32px;text-align:center;min-height:60vh}
-.onboarding-icon{width:140px;height:140px;border-radius:70px;background:var(--bg);display:flex;align-items:center;justify-content:center;margin-bottom:32px}
+.onboarding-icon{width:140px;height:140px;border-radius:70px;background:linear-gradient(135deg,rgba(37,99,235,.08) 0%,rgba(59,130,246,.15) 100%);display:flex;align-items:center;justify-content:center;margin-bottom:32px;box-shadow:0 4px 16px rgba(37,99,235,.1)}
 .onboarding-icon svg{width:70px;height:70px;fill:var(--primary)}
-.onboarding-slide h1{font-size:26px;margin-bottom:12px}
-.onboarding-slide p{font-size:18px;color:var(--text2);line-height:1.5}
+.onboarding-slide h1{font-size:26px;margin-bottom:12px;font-weight:800;letter-spacing:-.02em}
+.onboarding-slide p{font-size:18px;color:var(--text2);line-height:1.6}
 .dots{display:flex;gap:8px;justify-content:center;margin:16px 0}
 .dot{width:10px;height:10px;border-radius:5px;background:var(--border);transition:all .3s}
-.dot.active{background:var(--primary);width:24px}
+.dot.active{background:var(--primary-gradient);width:28px;box-shadow:0 1px 4px rgba(37,99,235,.3)}
 
 /* ─── Setup ────────────────────────────────────────────── */
-.role-grid{display:flex;gap:10px;margin-bottom:16px}
-.role-card{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 8px;border-radius:16px;border:2px solid var(--border);background:#FFF;font-size:13px;font-weight:600;color:var(--text2);transition:all .2s}
-.role-card.active{border-color:var(--primary);background:var(--primary);color:#FFF}
+.role-grid{display:flex;gap:12px;margin-bottom:16px}
+.role-card{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 8px;border-radius:20px;border:2px solid var(--border);background:#FFF;font-size:13px;font-weight:700;color:var(--text2);transition:all .25s ease;box-shadow:var(--shadow-sm)}
+.role-card.active{border-color:var(--primary);background:var(--primary-gradient);color:#FFF;box-shadow:0 4px 16px rgba(37,99,235,.3)}
 .role-card svg{width:32px;height:32px;fill:currentColor}
 
 /* ─── Elder Home ───────────────────────────────────────── */
-.greeting{font-size:28px;font-weight:700;text-align:center;margin-top:8px}
-.date-text{font-size:18px;color:var(--text2);text-align:center;text-transform:capitalize;margin-bottom:8px}
-.checkin-container{display:flex;flex-direction:column;align-items:center;margin:24px 0}
-.checkin-btn{width:220px;height:220px;border-radius:110px;background:var(--success);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#FFF;font-size:24px;font-weight:700;box-shadow:0 4px 20px rgba(76,175,80,.4);transition:transform .3s,box-shadow .3s;border:none;animation:pulse 2s ease-in-out infinite}
-.checkin-btn.pending{background:var(--warning);box-shadow:0 4px 20px rgba(255,152,0,.4)}
-.checkin-btn.confirmed{background:#388E3C;animation:none;transform:scale(.95)}
-.checkin-btn svg{width:70px;height:70px;fill:#FFF}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}
-.info-card{text-align:center;padding:16px}
-.info-card .value{font-size:28px;font-weight:700;color:var(--primary)}
-.info-card .label{font-size:13px;color:var(--text2);margin-top:4px}
+.greeting{font-size:30px;font-weight:800;text-align:center;margin-top:8px;letter-spacing:-.02em;background:linear-gradient(135deg,var(--text) 0%,var(--primary-dark) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.date-text{font-size:16px;color:var(--text3);text-align:center;text-transform:capitalize;margin-bottom:8px;font-weight:500;letter-spacing:.01em}
+.checkin-container{display:flex;flex-direction:column;align-items:center;margin:32px 0}
+.checkin-btn{width:232px;height:232px;border-radius:116px;background:linear-gradient(145deg,#16A34A 0%,#22C55E 50%,#4ADE80 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#FFF;font-size:26px;font-weight:800;letter-spacing:.02em;box-shadow:0 8px 32px rgba(22,163,74,.35),0 2px 8px rgba(0,0,0,.1),inset 0 1px 1px rgba(255,255,255,.2);transition:transform .3s cubic-bezier(.34,1.56,.64,1),box-shadow .3s;border:none;animation:pulse 2.5s ease-in-out infinite}
+.checkin-btn.pending{background:linear-gradient(145deg,#F59E0B 0%,#FBBF24 50%,#FCD34D 100%);box-shadow:0 8px 32px rgba(245,158,11,.35),0 2px 8px rgba(0,0,0,.1),inset 0 1px 1px rgba(255,255,255,.2)}
+.checkin-btn.confirmed{background:linear-gradient(145deg,#15803D 0%,#166534 100%);animation:none;transform:scale(.95)}
+.checkin-btn svg{width:72px;height:72px;fill:#FFF;filter:drop-shadow(0 2px 4px rgba(0,0,0,.15))}
+@keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 8px 32px rgba(22,163,74,.35),0 2px 8px rgba(0,0,0,.1)}50%{transform:scale(1.05);box-shadow:0 12px 40px rgba(22,163,74,.45),0 4px 12px rgba(0,0,0,.1)}}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%}
+.info-card{text-align:center;padding:20px 16px}
+.info-card .value{font-size:28px;font-weight:800;color:var(--primary);letter-spacing:-.01em}
+.info-card .label{font-size:13px;color:var(--text3);margin-top:6px;font-weight:500}
 
 /* ─── SOS ──────────────────────────────────────────────── */
-.sos-btn{width:200px;height:200px;border-radius:100px;background:var(--danger);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#FFF;font-size:22px;font-weight:700;box-shadow:0 4px 20px rgba(244,67,54,.4);border:none;transition:transform .1s}
+.sos-btn{width:200px;height:200px;border-radius:100px;background:linear-gradient(145deg,#DC2626 0%,#EF4444 50%,#F87171 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#FFF;font-size:22px;font-weight:800;box-shadow:0 8px 32px rgba(220,38,38,.4),0 2px 8px rgba(0,0,0,.1),inset 0 1px 1px rgba(255,255,255,.15);border:none;transition:transform .1s;letter-spacing:.02em}
 .sos-btn:active{transform:scale(.92)}
-.sos-btn.activated{background:#B71C1C}
-.sos-btn svg{width:64px;height:64px;fill:#FFF}
+.sos-btn.activated{background:linear-gradient(145deg,#991B1B 0%,#B91C1C 100%)}
+.sos-btn svg{width:64px;height:64px;fill:#FFF;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2))}
 .progress-bar-track{width:220px;height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:16px}
-.progress-bar-fill{height:100%;background:var(--danger);border-radius:4px;width:0%;transition:width .05s linear}
-.quick-call{display:flex;align-items:center;gap:10px;padding:14px;background:#FFF;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);font-weight:600;color:var(--danger);font-size:16px;text-decoration:none}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,#DC2626,#EF4444);border-radius:4px;width:0%;transition:width .05s linear}
+.quick-call{display:flex;align-items:center;gap:12px;padding:16px;background:#FFF;border-radius:16px;box-shadow:var(--shadow-sm);border:1px solid rgba(226,232,240,.5);font-weight:700;color:var(--danger);font-size:16px;text-decoration:none;transition:transform .15s,box-shadow .15s}
+.quick-call:active{transform:scale(.98)}
 .quick-call svg{width:22px;height:22px;fill:var(--danger)}
 
 /* ─── Medications ──────────────────────────────────────── */
 .med-card{position:relative}
-.med-name{font-size:17px;font-weight:600}
+.med-name{font-size:17px;font-weight:700}
 .med-dosage{font-size:14px;color:var(--text2)}
 .med-freq{font-size:13px;color:var(--text3);margin-top:2px}
-.stock-row{display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;color:var(--text2)}
+.stock-row{display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:13px;color:var(--text2)}
 .stock-row.low{color:var(--danger);font-weight:600}
-.take-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;background:var(--success);border-radius:10px;color:#FFF;font-size:16px;font-weight:700;margin-top:10px;border:none}
-.take-btn:active{opacity:.85}
+.take-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:12px;background:linear-gradient(135deg,#16A34A 0%,#22C55E 100%);border-radius:12px;color:#FFF;font-size:16px;font-weight:700;margin-top:12px;border:none;box-shadow:0 2px 8px rgba(22,163,74,.2);transition:transform .15s,opacity .15s}
+.take-btn:active{opacity:.85;transform:scale(.98)}
 .delete-btn{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--danger);padding:4px}
 .delete-btn svg{width:20px;height:20px;fill:var(--danger)}
 
@@ -134,15 +144,15 @@ input:focus,select:focus{border-color:var(--primary)}
 .status-card.ok{border-left-color:var(--success)}
 .status-card.warn{border-left-color:var(--warning)}
 .status-card.alert{border-left-color:var(--danger)}
-.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.stat-card{text-align:center;padding:14px}
-.stat-card .value{font-size:26px;font-weight:700;color:var(--primary)}
-.stat-card .label{font-size:12px;color:var(--text2);margin-top:4px}
-.checkin-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--border)}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.stat-card{text-align:center;padding:20px 16px}
+.stat-card .value{font-size:28px;font-weight:800;color:var(--primary);letter-spacing:-.01em}
+.stat-card .label{font-size:12px;color:var(--text3);margin-top:6px;font-weight:500;letter-spacing:.02em;text-transform:uppercase}
+.checkin-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--border)}
 
 /* ─── Emergency Contacts ───────────────────────────────── */
-.contact-card{display:flex;align-items:center;gap:12px}
-.priority-badge{width:32px;height:32px;border-radius:16px;background:var(--primary-light);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+.contact-card{display:flex;align-items:center;gap:14px}
+.priority-badge{width:36px;height:36px;border-radius:18px;background:var(--primary-gradient);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;box-shadow:0 2px 6px rgba(37,99,235,.25)}
 .contact-info{flex:1}
 .contact-name{font-weight:600;font-size:16px}
 .contact-rel{font-size:13px;color:var(--text2)}
@@ -156,17 +166,17 @@ input:focus,select:focus{border-color:var(--primary)}
 .health-entry .info{flex:1}
 .health-entry .value{font-size:17px;font-weight:600;color:var(--primary)}
 .metric-chips{display:flex;flex-wrap:wrap;gap:6px}
-.metric-chip{padding:6px 12px;border-radius:999px;border:1px solid var(--border);font-size:12px;background:#FFF;color:var(--text2)}
-.metric-chip.active{background:var(--primary);color:#FFF;border-color:var(--primary)}
+.metric-chip{padding:8px 14px;border-radius:999px;border:1.5px solid var(--border);font-size:12px;font-weight:600;background:#FFF;color:var(--text2);transition:all .2s}
+.metric-chip.active{background:var(--primary-gradient);color:#FFF;border-color:transparent;box-shadow:0 2px 6px rgba(37,99,235,.2)}
 
 /* ─── Paywall ──────────────────────────────────────────── */
-.plan-card{border:2px solid transparent;cursor:pointer;transition:border-color .2s}
-.plan-card.selected{border-color:var(--primary)}
+.plan-card{border:2px solid transparent;cursor:pointer;transition:border-color .2s,box-shadow .2s,transform .2s}
+.plan-card.selected{border-color:var(--primary);box-shadow:0 4px 16px rgba(37,99,235,.15)}
 .plan-card.highlighted{position:relative}
-.popular-badge{position:absolute;top:-10px;right:12px;background:var(--primary);color:#FFF;padding:2px 12px;border-radius:999px;font-size:11px;font-weight:700}
+.popular-badge{position:absolute;top:-10px;right:12px;background:var(--primary-gradient);color:#FFF;padding:3px 14px;border-radius:999px;font-size:11px;font-weight:700;box-shadow:0 2px 6px rgba(37,99,235,.25);letter-spacing:.02em}
 .plan-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.plan-name{font-size:20px;font-weight:700}
-.plan-price{font-size:16px;font-weight:600;color:var(--primary)}
+.plan-name{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.plan-price{font-size:16px;font-weight:700;color:var(--primary)}
 .plan-desc{font-size:13px;color:var(--text2);margin-bottom:12px}
 .feature-list{display:flex;flex-direction:column;gap:6px}
 .feature-row{display:flex;align-items:center;gap:6px;font-size:13px}
@@ -177,34 +187,38 @@ input:focus,select:focus{border-color:var(--primary)}
 .legal-text{font-size:11px;color:var(--text3);text-align:center;line-height:1.6;margin-top:24px}
 
 /* ─── Settings ─────────────────────────────────────────── */
-.profile-row{display:flex;align-items:center;gap:14px}
-.avatar{width:48px;height:48px;border-radius:24px;background:var(--primary);color:#FFF;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0}
-.time-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.profile-row{display:flex;align-items:center;gap:16px}
+.avatar{width:52px;height:52px;border-radius:26px;background:var(--primary-gradient);color:#FFF;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0;box-shadow:0 2px 8px rgba(37,99,235,.25)}
+.time-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)}
 .time-text{flex:1;font-size:17px;font-weight:600}
-.menu-row{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer}
-.menu-row .label{flex:1;font-size:16px}
+.menu-row{display:flex;align-items:center;gap:12px;padding:16px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:opacity .15s}
+.menu-row:active{opacity:.7}
+.menu-row .label{flex:1;font-size:16px;font-weight:500}
 
 /* ─── Modal ────────────────────────────────────────────── */
-.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:200;display:none;align-items:flex-end;justify-content:center}
 .modal-overlay.visible{display:flex}
-.modal{background:var(--bg);width:100%;max-width:430px;max-height:90vh;border-radius:20px 20px 0 0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--safe-bottom) + 16px)}
-.modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:1}
-.modal-header h2{margin:0}
-.modal-close{padding:4px;background:none;border:none;font-size:24px;line-height:1}
-.modal-body{padding:16px}
+.modal{background:var(--bg);width:100%;max-width:430px;max-height:90vh;border-radius:24px 24px 0 0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--safe-bottom) + 16px);box-shadow:0 -8px 40px rgba(0,0,0,.15);animation:modalSlide .3s cubic-bezier(.32,.72,0,1)}
+@keyframes modalSlide{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:1}
+.modal-header h2{margin:0;font-weight:700}
+.modal-close{padding:8px;background:var(--border);border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s}
+.modal-close:active{background:#CBD5E1}
+.modal-close svg{width:20px;height:20px;fill:var(--text)}
+.modal-body{padding:20px}
 
 /* ─── Freq chips ───────────────────────────────────────── */
 .freq-chips{display:flex;flex-wrap:wrap;gap:6px}
-.freq-chip{padding:8px 14px;border-radius:999px;border:1px solid var(--border);font-size:13px;background:#FFF;color:var(--text2)}
-.freq-chip.active{background:var(--primary);color:#FFF;border-color:var(--primary)}
+.freq-chip{padding:8px 14px;border-radius:999px;border:1.5px solid var(--border);font-size:13px;font-weight:600;background:#FFF;color:var(--text2);transition:all .2s}
+.freq-chip.active{background:var(--primary-gradient);color:#FFF;border-color:transparent;box-shadow:0 2px 6px rgba(37,99,235,.2)}
 
 /* ─── Empty state ──────────────────────────────────────── */
 .empty-state{display:flex;flex-direction:column;align-items:center;padding:48px 24px;color:var(--text3)}
-.empty-state svg{width:48px;height:48px;fill:var(--text3);margin-bottom:12px}
-.empty-state p{font-size:15px;text-align:center}
+.empty-state svg{width:48px;height:48px;fill:var(--text3);margin-bottom:12px;opacity:.6}
+.empty-state p{font-size:15px;text-align:center;line-height:1.5}
 
 /* ─── Toast ────────────────────────────────────────────── */
-.toast{position:fixed;top:calc(var(--safe-top) + 12px);left:50%;transform:translateX(-50%) translateY(-120px);background:#333;color:#FFF;padding:12px 24px;border-radius:12px;font-size:15px;font-weight:600;z-index:300;transition:transform .3s ease;white-space:nowrap;max-width:90%}
+.toast{position:fixed;top:calc(var(--safe-top) + 12px);left:50%;transform:translateX(-50%) translateY(-120px);background:rgba(15,23,42,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#FFF;padding:14px 28px;border-radius:14px;font-size:15px;font-weight:600;z-index:300;transition:transform .3s cubic-bezier(.32,.72,0,1);white-space:nowrap;max-width:90%;box-shadow:var(--shadow-lg)}
 .toast.show{transform:translateX(-50%) translateY(0)}
 
 /* ─── Escalation ───────────────────────────────────────── */
@@ -264,11 +278,12 @@ let state = {
   checkinIntervalHours: 2,
   checkinWindowStart: '07:00',
   checkinWindowEnd: '22:00',
-  autoCheckinMode: 'manual', // manual | auto_movement | auto_wearable
+  movementDetection: false, // only for Central plan — postpones missed check-ins if movement detected
   subscription: 'free', // free | familia | central
+  gamification: { streak: 0, points: 0, badges: [] },
   trialStart: null, // ISO date string
   linkedElderEmail: null, // for family accounts
-  currentTab: 'checkin', // elder: checkin|meds|sos|settings  family: dashboard|contacts|meds|settings
+  currentTab: 'checkin', // elder: checkin|meds|sos|settings|marketplace|calendar|health-report  family: dashboard|contacts|meds|settings|marketplace|calendar|health-report
 };
 
 // Load from localStorage
@@ -315,13 +330,14 @@ function setToken(token) {
 // Sync full state from API after login/register
 async function syncFromAPI() {
   if (!authToken) return;
-  const [me, checkins, contacts, meds, health, settings] = await Promise.all([
+  const [me, checkins, contacts, meds, health, settings, gamification] = await Promise.all([
     api('GET', '/api/me'),
     api('GET', '/api/checkins?limit=200'),
     api('GET', '/api/contacts'),
     api('GET', '/api/medications'),
     api('GET', '/api/health?limit=100'),
     api('GET', '/api/settings'),
+    api('GET', '/api/gamification'),
   ]);
   if (me.ok) {
     const u = me.data;
@@ -344,6 +360,14 @@ async function syncFromAPI() {
     state.checkinIntervalHours = s.checkin_interval_hours || 2;
     state.checkinWindowStart = s.checkin_window_start || '07:00';
     state.checkinWindowEnd = s.checkin_window_end || '22:00';
+    state.movementDetection = s.movement_detection || false;
+  }
+  if (gamification.ok) {
+    state.gamification = {
+      streak: gamification.data.streak || 0,
+      points: gamification.data.points || 0,
+      badges: gamification.data.badges || [],
+    };
   }
   save();
 }
@@ -371,7 +395,7 @@ function syncSettings() {
     checkin_interval_hours: state.checkinIntervalHours,
     checkin_window_start: state.checkinWindowStart,
     checkin_window_end: state.checkinWindowEnd,
-    auto_checkin_mode: state.autoCheckinMode,
+    movement_detection: state.movementDetection,
   });
 }
 
@@ -598,6 +622,22 @@ function renderRegister() {
         <div style="font-size:13px;color:var(--text2);margin-top:4px">Todos os recursos liberados por 30 dias. Depois, escolha seu plano ou continue no gratuito.</div>
       </div>
 
+      <div class="card mt-md" style="background:#FFF;border:1px solid var(--border)">
+        <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:12px">📋 Consentimentos (LGPD)</div>
+        <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;cursor:pointer;font-size:14px;color:var(--text2);line-height:1.4">
+          <input type="checkbox" id="consent-terms" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;accent-color:var(--primary)">
+          <span>Li e aceito os <a href="#" style="color:var(--primary);font-weight:600">Termos de Uso</a> e <a href="#" style="color:var(--primary);font-weight:600">Política de Privacidade</a> <span style="color:var(--danger)">*</span></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;cursor:pointer;font-size:14px;color:var(--text2);line-height:1.4">
+          <input type="checkbox" id="consent-health-share" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;accent-color:var(--primary)">
+          <span>Autorizo o compartilhamento dos meus dados de saúde com familiares vinculados <span style="color:var(--danger)">*</span></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:14px;color:var(--text3);line-height:1.4">
+          <input type="checkbox" id="consent-comms" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;accent-color:var(--primary)">
+          <span>Autorizo o envio de comunicações sobre o serviço (opcional)</span>
+        </label>
+      </div>
+
       <button class="btn btn-elder mt-lg" data-action="do-register">Criar conta</button>
       <button class="btn-ghost btn mt-sm" data-action="go-login">Já tenho conta</button>
     </div>`;
@@ -663,14 +703,29 @@ function renderElderScreen() {
     case 'settings': return renderSettings();
     case 'contacts': return renderContacts();
     case 'escalation': return renderEscalation();
+    case 'marketplace': return renderMarketplace();
+    case 'calendar': return renderCalendar();
+    case 'health-report': return renderHealthReport();
     default: return renderElderHome();
   }
+}
+
+function getNextCheckinTime() {
+  const times = getEffectiveCheckinTimes();
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  for (const t of times) {
+    const [h, m] = t.split(':').map(Number);
+    if (h * 60 + m > nowMins) return t;
+  }
+  return null; // all done for today
 }
 
 function renderElderHome() {
   const pending = todayCheckins().find(c => c.status === 'pending');
   const conf = confirmedToday();
   const btnClass = pending ? 'pending' : '';
+  const nextTime = getNextCheckinTime();
 
   return `
     <div class="screen active screen-padtop">
@@ -683,6 +738,7 @@ function renderElderHome() {
           <span>${pending ? 'TOQUE AQUI' : 'ESTOU BEM'}</span>
         </button>
         ${pending ? '<p style="color:var(--warning);font-size:17px;font-weight:600;margin-top:12px">Você tem um check-in pendente</p>' : ''}
+        ${nextTime ? `<p style="color:var(--text2);font-size:15px;margin-top:${pending ? '4' : '12'}px">${icons.alarm.replace('width','style="width:16px;height:16px;fill:var(--text3);vertical-align:middle;margin-right:4px" width')}Próximo check-in às <strong>${nextTime}</strong></p>` : '<p style="color:var(--success);font-size:15px;margin-top:12px">✅ Todos os check-ins de hoje concluídos</p>'}
       </div>
 
       <div class="card">
@@ -729,6 +785,30 @@ function renderElderHome() {
           <div class="value">${state.contacts.length}</div>
           <div class="label">Contatos</div>
         </div>
+      </div>
+
+      <div class="card" style="background:linear-gradient(135deg,#FFF7ED 0%,#FEF3C7 100%);border:1px solid #FDE68A">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <span style="font-size:24px">🏆</span>
+          <h2 style="margin:0;font-size:17px">Conquistas</h2>
+        </div>
+        <div style="display:flex;gap:16px;margin-bottom:12px">
+          <div style="text-align:center">
+            <div style="font-size:24px;font-weight:800;color:#EA580C">🔥 ${state.gamification?.streak || 0}</div>
+            <div style="font-size:12px;color:var(--text2);font-weight:500">dias seguidos</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:24px;font-weight:800;color:#D97706">⭐ ${state.gamification?.points || 0}</div>
+            <div style="font-size:12px;color:var(--text2);font-weight:500">pontos</div>
+          </div>
+        </div>
+        ${(state.gamification?.badges || []).length > 0 ? `
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${state.gamification.badges.map(b => `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#FFF;border-radius:999px;font-size:12px;font-weight:600;box-shadow:var(--shadow-sm)">${b}</span>`).join('')}
+          </div>
+        ` : `
+          <div style="font-size:13px;color:var(--text3)">Complete check-ins para ganhar badges!</div>
+        `}
       </div>
 
       <!-- Test / Demo buttons -->
@@ -865,6 +945,9 @@ function renderFamilyApp() {
   switch(state.currentTab) {
     case 'dashboard': screen = renderDashboard(); break;
     case 'settings': screen = renderSettings(); break;
+    case 'marketplace': screen = renderMarketplace(); break;
+    case 'calendar': screen = renderCalendar(); break;
+    case 'health-report': screen = renderHealthReport(); break;
     default: screen = renderDashboard();
   }
   return `
@@ -1175,22 +1258,32 @@ function renderSettings() {
 
       ${isElder ? `
         <div class="card">
-          <h2>Modo de Confirmação</h2>
-          <div class="caption mb-md">Escolha como seus check-ins são confirmados</div>
-          ${[
-            { id:'manual', label:'Manual', desc:'Você toca o botão', icon:'🤚' },
-            { id:'auto_movement', label:'Automático (movimento)', desc:'Confirmado se detectar movimento no celular', icon:'📱' },
-            { id:'auto_wearable', label:'Automático (relógio)', desc:'Confirmado se o wearable detectar atividade', icon:'⌚' },
-          ].map(m => `
-            <button data-action="set-auto-mode" data-mode="${m.id}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px;border:2px solid ${(state.autoCheckinMode||'manual')===m.id?'var(--primary)':'var(--border)'};border-radius:12px;background:${(state.autoCheckinMode||'manual')===m.id?'#EBF4FF':'#FFF'};margin-bottom:6px;cursor:pointer">
-              <span style="font-size:24px">${m.icon}</span>
-              <div style="flex:1">
-                <div style="font-weight:600;color:${(state.autoCheckinMode||'manual')===m.id?'var(--primary)':'var(--text)'}">${m.label}</div>
-                <div style="font-size:12px;color:var(--text2)">${m.desc}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:20px">⌚</span>
+            <h2 style="margin:0">Detecção de Movimento</h2>
+          </div>
+          <div class="caption mb-md" style="line-height:1.5">Se ativado e um check-in for perdido, mas houver movimento detectado pelo relógio, o check-in será adiado para a próxima janela ao invés de iniciar a escalação.</div>
+          ${getEffectiveSub() === 'central' ? `
+            <button data-action="toggle-movement-detection" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:14px 16px;border:2px solid ${state.movementDetection?'var(--primary)':'var(--border)'};border-radius:14px;background:${state.movementDetection?'linear-gradient(135deg,#EBF4FF 0%,#DBEAFE 100%)':'#FFF'};cursor:pointer;transition:all .2s">
+              <div style="width:44px;height:26px;border-radius:13px;background:${state.movementDetection?'var(--primary-gradient)':'var(--disabled)'};position:relative;transition:background .2s;flex-shrink:0">
+                <div style="width:22px;height:22px;border-radius:11px;background:#FFF;position:absolute;top:2px;${state.movementDetection?'right:2px':'left:2px'};transition:all .2s;box-shadow:0 1px 3px rgba(0,0,0,.15)"></div>
               </div>
-              ${(state.autoCheckinMode||'manual')===m.id?'<span style="color:var(--primary);font-size:20px">✓</span>':''}
+              <div style="flex:1">
+                <div style="font-weight:600;color:${state.movementDetection?'var(--primary)':'var(--text)'}">${state.movementDetection?'Ativado':'Desativado'}</div>
+                <div style="font-size:12px;color:var(--text2)">${state.movementDetection?'Check-ins perdidos serão adiados se houver movimento':'Clique para ativar'}</div>
+              </div>
             </button>
-          `).join('')}
+          ` : `
+            <div style="display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:14px;background:#F8FAFC;opacity:.7">
+              <div style="width:44px;height:26px;border-radius:13px;background:var(--disabled);position:relative;flex-shrink:0">
+                <div style="width:22px;height:22px;border-radius:11px;background:#FFF;position:absolute;top:2px;left:2px;box-shadow:0 1px 3px rgba(0,0,0,.15)"></div>
+              </div>
+              <div style="flex:1">
+                <div style="font-weight:600;color:var(--text3);display:flex;align-items:center;gap:6px">🔒 Desativado</div>
+                <div style="font-size:12px;color:var(--text3)">Disponível no plano Central</div>
+              </div>
+            </div>
+          `}
         </div>
       ` : ''}
 
@@ -1257,6 +1350,25 @@ function renderSettings() {
           <span class="label">Escalação ${state.escalation && !state.escalation?.resolved ? '<span class="badge badge-danger" style="margin-left:6px;font-size:10px">ATIVA</span>' : ''}</span>
           ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
         </button>
+        ${getEffectiveSub() !== 'free' ? `
+          <button class="menu-row w100" data-tab="marketplace" style="border:none;background:none;text-align:left">
+            <span style="font-size:20px;width:20px;text-align:center">🛒</span>
+            <span class="label">Marketplace</span>
+            ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
+          </button>
+          <button class="menu-row w100" data-tab="calendar" style="border:none;background:none;text-align:left">
+            <span style="font-size:20px;width:20px;text-align:center">📅</span>
+            <span class="label">Agenda / Calendário</span>
+            ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
+          </button>
+        ` : ''}
+        ${getEffectiveSub() === 'central' ? `
+          <button class="menu-row w100" data-tab="health-report" style="border:none;background:none;text-align:left">
+            <span style="font-size:20px;width:20px;text-align:center">📊</span>
+            <span class="label">Relatório Mensal de Saúde</span>
+            ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
+          </button>
+        ` : ''}
       </div>
 
       <div class="card" style="background:#F0F7FF">
@@ -1269,9 +1381,205 @@ function renderSettings() {
       </div>
 
       <button class="btn btn-danger mt-lg" data-action="logout">Sair da conta</button>
-      <p class="caption text-center mt-md">Estou Bem v1.0.0 — Web Preview</p>
+      <p class="caption text-center mt-md">Estou Bem v1.1.0 — Web Preview</p>
     </div>
     ${renderPaywallModal()}`;
+}
+
+// ─── Marketplace ─────────────────────────────────────────
+function renderMarketplace() {
+  const categories = [
+    { id:'farmacia', label:'Farmácia', icon:'💊' },
+    { id:'telemedicina', label:'Telemedicina', icon:'🩺' },
+    { id:'cuidador', label:'Cuidador', icon:'🤝' },
+    { id:'fisioterapeuta', label:'Fisioterapeuta', icon:'🏋️' },
+    { id:'nutricionista', label:'Nutricionista', icon:'🥗' },
+    { id:'transporte', label:'Transporte', icon:'🚗' },
+    { id:'refeicoes', label:'Refeições', icon:'🍽️' },
+  ];
+  const sub = getEffectiveSub();
+  if (sub === 'free') {
+    return `
+      <div class="screen active screen-padtop">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <button data-action="go-back" style="padding:8px;background:none;border:none">${icons.chevron.replace('width','style="width:24px;height:24px;fill:var(--text);transform:rotate(180deg)" width')}</button>
+          <h1 style="margin:0">🛒 Marketplace</h1>
+        </div>
+        <div class="card text-center" style="padding:40px 20px">
+          <span style="font-size:48px">🔒</span>
+          <h2 style="margin-top:12px">Recurso Premium</h2>
+          <p class="caption">Disponível nos planos Família e Central</p>
+          <button class="btn mt-md" data-action="show-paywall">Ver planos</button>
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="screen active screen-padtop">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <button data-action="go-back" style="padding:8px;background:none;border:none">${icons.chevron.replace('width','style="width:24px;height:24px;fill:var(--text);transform:rotate(180deg)" width')}</button>
+        <h1 style="margin:0">🛒 Marketplace</h1>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px" id="marketplace-categories">
+        ${categories.map(c => `
+          <button class="btn btn-small btn-outline" data-action="marketplace-filter" data-type="${c.id}" style="width:auto;font-size:13px;padding:8px 14px;border-radius:999px">
+            ${c.icon} ${c.label}
+          </button>
+        `).join('')}
+      </div>
+      <div id="marketplace-providers">
+        <div class="card text-center" style="padding:32px 20px">
+          <span style="font-size:36px;opacity:.5">☝️</span>
+          <p class="caption mt-sm">Selecione uma categoria acima para ver os prestadores disponíveis</p>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── Calendar ────────────────────────────────────────────
+function renderCalendar() {
+  const sub = getEffectiveSub();
+  if (sub === 'free') {
+    return `
+      <div class="screen active screen-padtop">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <button data-action="go-back" style="padding:8px;background:none;border:none">${icons.chevron.replace('width','style="width:24px;height:24px;fill:var(--text);transform:rotate(180deg)" width')}</button>
+          <h1 style="margin:0">📅 Agenda</h1>
+        </div>
+        <div class="card text-center" style="padding:40px 20px">
+          <span style="font-size:48px">🔒</span>
+          <h2 style="margin-top:12px">Recurso Premium</h2>
+          <p class="caption">Disponível nos planos Família e Central</p>
+          <button class="btn mt-md" data-action="show-paywall">Ver planos</button>
+        </div>
+      </div>`;
+  }
+  const todayStr = today();
+  return `
+    <div class="screen active screen-padtop">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <button data-action="go-back" style="padding:8px;background:none;border:none">${icons.chevron.replace('width','style="width:24px;height:24px;fill:var(--text);transform:rotate(180deg)" width')}</button>
+        <h1 style="margin:0">📅 Agenda</h1>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn btn-small btn-outline" style="flex:1" data-action="calendar-sync">🔄 Sincronizar</button>
+      </div>
+      <div class="card">
+        <h2 style="font-size:16px;color:var(--primary)">Hoje — ${formatDate(todayStr)}</h2>
+        <div id="calendar-today" style="min-height:60px">
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+            ${getEffectiveCheckinTimes().map(t => `
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+                ${icons.alarm.replace('width','style="width:18px;height:18px;fill:var(--primary)" width')}
+                <div style="flex:1">
+                  <div style="font-weight:600;font-size:14px">Check-in</div>
+                  <div style="font-size:12px;color:var(--text3)">${t}</div>
+                </div>
+              </div>
+            `).join('')}
+            ${state.medications.map(m => `
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+                ${icons.medical.replace('width','style="width:18px;height:18px;fill:var(--success)" width')}
+                <div style="flex:1">
+                  <div style="font-weight:600;font-size:14px">${m.name}</div>
+                  <div style="font-size:12px;color:var(--text3)">${m.time} — ${m.dosage}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      <div id="calendar-upcoming">
+        <div class="card">
+          <h2 style="font-size:16px">Próximos eventos</h2>
+          <div class="caption text-center" style="padding:16px 0">Sincronize seu calendário para ver eventos futuros</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── Health Report ───────────────────────────────────────
+function renderHealthReport() {
+  const sub = getEffectiveSub();
+  if (sub !== 'central') {
+    return `
+      <div class="screen active screen-padtop">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <button data-action="go-back" style="padding:8px;background:none;border:none">${icons.chevron.replace('width','style="width:24px;height:24px;fill:var(--text);transform:rotate(180deg)" width')}</button>
+          <h1 style="margin:0">📊 Relatório de Saúde</h1>
+        </div>
+        <div class="card text-center" style="padding:40px 20px">
+          <span style="font-size:48px">🔒</span>
+          <h2 style="margin-top:12px">Recurso Central</h2>
+          <p class="caption">Disponível exclusivamente no plano Central</p>
+          <button class="btn mt-md" data-action="show-paywall">Ver planos</button>
+        </div>
+      </div>`;
+  }
+  const now = new Date();
+  const currentMonth = now.toISOString().slice(0,7);
+  const confRate = adherenceRate7d();
+  return `
+    <div class="screen active screen-padtop">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <button data-action="go-back" style="padding:8px;background:none;border:none">${icons.chevron.replace('width','style="width:24px;height:24px;fill:var(--text);transform:rotate(180deg)" width')}</button>
+        <h1 style="margin:0">📊 Relatório de Saúde</h1>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <div class="input-label" style="margin:0;flex:1">Mês de referência</div>
+          <input type="month" id="report-month" value="${currentMonth}" style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;font-size:15px;background:#FFF">
+        </div>
+        <button class="btn" data-action="generate-report">📄 Gerar Relatório</button>
+      </div>
+      <div id="health-report-content">
+        <div class="card">
+          <h2 style="font-size:16px">Resumo do Mês</h2>
+          <div class="stats-grid" style="margin-top:12px">
+            <div class="stat-card card" style="margin-bottom:0">
+              <div class="value">${confRate}%</div>
+              <div class="label">Taxa check-in</div>
+            </div>
+            <div class="stat-card card" style="margin-bottom:0">
+              <div class="value">${state.checkins.filter(c=>c.status==='confirmed').length}</div>
+              <div class="label">Confirmados</div>
+            </div>
+          </div>
+        </div>
+        ${state.healthEntries.length > 0 ? `
+          <div class="card">
+            <h2 style="font-size:16px">Métricas de Saúde</h2>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+              ${[...new Set(state.healthEntries.map(h=>h.type))].map(type => {
+                const entries = state.healthEntries.filter(h=>h.type===type);
+                const avg = (entries.reduce((s,e)=>s+Number(e.value),0)/entries.length).toFixed(1);
+                return `
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg);border-radius:10px">
+                    <span style="font-weight:600;font-size:14px;text-transform:capitalize">${type}</span>
+                    <span style="font-weight:700;color:var(--primary)">${avg} ${entries[0]?.unit||''}</span>
+                  </div>`;
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
+        ${state.medications.length > 0 ? `
+          <div class="card">
+            <h2 style="font-size:16px">Medicamentos em Uso</h2>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+              ${state.medications.map(m => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);border-radius:10px">
+                  <div>
+                    <div style="font-weight:600;font-size:14px">${m.name}</div>
+                    <div style="font-size:12px;color:var(--text3)">${m.dosage} — ${m.frequency}</div>
+                  </div>
+                  <div style="font-size:12px;color:var(--text2)">Estoque: ${m.stock} ${m.unit}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+        <button class="btn btn-outline mt-sm" data-action="share-report">📤 Compartilhar com médico</button>
+      </div>
+    </div>`;
 }
 
 // ─── Paywall ──────────────────────────────────────────────
@@ -1365,6 +1673,11 @@ function bindEvents() {
     }
   }));
 
+  // Close modals by tapping overlay background
+  $$('.modal-overlay').forEach(overlay => overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('visible');
+  }));
+
   // Interval window inputs
   const intStart = $('#interval-start');
   const intEnd = $('#interval-end');
@@ -1418,9 +1731,20 @@ function handleAction(action, el) {
       if (!role) { toast('❌ Selecione seu perfil'); return; }
       if (!pw || pw.length < 6) { toast('❌ Senha deve ter no mínimo 6 caracteres'); return; }
       if (pw !== pw2) { toast('❌ Senhas não conferem'); return; }
+      const consentTerms = $('#consent-terms')?.checked;
+      const consentHealth = $('#consent-health-share')?.checked;
+      const consentComms = $('#consent-comms')?.checked;
+      if (!consentTerms) { toast('❌ Você deve aceitar os Termos de Uso e Política de Privacidade'); return; }
+      if (!consentHealth) { toast('❌ Você deve autorizar o compartilhamento de dados de saúde'); return; }
       api('POST', '/api/register', { email, password: pw, name, phone, role }).then(async res => {
         if (!res.ok) { toast(`❌ ${res.error}`); return; }
         setToken(res.data.token);
+        // Record LGPD consents
+        await Promise.all([
+          api('POST', '/api/consent', { type: 'terms_privacy', granted: true }),
+          api('POST', '/api/consent', { type: 'health_data_sharing', granted: true }),
+          api('POST', '/api/consent', { type: 'service_communications', granted: consentComms || false }),
+        ]);
         await syncFromAPI();
         state.currentTab = role === 'elder' ? 'checkin' : 'dashboard';
         toast('🎁 Conta criada! 30 dias grátis com todos os recursos');
@@ -1581,8 +1905,8 @@ function handleAction(action, el) {
     case 'show-paywall':
       $('#modal-paywall')?.classList.add('visible');
       break;
-    case 'set-auto-mode':
-      state.autoCheckinMode = el.dataset.mode;
+    case 'toggle-movement-detection':
+      state.movementDetection = !state.movementDetection;
       save(); syncSettings();
       render();
       break;
@@ -1620,7 +1944,7 @@ function handleAction(action, el) {
         setToken(null);
         if (state.auth?.email) saveUserState(state.auth.email, state);
         localStorage.removeItem('estoubem_state');
-        state = { screen:'login', onboardingSlide:0, auth:null, user:null, checkins:[], medications:[], contacts:[], healthEntries:[], checkinTimes:['09:00'], checkinMode:'scheduled', checkinIntervalHours:2, checkinWindowStart:'07:00', checkinWindowEnd:'22:00', subscription:'free', trialStart:null, linkedElderEmail:null, currentTab:'checkin', escalation:null };
+        state = { screen:'login', onboardingSlide:0, auth:null, user:null, checkins:[], medications:[], contacts:[], healthEntries:[], checkinTimes:['09:00'], checkinMode:'scheduled', checkinIntervalHours:2, checkinWindowStart:'07:00', checkinWindowEnd:'22:00', movementDetection:false, subscription:'free', trialStart:null, linkedElderEmail:null, currentTab:'checkin', escalation:null, gamification:{streak:0,points:0,badges:[]} };
         render();
       }
       break;
@@ -1638,6 +1962,136 @@ function handleAction(action, el) {
       }
       window.location.href = 'tel:192';
       break;
+    case 'marketplace-filter': {
+      const type = el.dataset.type;
+      // Highlight selected category
+      $$('[data-action="marketplace-filter"]').forEach(b => {
+        b.className = b.dataset.type === type ? 'btn btn-small' : 'btn btn-small btn-outline';
+        b.style.width = 'auto';
+        b.style.fontSize = '13px';
+        b.style.padding = '8px 14px';
+        b.style.borderRadius = '999px';
+      });
+      const container = $('#marketplace-providers');
+      if (container) container.innerHTML = '<div class="card text-center"><p class="caption">⏳ Carregando prestadores...</p></div>';
+      api('GET', `/api/marketplace/providers?type=${type}`).then(res => {
+        const container = $('#marketplace-providers');
+        if (!container) return;
+        if (res.ok && res.data.length > 0) {
+          container.innerHTML = res.data.map(p => `
+            <div class="card" style="border:1px solid var(--border)">
+              <div style="font-weight:700;font-size:16px;margin-bottom:4px">${p.name}</div>
+              <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.4">${p.description}</div>
+              <button class="btn btn-small" style="width:auto" onclick="toast('📞 Agendamento solicitado!')">Agendar</button>
+            </div>
+          `).join('');
+        } else {
+          container.innerHTML = '<div class="card text-center"><p class="caption">Nenhum prestador encontrado nesta categoria.</p></div>';
+        }
+      });
+      break;
+    }
+    case 'calendar-sync':
+      toast('🔄 Sincronizando calendário...');
+      api('POST', '/api/calendar/sync').then(res => {
+        if (res.ok) {
+          toast('✅ Calendário sincronizado!');
+          // Reload calendar events
+          api('GET', '/api/calendar').then(calRes => {
+            const container = $('#calendar-upcoming');
+            if (!container || !calRes.ok) return;
+            const events = calRes.data || [];
+            if (events.length > 0) {
+              // Group by date
+              const grouped = {};
+              events.forEach(e => { if (!grouped[e.date]) grouped[e.date]=[]; grouped[e.date].push(e); });
+              container.innerHTML = Object.entries(grouped).map(([date, evts]) => `
+                <div class="card">
+                  <h2 style="font-size:14px;color:var(--primary);text-transform:capitalize">${formatDate(date)}</h2>
+                  ${evts.map(e => `
+                    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:12px;border:1px solid var(--border);margin-top:6px">
+                      <span style="font-size:16px">${e.icon || '📌'}</span>
+                      <div style="flex:1">
+                        <div style="font-weight:600;font-size:14px">${e.title}</div>
+                        <div style="font-size:12px;color:var(--text3)">${e.time || ''}</div>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              `).join('');
+            } else {
+              container.innerHTML = '<div class="card"><h2 style="font-size:16px">Próximos eventos</h2><div class="caption text-center" style="padding:16px 0">Nenhum evento encontrado</div></div>';
+            }
+          });
+        } else {
+          toast('❌ Falha ao sincronizar calendário');
+        }
+      });
+      break;
+    case 'generate-report': {
+      const month = $('#report-month')?.value;
+      if (!month) { toast('❌ Selecione um mês'); break; }
+      toast('📄 Gerando relatório...');
+      api('GET', `/api/health-report/${month}`).then(res => {
+        const container = $('#health-report-content');
+        if (!container) return;
+        if (res.ok && res.data) {
+          const r = res.data;
+          container.innerHTML = `
+            <div class="card">
+              <h2 style="font-size:16px">Resumo — ${month}</h2>
+              <div class="stats-grid" style="margin-top:12px">
+                <div class="stat-card card" style="margin-bottom:0">
+                  <div class="value">${r.checkin_rate || 0}%</div>
+                  <div class="label">Taxa check-in</div>
+                </div>
+                <div class="stat-card card" style="margin-bottom:0">
+                  <div class="value">${r.total_checkins || 0}</div>
+                  <div class="label">Confirmados</div>
+                </div>
+              </div>
+            </div>
+            ${r.metrics && r.metrics.length > 0 ? `
+              <div class="card">
+                <h2 style="font-size:16px">Métricas de Saúde</h2>
+                ${r.metrics.map(m => `
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg);border-radius:10px;margin-top:6px">
+                    <span style="font-weight:600;font-size:14px">${m.type}</span>
+                    <span style="font-weight:700;color:var(--primary)">${m.average} ${m.unit||''}</span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+            ${r.medications && r.medications.length > 0 ? `
+              <div class="card">
+                <h2 style="font-size:16px">Medicamentos</h2>
+                ${r.medications.map(m => `
+                  <div style="padding:8px 12px;background:var(--bg);border-radius:10px;margin-top:6px">
+                    <div style="font-weight:600;font-size:14px">${m.name}</div>
+                    <div style="font-size:12px;color:var(--text3)">${m.dosage}</div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+            <button class="btn btn-outline mt-sm" data-action="share-report">📤 Compartilhar com médico</button>
+          `;
+          bindEvents();
+          toast('✅ Relatório gerado!');
+        } else {
+          toast('❌ Falha ao gerar relatório');
+        }
+      });
+      break;
+    }
+    case 'share-report': {
+      const reportText = `Relatório Mensal de Saúde — Estou Bem\nPaciente: ${state.user?.name || 'N/A'}\nTaxa de Check-in: ${adherenceRate7d()}%\nMedicamentos: ${state.medications.map(m => m.name + ' ' + m.dosage).join(', ') || 'Nenhum'}\nGerado em: ${new Date().toLocaleDateString('pt-BR')}`;
+      if (navigator.share) {
+        navigator.share({ title: 'Relatório de Saúde — Estou Bem', text: reportText }).catch(() => {});
+      } else {
+        navigator.clipboard.writeText(reportText).then(() => toast('📋 Relatório copiado para área de transferência!')).catch(() => toast('❌ Falha ao copiar'));
+      }
+      break;
+    }
     case 'show-escalation':
       state.currentTab = 'escalation';
       render();

@@ -192,6 +192,31 @@ async function initDB() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS total_points INTEGER DEFAULT 0;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS badges JSONB DEFAULT '[]';
 
+      -- Calendar sync
+      CREATE TABLE IF NOT EXISTS calendar_events (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        type TEXT DEFAULT 'medication' CHECK (type IN ('medication','checkin','appointment','custom')),
+        start_time TIMESTAMPTZ NOT NULL,
+        end_time TIMESTAMPTZ,
+        recurring TEXT, -- 'daily','weekly','monthly',null
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Monthly health reports
+      CREATE TABLE IF NOT EXISTS health_reports (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        month TEXT NOT NULL, -- 'YYYY-MM'
+        summary JSONB DEFAULT '{}',
+        generated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_calendar_user ON calendar_events(user_id);
+      CREATE INDEX IF NOT EXISTS idx_health_reports_user ON health_reports(user_id, month);
+
       CREATE INDEX IF NOT EXISTS idx_checkins_user_date ON checkins(user_id, date);
       CREATE INDEX IF NOT EXISTS idx_contacts_user ON contacts(user_id);
       CREATE INDEX IF NOT EXISTS idx_medications_user ON medications(user_id);
@@ -235,7 +260,7 @@ app.use(express.json());
 app.use('/api', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Key');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
@@ -851,8 +876,598 @@ app.get('/api/postback/event', async (req, res) => {
   res.status(200).send('OK');
 });
 
+// ── Calendar Sync Routes (Premium) ───────────────────────
+app.get('/api/calendar', authMiddleware, async (req, res) => {
+  const sub = await getEffectiveSub(req.userId);
+  if (sub === 'free') return res.status(403).json({ error: 'Premium feature — upgrade to Família or Central' });
+
+  const { month } = req.query; // YYYY-MM
+  let query = `SELECT * FROM calendar_events WHERE user_id = $1`;
+  const params = [req.userId];
+  if (month) {
+    query += ` AND start_time >= $2 AND start_time < ($2::date + interval '1 month')`;
+    params.push(`${month}-01`);
+  }
+  query += ` ORDER BY start_time`;
+  const result = await pool.query(query, params);
+  res.json(result.rows);
+});
+
+app.post('/api/calendar', authMiddleware, async (req, res) => {
+  const sub = await getEffectiveSub(req.userId);
+  if (sub === 'free') return res.status(403).json({ error: 'Premium feature' });
+
+  const { title, type, start_time, end_time, recurring, notes } = req.body;
+  if (!title || !start_time) return res.status(400).json({ error: 'title and start_time are required' });
+
+  const result = await pool.query(
+    `INSERT INTO calendar_events (user_id, title, type, start_time, end_time, recurring, notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [req.userId, title, type || 'custom', start_time, end_time, recurring, notes]
+  );
+  res.json(result.rows[0]);
+});
+
+app.delete('/api/calendar/:id', authMiddleware, async (req, res) => {
+  await pool.query(`DELETE FROM calendar_events WHERE id = $1 AND user_id = $2`, [req.params.id, req.userId]);
+  res.json({ ok: true });
+});
+
+// Auto-generate calendar events from medications + check-in schedule
+app.post('/api/calendar/sync', authMiddleware, async (req, res) => {
+  const sub = await getEffectiveSub(req.userId);
+  if (sub === 'free') return res.status(403).json({ error: 'Premium feature' });
+
+  // Get meds and settings
+  const [meds, settings] = await Promise.all([
+    pool.query(`SELECT * FROM medications WHERE user_id = $1`, [req.userId]),
+    pool.query(`SELECT * FROM settings WHERE user_id = $1`, [req.userId]),
+  ]);
+
+  const today = new Date();
+  let created = 0;
+
+  // Create events for next 7 days
+  for (let d = 0; d < 7; d++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() + d);
+    const dateStr = date.toISOString().slice(0, 10);
+
+    // Medication events
+    for (const med of meds.rows) {
+      if (!med.time) continue;
+      const [h, m] = med.time.split(':');
+      const start = new Date(date);
+      start.setHours(parseInt(h), parseInt(m), 0, 0);
+
+      // Check if already exists
+      const exists = await pool.query(
+        `SELECT id FROM calendar_events WHERE user_id = $1 AND title = $2 AND start_time::date = $3::date`,
+        [req.userId, `💊 ${med.name} (${med.dosage || ''})`, dateStr]
+      );
+      if (exists.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO calendar_events (user_id, title, type, start_time, recurring)
+           VALUES ($1, $2, 'medication', $3, 'daily')`,
+          [req.userId, `💊 ${med.name} (${med.dosage || ''})`, start.toISOString()]
+        );
+        created++;
+      }
+    }
+
+    // Check-in events
+    const checkinTimes = settings.rows[0]?.checkin_times || ['09:00'];
+    for (const t of checkinTimes) {
+      const [h, m] = t.split(':');
+      const start = new Date(date);
+      start.setHours(parseInt(h), parseInt(m), 0, 0);
+
+      const exists = await pool.query(
+        `SELECT id FROM calendar_events WHERE user_id = $1 AND type = 'checkin' AND start_time::date = $2::date AND title = $3`,
+        [req.userId, dateStr, `✅ Check-in ${t}`]
+      );
+      if (exists.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO calendar_events (user_id, title, type, start_time, recurring)
+           VALUES ($1, $2, 'checkin', $3, 'daily')`,
+          [req.userId, `✅ Check-in ${t}`, start.toISOString()]
+        );
+        created++;
+      }
+    }
+  }
+
+  res.json({ ok: true, created });
+});
+
+// ── Monthly Health Report (Central plan) ─────────────────
+app.get('/api/health-report/:month', authMiddleware, async (req, res) => {
+  const sub = await getEffectiveSub(req.userId);
+  if (sub !== 'central') return res.status(403).json({ error: 'Central plan feature' });
+
+  const { month } = req.params; // YYYY-MM
+
+  // Check for existing report
+  const existing = await pool.query(
+    `SELECT * FROM health_reports WHERE user_id = $1 AND month = $2`,
+    [req.userId, month]
+  );
+  if (existing.rows[0]) return res.json(existing.rows[0]);
+
+  // Generate report
+  const startDate = `${month}-01`;
+  const [checkins, health, meds] = await Promise.all([
+    pool.query(
+      `SELECT date, time, status FROM checkins WHERE user_id = $1 AND date >= $2 AND date < ($2::date + interval '1 month')::text ORDER BY date, time`,
+      [req.userId, startDate]
+    ),
+    pool.query(
+      `SELECT type, value, unit, date, time FROM health_entries WHERE user_id = $1 AND date >= $2 AND date < ($2::date + interval '1 month')::text ORDER BY date, time`,
+      [req.userId, startDate]
+    ),
+    pool.query(`SELECT name, dosage, frequency FROM medications WHERE user_id = $1`, [req.userId]),
+  ]);
+
+  const user = await pool.query(`SELECT name, phone FROM users WHERE id = $1`, [req.userId]);
+
+  // Aggregate stats
+  const totalCheckins = checkins.rows.length;
+  const confirmedCheckins = checkins.rows.filter(c => c.status === 'confirmed').length;
+  const missedCheckins = checkins.rows.filter(c => c.status === 'missed').length;
+
+  // Group health data by type
+  const healthByType = {};
+  for (const h of health.rows) {
+    if (!healthByType[h.type]) healthByType[h.type] = [];
+    healthByType[h.type].push({ value: h.value, unit: h.unit, date: h.date, time: h.time });
+  }
+
+  // Calculate averages for each health metric
+  const healthSummary = {};
+  for (const [type, entries] of Object.entries(healthByType)) {
+    const values = entries.map(e => e.value).filter(v => v != null);
+    healthSummary[type] = {
+      count: entries.length,
+      avg: values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1) : null,
+      min: values.length ? Math.min(...values) : null,
+      max: values.length ? Math.max(...values) : null,
+      unit: entries[0]?.unit,
+      entries,
+    };
+  }
+
+  const summary = {
+    patient: user.rows[0]?.name,
+    month,
+    generated: new Date().toISOString(),
+    checkins: { total: totalCheckins, confirmed: confirmedCheckins, missed: missedCheckins, rate: totalCheckins ? ((confirmedCheckins / totalCheckins) * 100).toFixed(0) + '%' : 'N/A' },
+    health: healthSummary,
+    medications: meds.rows,
+    daily_log: checkins.rows,
+  };
+
+  // Save report
+  await pool.query(
+    `INSERT INTO health_reports (user_id, month, summary) VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, month) DO UPDATE SET summary = $3, generated_at = NOW()`,
+    [req.userId, month, JSON.stringify(summary)]
+  ).catch(() => {
+    // unique constraint might not exist yet, just insert
+    pool.query(
+      `INSERT INTO health_reports (user_id, month, summary) VALUES ($1, $2, $3)`,
+      [req.userId, month, JSON.stringify(summary)]
+    ).catch(() => {});
+  });
+
+  res.json({ id: null, user_id: req.userId, month, summary, generated_at: new Date().toISOString() });
+});
+
+// Get health report for elder (family view)
+app.get('/api/health-report/elder/:month', authMiddleware, async (req, res) => {
+  const user = await pool.query(`SELECT linked_elder_id FROM users WHERE id = $1`, [req.userId]);
+  const elderId = user.rows[0]?.linked_elder_id;
+  if (!elderId) return res.status(404).json({ error: 'No linked elder' });
+
+  // Redirect to elder's report generation
+  req.userId = elderId;
+  const sub = await getEffectiveSub(elderId);
+  if (sub !== 'central') return res.status(403).json({ error: 'Elder needs Central plan' });
+
+  // Reuse same logic - generate for elder
+  const { month } = req.params;
+  const existing = await pool.query(
+    `SELECT * FROM health_reports WHERE user_id = $1 AND month = $2`,
+    [elderId, month]
+  );
+  if (existing.rows[0]) return res.json(existing.rows[0]);
+
+  res.status(404).json({ error: 'Report not yet generated. Ask elder to generate it first.' });
+});
+
+// ── Admin Auth Middleware ──────────────────────────────────
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'estoubem-admin-2024';
+
+function adminAuth(req, res, next) {
+  const key = req.headers['x-admin-key'];
+  if (!key || key !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized: invalid or missing X-Admin-Key' });
+  }
+  next();
+}
+
+// ── Admin API Routes ──────────────────────────────────────
+
+// GET /api/admin/stats - overview stats
+app.get('/api/admin/stats', adminAuth, async (req, res) => {
+  try {
+    const [
+      usersByRole,
+      todayCheckins,
+      subscriptions,
+      totalRevenue,
+      activeAffiliates,
+      pendingCommissions,
+      activeProviders
+    ] = await Promise.all([
+      pool.query(`SELECT role, COUNT(*)::int as count FROM users GROUP BY role`),
+      pool.query(`SELECT COUNT(*)::int as count FROM checkins WHERE date = $1`, [new Date().toISOString().slice(0, 10)]),
+      pool.query(`SELECT subscription, COUNT(*)::int as count FROM users GROUP BY subscription`),
+      pool.query(`SELECT COALESCE(SUM(revenue), 0) as total FROM conversions`),
+      pool.query(`SELECT COUNT(*)::int as count FROM affiliates WHERE is_active = true`),
+      pool.query(`SELECT COALESCE(SUM(amount), 0) as total FROM commissions WHERE status = 'pending'`),
+      pool.query(`SELECT COUNT(*)::int as count FROM service_providers WHERE is_active = true`)
+    ]);
+
+    res.json({
+      users_by_role: usersByRole.rows,
+      today_checkins: todayCheckins.rows[0].count,
+      subscriptions: subscriptions.rows,
+      total_revenue: parseFloat(totalRevenue.rows[0].total),
+      active_affiliates: activeAffiliates.rows[0].count,
+      pending_commissions: parseFloat(pendingCommissions.rows[0].total),
+      active_providers: activeProviders.rows[0].count
+    });
+  } catch (err) {
+    console.error('Admin stats error:', err);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// GET /api/admin/users - all users with gamification data
+app.get('/api/admin/users', adminAuth, async (req, res) => {
+  try {
+    const { search, role } = req.query;
+    let query = `SELECT id, email, name, phone, role, subscription, trial_start, streak_days, total_points, badges, referral_code, referred_by, created_at FROM users WHERE 1=1`;
+    const params = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      query += ` AND (name ILIKE $${params.length} OR email ILIKE $${params.length})`;
+    }
+    if (role) {
+      params.push(role);
+      query += ` AND role = $${params.length}`;
+    }
+
+    query += ` ORDER BY created_at DESC`;
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin users error:', err);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// GET /api/admin/users/:id - full user detail
+app.get('/api/admin/users/:id', adminAuth, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const [user, consent, conversions, referrals] = await Promise.all([
+      pool.query(`SELECT id, email, name, phone, role, subscription, trial_start, streak_days, total_points, badges, referral_code, referred_by, linked_elder_id, link_code, utm_source, utm_medium, utm_campaign, created_at FROM users WHERE id = $1`, [userId]),
+      pool.query(`SELECT * FROM consent_records WHERE user_id = $1 ORDER BY created_at DESC`, [userId]),
+      pool.query(`SELECT * FROM conversions WHERE user_id = $1 ORDER BY created_at DESC`, [userId]),
+      pool.query(`SELECT id, name, email FROM users WHERE referred_by = $1`, [userId])
+    ]);
+
+    if (user.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    res.json({
+      ...user.rows[0],
+      consent_records: consent.rows,
+      conversions: conversions.rows,
+      referrals: referrals.rows
+    });
+  } catch (err) {
+    console.error('Admin user detail error:', err);
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
+// GET /api/admin/affiliates - all affiliates
+app.get('/api/admin/affiliates', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM affiliates ORDER BY created_at DESC`);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin affiliates error:', err);
+    res.status(500).json({ error: 'Failed to fetch affiliates' });
+  }
+});
+
+// PUT /api/admin/affiliates/:id - update affiliate
+app.put('/api/admin/affiliates/:id', adminAuth, async (req, res) => {
+  try {
+    const { is_active, name, email, phone, channel, commission_rate } = req.body;
+    const result = await pool.query(
+      `UPDATE affiliates SET
+        is_active = COALESCE($1, is_active),
+        name = COALESCE($2, name),
+        email = COALESCE($3, email),
+        phone = COALESCE($4, phone),
+        channel = COALESCE($5, channel),
+        commission_rate = COALESCE($6, commission_rate)
+      WHERE id = $7 RETURNING *`,
+      [is_active, name, email, phone, channel, commission_rate ? JSON.stringify(commission_rate) : null, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Affiliate not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Admin update affiliate error:', err);
+    res.status(500).json({ error: 'Failed to update affiliate' });
+  }
+});
+
+// GET /api/admin/commissions - all commissions with affiliate and conversion details
+app.get('/api/admin/commissions', adminAuth, async (req, res) => {
+  try {
+    const { status } = req.query;
+    let query = `SELECT c.*, a.name as affiliate_name, a.code as affiliate_code, cv.event, cv.revenue as conversion_revenue, cv.user_id as conversion_user_id
+      FROM commissions c
+      LEFT JOIN affiliates a ON c.affiliate_id = a.id
+      LEFT JOIN conversions cv ON c.conversion_id = cv.id
+      WHERE 1=1`;
+    const params = [];
+
+    if (status) {
+      params.push(status);
+      query += ` AND c.status = $${params.length}`;
+    }
+
+    query += ` ORDER BY c.created_at DESC`;
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin commissions error:', err);
+    res.status(500).json({ error: 'Failed to fetch commissions' });
+  }
+});
+
+// PUT /api/admin/commissions/:id - update commission status
+app.put('/api/admin/commissions/:id', adminAuth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!status || !['pending', 'approved', 'paid', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be: pending, approved, paid, or rejected' });
+    }
+
+    const updates = [status, req.params.id];
+    let query = `UPDATE commissions SET status = $1`;
+    if (status === 'paid') {
+      query += `, paid_at = NOW()`;
+    }
+    query += ` WHERE id = $2 RETURNING *`;
+
+    const result = await pool.query(query, updates);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Commission not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Admin update commission error:', err);
+    res.status(500).json({ error: 'Failed to update commission' });
+  }
+});
+
+// GET /api/admin/providers - all service providers
+app.get('/api/admin/providers', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM service_providers ORDER BY created_at DESC`);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin providers error:', err);
+    res.status(500).json({ error: 'Failed to fetch providers' });
+  }
+});
+
+// POST /api/admin/providers - create provider
+app.post('/api/admin/providers', adminAuth, async (req, res) => {
+  try {
+    const { type, name, description, api_endpoint, commission_rate, is_active, metadata } = req.body;
+    if (!type || !name) return res.status(400).json({ error: 'type and name are required' });
+
+    const result = await pool.query(
+      `INSERT INTO service_providers (type, name, description, api_endpoint, commission_rate, is_active, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [type, name, description, api_endpoint, commission_rate || 0.15, is_active !== false, JSON.stringify(metadata || {})]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Admin create provider error:', err);
+    res.status(500).json({ error: 'Failed to create provider' });
+  }
+});
+
+// PUT /api/admin/providers/:id - update provider
+app.put('/api/admin/providers/:id', adminAuth, async (req, res) => {
+  try {
+    const { type, name, description, api_endpoint, commission_rate, is_active, metadata } = req.body;
+    const result = await pool.query(
+      `UPDATE service_providers SET
+        type = COALESCE($1, type),
+        name = COALESCE($2, name),
+        description = COALESCE($3, description),
+        api_endpoint = COALESCE($4, api_endpoint),
+        commission_rate = COALESCE($5, commission_rate),
+        is_active = COALESCE($6, is_active),
+        metadata = COALESCE($7, metadata)
+      WHERE id = $8 RETURNING *`,
+      [type, name, description, api_endpoint, commission_rate, is_active, metadata ? JSON.stringify(metadata) : null, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Provider not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Admin update provider error:', err);
+    res.status(500).json({ error: 'Failed to update provider' });
+  }
+});
+
+// DELETE /api/admin/providers/:id - delete provider
+app.delete('/api/admin/providers/:id', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`DELETE FROM service_providers WHERE id = $1 RETURNING id`, [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Provider not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Admin delete provider error:', err);
+    res.status(500).json({ error: 'Failed to delete provider' });
+  }
+});
+
+// GET /api/admin/bookings - all bookings with user and provider names
+app.get('/api/admin/bookings', adminAuth, async (req, res) => {
+  try {
+    const { status } = req.query;
+    let query = `SELECT b.*, u.name as user_name, u.email as user_email, sp.name as provider_name
+      FROM service_bookings b
+      LEFT JOIN users u ON b.user_id = u.id
+      LEFT JOIN service_providers sp ON b.provider_id = sp.id
+      WHERE 1=1`;
+    const params = [];
+
+    if (status) {
+      params.push(status);
+      query += ` AND b.status = $${params.length}`;
+    }
+
+    query += ` ORDER BY b.created_at DESC`;
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin bookings error:', err);
+    res.status(500).json({ error: 'Failed to fetch bookings' });
+  }
+});
+
+// GET /api/admin/institutions - all institutions
+app.get('/api/admin/institutions', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM institutions ORDER BY created_at DESC`);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin institutions error:', err);
+    res.status(500).json({ error: 'Failed to fetch institutions' });
+  }
+});
+
+// PUT /api/admin/institutions/:id - update institution
+app.put('/api/admin/institutions/:id', adminAuth, async (req, res) => {
+  try {
+    const { name, type, contact_name, contact_email, contact_phone, contract_value, max_users, is_active } = req.body;
+    const result = await pool.query(
+      `UPDATE institutions SET
+        name = COALESCE($1, name),
+        type = COALESCE($2, type),
+        contact_name = COALESCE($3, contact_name),
+        contact_email = COALESCE($4, contact_email),
+        contact_phone = COALESCE($5, contact_phone),
+        contract_value = COALESCE($6, contract_value),
+        max_users = COALESCE($7, max_users),
+        is_active = COALESCE($8, is_active)
+      WHERE id = $9 RETURNING *`,
+      [name, type, contact_name, contact_email, contact_phone, contract_value, max_users, is_active, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Institution not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Admin update institution error:', err);
+    res.status(500).json({ error: 'Failed to update institution' });
+  }
+});
+
+// DELETE /api/admin/institutions/:id - delete institution
+app.delete('/api/admin/institutions/:id', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`DELETE FROM institutions WHERE id = $1 RETURNING id`, [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Institution not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Admin delete institution error:', err);
+    res.status(500).json({ error: 'Failed to delete institution' });
+  }
+});
+
+// GET /api/admin/conversions - all conversions with user name
+app.get('/api/admin/conversions', adminAuth, async (req, res) => {
+  try {
+    const { event } = req.query;
+    let query = `SELECT cv.*, u.name as user_name, u.email as user_email
+      FROM conversions cv
+      LEFT JOIN users u ON cv.user_id = u.id
+      WHERE 1=1`;
+    const params = [];
+
+    if (event) {
+      params.push(event);
+      query += ` AND cv.event = $${params.length}`;
+    }
+
+    query += ` ORDER BY cv.created_at DESC`;
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin conversions error:', err);
+    res.status(500).json({ error: 'Failed to fetch conversions' });
+  }
+});
+
+// GET /api/admin/consent - all consent records with user name
+app.get('/api/admin/consent', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT cr.*, u.name as user_name, u.email as user_email
+       FROM consent_records cr
+       LEFT JOIN users u ON cr.user_id = u.id
+       ORDER BY cr.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin consent error:', err);
+    res.status(500).json({ error: 'Failed to fetch consent records' });
+  }
+});
+
+// GET /api/admin/gamification/leaderboard - top users by points
+app.get('/api/admin/gamification/leaderboard', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, role, streak_days, total_points, badges
+       FROM users
+       WHERE total_points > 0
+       ORDER BY total_points DESC, streak_days DESC
+       LIMIT 100`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin leaderboard error:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
 // ── Static Files ──────────────────────────────────────────
 app.use(express.static(__dirname));
+
+// Admin dashboard
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin.html'));
+});
 
 // SPA fallback
 app.get('*', (req, res) => {

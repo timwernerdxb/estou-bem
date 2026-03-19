@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estou Bem — Painel Administrativo</title>
+<style>
+/* ─── CSS Variables ────────────────────────────────────── */
+:root {
+  --sidebar-width: 260px;
+  --sidebar-bg: #1A1A2E;
+  --sidebar-hover: #16213E;
+  --sidebar-active: #0F3460;
+  --sidebar-text: #A0AEC0;
+  --sidebar-text-active: #FFF;
+  --primary: #4A90D9;
+  --primary-dark: #2E6DB4;
+  --primary-light: #7CB3E8;
+  --success: #48BB78;
+  --warning: #ED8936;
+  --danger: #F56565;
+  --info: #4299E1;
+  --bg: #F7FAFC;
+  --card: #FFF;
+  --border: #E2E8F0;
+  --text: #1A202C;
+  --text2: #718096;
+  --text3: #A0AEC0;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-lg: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+}
+
+/* ─── Reset ────────────────────────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+input, button, select, textarea { font-family: inherit; font-size: inherit; }
+button { cursor: pointer; border: none; background: none; }
+a { color: var(--primary); text-decoration: none; }
+table { border-collapse: collapse; width: 100%; }
+
+/* ─── Layout ───────────────────────────────────────────── */
+.layout { display: flex; height: 100vh; }
+
+/* ─── Sidebar ──────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  transition: transform .3s;
+  z-index: 200;
+}
+.sidebar-brand {
+  padding: 24px 20px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sidebar-brand .logo {
+  width: 36px; height: 36px;
+  background: var(--primary);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFF; font-weight: 800; font-size: 16px;
+}
+.sidebar-brand span { color: #FFF; font-weight: 700; font-size: 18px; }
+.sidebar-brand small { color: var(--sidebar-text); font-size: 11px; font-weight: 400; display: block; }
+
+.sidebar-nav { flex: 1; padding: 12px 0; }
+.nav-section { padding: 8px 20px 4px; font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; }
+.nav-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px; color: var(--sidebar-text);
+  font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: all .15s;
+  border-left: 3px solid transparent;
+}
+.nav-item:hover { background: var(--sidebar-hover); color: #E2E8F0; }
+.nav-item.active { background: var(--sidebar-active); color: var(--sidebar-text-active); border-left-color: var(--primary); }
+.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; fill: currentColor; }
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+.sidebar-footer button {
+  color: var(--danger); font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* ─── Main Content ─────────────────────────────────────── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.topbar {
+  height: 60px; background: var(--card);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+}
+.topbar-title { font-size: 18px; font-weight: 700; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.hamburger {
+  display: none; background: none; border: none; cursor: pointer;
+  padding: 4px; margin-right: 12px;
+}
+.hamburger svg { width: 24px; height: 24px; fill: var(--text); }
+
+.content { flex: 1; overflow-y: auto; padding: 24px; }
+
+/* ─── Section Panels ───────────────────────────────────── */
+.section { display: none; }
+.section.active { display: block; }
+
+/* ─── Cards / Stats ────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px; margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--card); border-radius: var(--radius);
+  padding: 20px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.stat-card .stat-label { font-size: 12px; color: var(--text2); text-transform: uppercase; font-weight: 600; letter-spacing: .5px; }
+.stat-card .stat-value { font-size: 28px; font-weight: 800; color: var(--text); }
+.stat-card .stat-sub { font-size: 12px; color: var(--text3); }
+.stat-card.primary { border-left: 4px solid var(--primary); }
+.stat-card.success { border-left: 4px solid var(--success); }
+.stat-card.warning { border-left: 4px solid var(--warning); }
+.stat-card.danger { border-left: 4px solid var(--danger); }
+.stat-card.info { border-left: 4px solid var(--info); }
+
+/* ─── Panel Card ───────────────────────────────────────── */
+.panel {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow); margin-bottom: 24px; overflow: hidden;
+}
+.panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+}
+.panel-header h3 { font-size: 16px; font-weight: 700; }
+.panel-body { padding: 0; }
+.panel-body.padded { padding: 20px; }
+
+/* ─── Tables ───────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
+table th, table td { padding: 10px 16px; text-align: left; font-size: 13px; white-space: nowrap; }
+table th { background: #F7FAFC; font-weight: 700; color: var(--text2); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 2px solid var(--border); }
+table td { border-bottom: 1px solid var(--border); }
+table tbody tr:hover { background: #F7FAFC; }
+table tbody tr:last-child td { border-bottom: none; }
+
+/* ─── Badges / Status ──────────────────────────────────── */
+.badge {
+  display: inline-block; padding: 3px 10px;
+  border-radius: 20px; font-size: 11px; font-weight: 700;
+}
+.badge-success { background: #C6F6D5; color: #22543D; }
+.badge-warning { background: #FEFCBF; color: #744210; }
+.badge-danger { background: #FED7D7; color: #742A2A; }
+.badge-info { background: #BEE3F8; color: #2A4365; }
+.badge-gray { background: #EDF2F7; color: #4A5568; }
+.badge-primary { background: #BEE3F8; color: #2B6CB0; }
+
+/* ─── Buttons ──────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 13px;
+  color: #FFF; background: var(--primary); transition: opacity .15s;
+  border: none; cursor: pointer;
+}
+.btn:hover { opacity: .9; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-success { background: var(--success); }
+.btn-warning { background: var(--warning); }
+.btn-danger { background: var(--danger); }
+.btn-outline { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+.btn-outline:hover { background: var(--primary); color: #FFF; }
+.btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ─── Forms ────────────────────────────────────────────── */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; font-weight: 600; color: var(--text2); }
+.form-group input, .form-group select, .form-group textarea {
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 14px; outline: none; transition: border-color .15s;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); }
+
+/* ─── Search / Filters ─────────────────────────────────── */
+.toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.toolbar input[type="text"], .toolbar input[type="search"], .toolbar select {
+  padding: 7px 12px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; outline: none; min-width: 180px;
+}
+.toolbar input:focus, .toolbar select:focus { border-color: var(--primary); }
+
+/* ─── Login Screen ─────────────────────────────────────── */
+.login-wrap {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; background: var(--sidebar-bg);
+}
+.login-box {
+  background: var(--card); border-radius: 16px;
+  padding: 40px; width: 100%; max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.login-box h1 { font-size: 24px; margin-bottom: 4px; }
+.login-box p { color: var(--text2); margin-bottom: 24px; font-size: 14px; }
+.login-box .form-group { margin-bottom: 16px; }
+.login-box .btn { width: 100%; padding: 12px; font-size: 15px; }
+.login-error { color: var(--danger); font-size: 13px; margin-bottom: 12px; display: none; }
+
+/* ─── Modal ────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  display: none; align-items: center; justify-content: center;
+  z-index: 500; padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--card); border-radius: 12px;
+  width: 100%; max-width: 600px; max-height: 90vh;
+  overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.modal-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-header h3 { font-size: 16px; font-weight: 700; }
+.modal-close { font-size: 22px; color: var(--text3); cursor: pointer; line-height: 1; }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ─── Toast ────────────────────────────────────────────── */
+.toast-container { position: fixed; top: 16px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  padding: 12px 20px; border-radius: 8px; color: #FFF;
+  font-size: 13px; font-weight: 600; box-shadow: var(--shadow-lg);
+  animation: slideIn .3s; min-width: 260px;
+}
+.toast-success { background: var(--success); }
+.toast-error { background: var(--danger); }
+.toast-info { background: var(--info); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ─── Responsive ───────────────────────────────────────── */
+.sidebar-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.4); z-index: 150;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed; left: 0; top: 0; height: 100%;
+    transform: translateX(-100%);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-overlay.open { display: block; }
+  .hamburger { display: block; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  .content { padding: 16px; }
+}
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── Misc ─────────────────────────────────────────────── */
+.empty-state { padding: 40px; text-align: center; color: var(--text3); font-size: 14px; }
+.loading { padding: 40px; text-align: center; color: var(--text3); }
+.clickable { cursor: pointer; }
+.clickable:hover { text-decoration: underline; color: var(--primary); }
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.mt-16 { margin-top: 16px; }
+.mb-16 { margin-bottom: 16px; }
+.gap-8 { gap: 8px; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div id="loginScreen" class="login-wrap">
+  <div class="login-box">
+    <h1>Estou Bem</h1>
+    <p>Painel Administrativo</p>
+    <div id="loginError" class="login-error"></div>
+    <div class="form-group">
+      <label>Senha de administrador</label>
+      <input type="password" id="loginPassword" placeholder="Digite a senha..." onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- ═══ MAIN LAYOUT ═══ -->
+<div id="appLayout" class="layout" style="display:none">
+
+  <!-- Sidebar overlay (mobile) -->
+  <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo">EB</div>
+      <div><span>Estou Bem</span><small>Administração</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Principal</div>
+      <div class="nav-item active" data-section="dashboard" onclick="navigateTo('dashboard')">
+        <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Visão Geral
+      </div>
+      <div class="nav-item" data-section="users" onclick="navigateTo('users')">
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        Usuários
+      </div>
+
+      <div class="nav-section">Monetização</div>
+      <div class="nav-item" data-section="affiliates" onclick="navigateTo('affiliates')">
+        <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+        Afiliados
+      </div>
+      <div class="nav-item" data-section="commissions" onclick="navigateTo('commissions')">
+        <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+        Comissões
+      </div>
+
+      <div class="nav-section">Marketplace</div>
+      <div class="nav-item" data-section="marketplace" onclick="navigateTo('marketplace')">
+        <svg viewBox="0 0 24 24"><path d="M18.36 9l.6 3H5.04l.6-3h12.72M20 4H4v2h16V4zm0 3H4l-1 5v2h1v6h10v-6h4v6h2v-6h1v-2l-1-5zM6 18v-4h6v4H6z"/></svg>
+        Provedores
+      </div>
+      <div class="nav-item" data-section="bookings" onclick="navigateTo('bookings')">
+        <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>
+        Agendamentos
+      </div>
+
+      <div class="nav-section">B2B & Dados</div>
+      <div class="nav-item" data-section="institutions" onclick="navigateTo('institutions')">
+        <svg viewBox="0 0 24 24"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg>
+        Instituições B2B
+      </div>
+      <div class="nav-item" data-section="conversions" onclick="navigateTo('conversions')">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+        Conversões
+      </div>
+      <div class="nav-item" data-section="consent" onclick="navigateTo('consent')">
+        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+        LGPD / Consentimento
+      </div>
+      <div class="nav-item" data-section="gamification" onclick="navigateTo('gamification')">
+        <svg viewBox="0 0 24 24"><path d="M7.5 21H2V9h5.5v12zm7.25-18h-5.5v18h5.5V3zM22 11h-5.5v10H22V11z"/></svg>
+        Gamificação
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button onclick="doLogout()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+        Sair
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Area -->
+  <div class="main">
+    <header class="topbar">
+      <div class="flex items-center">
+        <button class="hamburger" onclick="toggleSidebar()">
+          <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+        </button>
+        <span class="topbar-title" id="topbarTitle">Visão Geral</span>
+      </div>
+      <div class="topbar-right">
+        <span style="font-size:12px;color:var(--text3)" id="lastRefresh"></span>
+        <button class="btn btn-sm btn-outline" onclick="refreshCurrentSection()">Atualizar</button>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- ═══ DASHBOARD ═══ -->
+      <div id="sec-dashboard" class="section active">
+        <div class="stats-grid" id="dashStats"></div>
+        <div class="panel">
+          <div class="panel-header"><h3>Resumo de Assinaturas</h3></div>
+          <div class="panel-body padded" id="dashSubscriptions">
+            <div class="loading">Carregando...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ USERS ═══ -->
+      <div id="sec-users" class="section">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Gerenciamento de Usuários</h3>
+            <div class="toolbar">
+              <input type="search" id="userSearch" placeholder="Buscar por nome ou email..." oninput="filterUsers()">
+              <select id="userRoleFilter" onchange="filterUsers()">
+                <option value="">Todos os papéis</option>
+                <option value="elder">Idoso</option>
+                <option value="family">Familiar</option>
+                <option value="caregiver">Cuidador</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Nome</th><th>Email</th><th>Papel</th><th>Assinatura</th><th>Sequência</th><th>Pontos</th><th>Criado em</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <tr><td colspan="8" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ AFFILIATES ═══ -->
+      <div id="sec-affiliates" class="section">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Gerenciamento de Afiliados</h3>
+            <button class="btn btn-sm" onclick="openModal('affiliateModal')">+ Novo Afiliado</button>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Código</th><th>Canal</th><th>Nome</th><th>Email</th><th>Total Ganho</th><th>Conversões</th><th>Status</th><th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="affiliatesTableBody">
+                <tr><td colspan="8" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ COMMISSIONS ═══ -->
+      <div id="sec-commissions" class="section">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Comissões</h3>
+            <div class="toolbar">
+              <select id="commStatusFilter" onchange="loadCommissions()">
+                <option value="">Todos os status</option>
+                <option value="pending">Pendente</option>
+                <option value="approved">Aprovada</option>
+                <option value="paid">Paga</option>
+                <option value="rejected">Rejeitada</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Afiliado</th><th>Conversão</th><th>Valor</th><th>Status</th><th>Criado em</th><th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="commissionsTableBody">
+                <tr><td colspan="7" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MARKETPLACE PROVIDERS ═══ -->
+      <div id="sec-marketplace" class="section">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Provedores de Serviço</h3>
+            <button class="btn btn-sm" onclick="openModal('providerModal')">+ Novo Provedor</button>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Nome</th><th>Tipo</th><th>Comissão</th><th>Status</th><th>Criado em</th><th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="providersTableBody">
+                <tr><td colspan="7" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ BOOKINGS ═══ -->
+      <div id="sec-bookings" class="section">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Agendamentos</h3>
+            <div class="toolbar">
+              <select id="bookingStatusFilter" onchange="loadBookings()">
+                <option value="">Todos os status</option>
+                <option value="pending">Pendente</option>
+                <option value="confirmed">Confirmado</option>
+                <option value="completed">Concluído</option>
+                <option value="cancelled">Cancelado</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Usuário</th><th>Provedor</th><th>Tipo</th><th>Valor</th><th>Comissão</th><th>Status</th><th>Agendado para</th><th>Criado em</th>
+                </tr>
+              </thead>
+              <tbody id="bookingsTableBody">
+                <tr><td colspan="9" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ INSTITUTIONS ═══ -->
+      <div id="sec-institutions" class="section">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Instituições B2B</h3>
+            <button class="btn btn-sm" onclick="openModal('institutionModal')">+ Nova Instituição</button>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Nome</th><th>Tipo</th><th>Contato</th><th>Email</th><th>Valor Contrato</th><th>Máx Usuários</th><th>Status</th><th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="institutionsTableBody">
+                <tr><td colspan="9" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ CONVERSIONS ═══ -->
+      <div id="sec-conversions" class="section">
+        <div class="stats-grid" id="conversionStats"></div>
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Conversões Recentes</h3>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Evento</th><th>Receita</th><th>Afiliado</th><th>Canal</th><th>Usuário</th><th>Data</th>
+                </tr>
+              </thead>
+              <tbody id="conversionsTableBody">
+                <tr><td colspan="7" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ CONSENT ═══ -->
+      <div id="sec-consent" class="section">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Registros de Consentimento LGPD</h3>
+            <button class="btn btn-sm btn-outline" onclick="exportConsent()">Exportar CSV</button>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Usuário ID</th><th>Tipo</th><th>Concedido</th><th>IP</th><th>Data</th>
+                </tr>
+              </thead>
+              <tbody id="consentTableBody">
+                <tr><td colspan="6" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ GAMIFICATION ═══ -->
+      <div id="sec-gamification" class="section">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Ranking — Sequência e Pontos</h3>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th><th>Nome</th><th>Email</th><th>Sequência (dias)</th><th>Pontos</th><th>Conquistas</th>
+                </tr>
+              </thead>
+              <tbody id="gamificationTableBody">
+                <tr><td colspan="6" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ═══ MODALS ═══ -->
+
+<!-- User Detail Modal -->
+<div id="userDetailModal" class="modal-overlay" onclick="if(event.target===this)closeModal('userDetailModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Detalhes do Usuário</h3>
+      <span class="modal-close" onclick="closeModal('userDetailModal')">&times;</span>
+    </div>
+    <div class="modal-body" id="userDetailContent">
+      <div class="loading">Carregando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Affiliate Create/Edit Modal -->
+<div id="affiliateModal" class="modal-overlay" onclick="if(event.target===this)closeModal('affiliateModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="affiliateModalTitle">Novo Afiliado</h3>
+      <span class="modal-close" onclick="closeModal('affiliateModal')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="affEditId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Código *</label>
+          <input type="text" id="affCode" placeholder="ex: JOAO2024">
+        </div>
+        <div class="form-group">
+          <label>Canal *</label>
+          <select id="affChannel">
+            <option value="influencer">Influenciador</option>
+            <option value="paid_media">Mídia Paga</option>
+            <option value="ad_network">Rede de Anúncios</option>
+            <option value="organic">Orgânico</option>
+            <option value="referral">Indicação</option>
+            <option value="b2b_partner">Parceiro B2B</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Nome *</label>
+          <input type="text" id="affName" placeholder="Nome completo">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="affEmail" placeholder="email@exemplo.com">
+        </div>
+        <div class="form-group">
+          <label>Telefone</label>
+          <input type="text" id="affPhone" placeholder="(11) 99999-0000">
+        </div>
+        <div class="form-group">
+          <label>Comissão — registro (R$)</label>
+          <input type="number" id="affCommRegister" step="0.01" value="5.00">
+        </div>
+        <div class="form-group">
+          <label>Comissão — assinatura (R$)</label>
+          <input type="number" id="affCommSubscription" step="0.01" value="15.00">
+        </div>
+        <div class="form-group">
+          <label>Comissão — compra (R$)</label>
+          <input type="number" id="affCommPurchase" step="0.01" value="10.00">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('affiliateModal')">Cancelar</button>
+      <button class="btn" onclick="saveAffiliate()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Affiliate Dashboard Modal -->
+<div id="affiliateDashModal" class="modal-overlay" onclick="if(event.target===this)closeModal('affiliateDashModal')">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h3>Dashboard do Afiliado</h3>
+      <span class="modal-close" onclick="closeModal('affiliateDashModal')">&times;</span>
+    </div>
+    <div class="modal-body" id="affiliateDashContent">
+      <div class="loading">Carregando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Provider Modal -->
+<div id="providerModal" class="modal-overlay" onclick="if(event.target===this)closeModal('providerModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="providerModalTitle">Novo Provedor</h3>
+      <span class="modal-close" onclick="closeModal('providerModal')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="provEditId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nome *</label>
+          <input type="text" id="provName" placeholder="Nome do provedor">
+        </div>
+        <div class="form-group">
+          <label>Tipo *</label>
+          <select id="provType">
+            <option value="pharmacy">Farmácia</option>
+            <option value="telemedicine">Telemedicina</option>
+            <option value="caregiver">Cuidador</option>
+            <option value="physiotherapist">Fisioterapeuta</option>
+            <option value="nutritionist">Nutricionista</option>
+            <option value="transport">Transporte</option>
+            <option value="meals">Refeições</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <textarea id="provDescription" rows="2" placeholder="Descrição do serviço"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Endpoint API</label>
+          <input type="text" id="provApiEndpoint" placeholder="https://...">
+        </div>
+        <div class="form-group">
+          <label>Taxa de Comissão</label>
+          <input type="number" id="provCommission" step="0.01" value="0.15" min="0" max="1">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('providerModal')">Cancelar</button>
+      <button class="btn" onclick="saveProvider()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Institution Modal -->
+<div id="institutionModal" class="modal-overlay" onclick="if(event.target===this)closeModal('institutionModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="institutionModalTitle">Nova Instituição</h3>
+      <span class="modal-close" onclick="closeModal('institutionModal')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="instEditId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nome *</label>
+          <input type="text" id="instName" placeholder="Nome da instituição">
+        </div>
+        <div class="form-group">
+          <label>Tipo *</label>
+          <select id="instType">
+            <option value="health_insurer">Plano de Saúde</option>
+            <option value="ilpi">ILPI</option>
+            <option value="hospital">Hospital</option>
+            <option value="clinic">Clínica</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Nome do Contato</label>
+          <input type="text" id="instContactName" placeholder="Nome do responsável">
+        </div>
+        <div class="form-group">
+          <label>Email do Contato</label>
+          <input type="email" id="instContactEmail" placeholder="email@instituicao.com">
+        </div>
+        <div class="form-group">
+          <label>Telefone do Contato</label>
+          <input type="text" id="instContactPhone" placeholder="(11) 3333-4444">
+        </div>
+        <div class="form-group">
+          <label>Valor do Contrato (R$)</label>
+          <input type="number" id="instContractValue" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Máximo de Usuários</label>
+          <input type="number" id="instMaxUsers" placeholder="100">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('institutionModal')">Cancelar</button>
+      <button class="btn" onclick="saveInstitution()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  State & Config
+// ═══════════════════════════════════════════════════════════
+const API = window.location.origin + '/api';
+let adminKey = sessionStorage.getItem('adminKey') || '';
+let currentSection = 'dashboard';
+
+// Cache
+let allUsers = [];
+let allAffiliates = [];
+let allConsentRecords = [];
+
+// ═══════════════════════════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════════════════════════
+function adminHeaders() {
+  return { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey };
+}
+
+async function apiFetch(path, opts = {}) {
+  const url = path.startsWith('http') ? path : API + path;
+  const res = await fetch(url, {
+    headers: adminHeaders(),
+    ...opts,
+    ...(opts.body ? { body: JSON.stringify(opts.body) } : {}),
+  });
+  if (res.status === 401 || res.status === 403) {
+    toast('Sessão expirada ou senha inválida', 'error');
+    doLogout();
+    throw new Error('Unauthorized');
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Erro ${res.status}`);
+  }
+  return res.json();
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function formatMoney(v) {
+  if (v == null || isNaN(v)) return 'R$ 0,00';
+  return 'R$ ' + Number(v).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function roleName(r) {
+  return { elder: 'Idoso', family: 'Familiar', caregiver: 'Cuidador' }[r] || r || '—';
+}
+
+function subName(s) {
+  return { free: 'Gratuito', familia: 'Família', central: 'Central' }[s] || s || 'Gratuito';
+}
+
+function channelName(c) {
+  return { influencer: 'Influenciador', paid_media: 'Mídia Paga', ad_network: 'Rede Anúncios', organic: 'Orgânico', referral: 'Indicação', b2b_partner: 'Parceiro B2B' }[c] || c || '—';
+}
+
+function providerTypeName(t) {
+  return { pharmacy: 'Farmácia', telemedicine: 'Telemedicina', caregiver: 'Cuidador', physiotherapist: 'Fisioterapeuta', nutritionist: 'Nutricionista', transport: 'Transporte', meals: 'Refeições' }[t] || t || '—';
+}
+
+function instTypeName(t) {
+  return { health_insurer: 'Plano de Saúde', ilpi: 'ILPI', hospital: 'Hospital', clinic: 'Clínica' }[t] || t || '—';
+}
+
+function consentTypeName(t) {
+  return { terms: 'Termos de Uso', privacy: 'Privacidade', data_sharing: 'Compartilhamento', marketing: 'Marketing', health_data: 'Dados de Saúde' }[t] || t || '—';
+}
+
+function statusBadge(s) {
+  const map = {
+    pending: 'badge-warning', confirmed: 'badge-info', approved: 'badge-info',
+    completed: 'badge-success', paid: 'badge-success',
+    cancelled: 'badge-gray', rejected: 'badge-danger',
+  };
+  const labels = {
+    pending: 'Pendente', confirmed: 'Confirmado', approved: 'Aprovada',
+    completed: 'Concluído', paid: 'Paga', cancelled: 'Cancelado', rejected: 'Rejeitada',
+  };
+  return `<span class="badge ${map[s] || 'badge-gray'}">${labels[s] || s}</span>`;
+}
+
+function activeBadge(active) {
+  return active
+    ? '<span class="badge badge-success">Ativo</span>'
+    : '<span class="badge badge-gray">Inativo</span>';
+}
+
+function badgesList(badges) {
+  if (!badges || !badges.length) return '—';
+  const names = { streak_7: '7 dias', streak_30: '30 dias', streak_100: '100 dias' };
+  return badges.map(b => `<span class="badge badge-primary">${names[b] || b}</span>`).join(' ');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Toast
+// ═══════════════════════════════════════════════════════════
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Modal helpers
+// ═══════════════════════════════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ═══════════════════════════════════════════════════════════
+//  Sidebar / Navigation
+// ═══════════════════════════════════════════════════════════
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+
+const sectionTitles = {
+  dashboard: 'Visão Geral', users: 'Usuários', affiliates: 'Afiliados',
+  commissions: 'Comissões', marketplace: 'Provedores de Serviço',
+  bookings: 'Agendamentos', institutions: 'Instituições B2B',
+  conversions: 'Conversões / Analytics', consent: 'LGPD / Consentimento',
+  gamification: 'Gamificação',
+};
+
+function navigateTo(section) {
+  currentSection = section;
+  // Update sidebar
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.section === section));
+  // Update sections
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'sec-' + section));
+  // Update title
+  document.getElementById('topbarTitle').textContent = sectionTitles[section] || section;
+  // Close mobile sidebar
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+  // Load data
+  loadSection(section);
+}
+
+function refreshCurrentSection() {
+  loadSection(currentSection);
+}
+
+function loadSection(section) {
+  const loaders = {
+    dashboard: loadDashboard,
+    users: loadUsers,
+    affiliates: loadAffiliates,
+    commissions: loadCommissions,
+    marketplace: loadProviders,
+    bookings: loadBookings,
+    institutions: loadInstitutions,
+    conversions: loadConversions,
+    consent: loadConsent,
+    gamification: loadGamification,
+  };
+  if (loaders[section]) loaders[section]();
+  document.getElementById('lastRefresh').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Auth
+// ═══════════════════════════════════════════════════════════
+function doLogin() {
+  const pw = document.getElementById('loginPassword').value.trim();
+  if (!pw) {
+    document.getElementById('loginError').textContent = 'Digite a senha';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+  adminKey = pw;
+  sessionStorage.setItem('adminKey', pw);
+  // Attempt to validate by fetching stats
+  apiFetch('/admin/stats')
+    .then(() => {
+      showApp();
+    })
+    .catch(() => {
+      // If the admin endpoint doesn't exist yet, still allow login with default password
+      if (pw === 'estoubem-admin-2024') {
+        showApp();
+      } else {
+        document.getElementById('loginError').textContent = 'Senha incorreta';
+        document.getElementById('loginError').style.display = 'block';
+        adminKey = '';
+        sessionStorage.removeItem('adminKey');
+      }
+    });
+}
+
+function doLogout() {
+  adminKey = '';
+  sessionStorage.removeItem('adminKey');
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appLayout').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appLayout').style.display = 'flex';
+  loadSection('dashboard');
+}
+
+// Auto-login if key in session
+if (adminKey) {
+  showApp();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════════════════
+async function loadDashboard() {
+  const el = document.getElementById('dashStats');
+  const subEl = document.getElementById('dashSubscriptions');
+  try {
+    const data = await apiFetch('/admin/stats');
+    const s = data;
+    el.innerHTML = `
+      <div class="stat-card primary">
+        <div class="stat-label">Total de Usuários</div>
+        <div class="stat-value">${s.total_users || 0}</div>
+        <div class="stat-sub">Idosos: ${s.elders || 0} · Familiares: ${s.families || 0} · Cuidadores: ${s.caregivers || 0}</div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-label">Check-ins Hoje</div>
+        <div class="stat-value">${s.checkins_today || 0}</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="stat-label">Receita Total</div>
+        <div class="stat-value">${formatMoney(s.total_revenue)}</div>
+        <div class="stat-sub">Conversões: ${s.total_conversions || 0}</div>
+      </div>
+      <div class="stat-card info">
+        <div class="stat-label">Afiliados Ativos</div>
+        <div class="stat-value">${s.active_affiliates || 0}</div>
+      </div>
+      <div class="stat-card danger">
+        <div class="stat-label">Comissões Pendentes</div>
+        <div class="stat-value">${formatMoney(s.pending_commissions)}</div>
+      </div>
+      <div class="stat-card primary">
+        <div class="stat-label">Provedores Ativos</div>
+        <div class="stat-value">${s.active_providers || 0}</div>
+      </div>
+    `;
+    subEl.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card success">
+          <div class="stat-label">Gratuito</div>
+          <div class="stat-value">${s.sub_free || 0}</div>
+        </div>
+        <div class="stat-card warning">
+          <div class="stat-label">Família</div>
+          <div class="stat-value">${s.sub_familia || 0}</div>
+        </div>
+        <div class="stat-card info">
+          <div class="stat-label">Central</div>
+          <div class="stat-value">${s.sub_central || 0}</div>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = `
+      <div class="stat-card primary"><div class="stat-label">Total de Usuários</div><div class="stat-value">—</div><div class="stat-sub">API admin não disponível ainda</div></div>
+      <div class="stat-card success"><div class="stat-label">Check-ins Hoje</div><div class="stat-value">—</div></div>
+      <div class="stat-card warning"><div class="stat-label">Receita Total</div><div class="stat-value">—</div></div>
+      <div class="stat-card info"><div class="stat-label">Afiliados Ativos</div><div class="stat-value">—</div></div>
+    `;
+    subEl.innerHTML = '<div class="empty-state">Endpoints admin ainda não implementados no servidor.</div>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  USERS
+// ═══════════════════════════════════════════════════════════
+async function loadUsers() {
+  const tbody = document.getElementById('usersTableBody');
+  tbody.innerHTML = '<tr><td colspan="8" class="loading">Carregando...</td></tr>';
+  try {
+    allUsers = await apiFetch('/admin/users');
+    renderUsers();
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Não foi possível carregar usuários.</td></tr>';
+  }
+}
+
+function filterUsers() {
+  renderUsers();
+}
+
+function renderUsers() {
+  const tbody = document.getElementById('usersTableBody');
+  const search = (document.getElementById('userSearch').value || '').toLowerCase();
+  const role = document.getElementById('userRoleFilter').value;
+  let filtered = allUsers;
+  if (search) filtered = filtered.filter(u => (u.name || '').toLowerCase().includes(search) || (u.email || '').toLowerCase().includes(search));
+  if (role) filtered = filtered.filter(u => u.role === role);
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Nenhum usuário encontrado.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(u => `
+    <tr>
+      <td>${u.id}</td>
+      <td class="clickable" onclick="showUserDetail(${u.id})">${esc(u.name)}</td>
+      <td>${esc(u.email)}</td>
+      <td><span class="badge badge-info">${roleName(u.role)}</span></td>
+      <td>${subName(u.subscription)}</td>
+      <td>${u.streak_days || 0} dias</td>
+      <td>${u.total_points || 0}</td>
+      <td>${formatDate(u.created_at)}</td>
+    </tr>
+  `).join('');
+}
+
+async function showUserDetail(id) {
+  openModal('userDetailModal');
+  const el = document.getElementById('userDetailContent');
+  el.innerHTML = '<div class="loading">Carregando...</div>';
+  try {
+    const u = await apiFetch(`/admin/users/${id}`);
+    el.innerHTML = `
+      <div class="form-grid mb-16">
+        <div><strong>ID:</strong> ${u.id}</div>
+        <div><strong>Nome:</strong> ${esc(u.name)}</div>
+        <div><strong>Email:</strong> ${esc(u.email)}</div>
+        <div><strong>Telefone:</strong> ${esc(u.phone || '—')}</div>
+        <div><strong>Papel:</strong> ${roleName(u.role)}</div>
+        <div><strong>Assinatura:</strong> ${subName(u.subscription)}</div>
+        <div><strong>Código de Link:</strong> ${u.link_code || '—'}</div>
+        <div><strong>Idoso Vinculado:</strong> ${u.linked_elder_id || '—'}</div>
+        <div><strong>Código de Indicação:</strong> ${u.referral_code || '—'}</div>
+        <div><strong>Indicado por:</strong> ${u.referred_by || '—'}</div>
+        <div><strong>Sequência:</strong> ${u.streak_days || 0} dias</div>
+        <div><strong>Pontos:</strong> ${u.total_points || 0}</div>
+        <div><strong>Conquistas:</strong> ${badgesList(u.badges)}</div>
+        <div><strong>UTM Source:</strong> ${u.utm_source || '—'}</div>
+        <div><strong>UTM Medium:</strong> ${u.utm_medium || '—'}</div>
+        <div><strong>UTM Campaign:</strong> ${u.utm_campaign || '—'}</div>
+        <div><strong>Criado em:</strong> ${formatDate(u.created_at)}</div>
+        <div><strong>Início Trial:</strong> ${formatDate(u.trial_start)}</div>
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = '<div class="empty-state">Não foi possível carregar detalhes.</div>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AFFILIATES
+// ═══════════════════════════════════════════════════════════
+async function loadAffiliates() {
+  const tbody = document.getElementById('affiliatesTableBody');
+  tbody.innerHTML = '<tr><td colspan="8" class="loading">Carregando...</td></tr>';
+  try {
+    allAffiliates = await apiFetch('/admin/affiliates');
+    renderAffiliates();
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Não foi possível carregar afiliados.</td></tr>';
+  }
+}
+
+function renderAffiliates() {
+  const tbody = document.getElementById('affiliatesTableBody');
+  if (!allAffiliates.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Nenhum afiliado cadastrado.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = allAffiliates.map(a => `
+    <tr>
+      <td><strong>${esc(a.code)}</strong></td>
+      <td>${channelName(a.channel)}</td>
+      <td>${esc(a.name)}</td>
+      <td>${esc(a.email || '—')}</td>
+      <td>${formatMoney(a.total_earned)}</td>
+      <td>${a.total_conversions || 0}</td>
+      <td>${activeBadge(a.is_active)}</td>
+      <td>
+        <div class="btn-group">
+          <button class="btn btn-sm btn-outline" onclick="viewAffiliateDash('${esc(a.code)}')">Dashboard</button>
+          <button class="btn btn-sm ${a.is_active ? 'btn-warning' : 'btn-success'}" onclick="toggleAffiliate(${a.id}, ${!a.is_active})">
+            ${a.is_active ? 'Desativar' : 'Ativar'}
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function toggleAffiliate(id, active) {
+  try {
+    await apiFetch(`/admin/affiliates/${id}`, { method: 'PUT', body: { is_active: active } });
+    toast(active ? 'Afiliado ativado' : 'Afiliado desativado', 'success');
+    loadAffiliates();
+  } catch (e) {
+    toast('Erro ao atualizar afiliado: ' + e.message, 'error');
+  }
+}
+
+async function viewAffiliateDash(code) {
+  openModal('affiliateDashModal');
+  const el = document.getElementById('affiliateDashContent');
+  el.innerHTML = '<div class="loading">Carregando...</div>';
+  try {
+    const data = await apiFetch(`/affiliates/${code}/dashboard`);
+    const a = data.affiliate;
+    const s = data.stats;
+    el.innerHTML = `
+      <div class="stats-grid mb-16">
+        <div class="stat-card primary">
+          <div class="stat-label">Total Conversões</div>
+          <div class="stat-value">${s.total_conversions || 0}</div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-label">Total Ganho</div>
+          <div class="stat-value">${formatMoney(s.total_earned)}</div>
+        </div>
+        <div class="stat-card warning">
+          <div class="stat-label">Pendente</div>
+          <div class="stat-value">${formatMoney(s.pending_amount)}</div>
+        </div>
+        <div class="stat-card info">
+          <div class="stat-label">Pago</div>
+          <div class="stat-value">${formatMoney(s.paid_amount)}</div>
+        </div>
+      </div>
+      <h4 style="margin-bottom:12px">Comissões Recentes</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Evento</th><th>Receita</th><th>Comissão</th><th>Status</th><th>Data</th></tr></thead>
+          <tbody>
+            ${(data.commissions || []).map(c => `
+              <tr>
+                <td>${esc(c.event || '—')}</td>
+                <td>${formatMoney(c.revenue)}</td>
+                <td>${formatMoney(c.amount)}</td>
+                <td>${statusBadge(c.status)}</td>
+                <td>${formatDate(c.conversion_date)}</td>
+              </tr>
+            `).join('') || '<tr><td colspan="5" class="empty-state">Nenhuma comissão</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = '<div class="empty-state">Não foi possível carregar dashboard do afiliado.</div>';
+  }
+}
+
+async function saveAffiliate() {
+  const editId = document.getElementById('affEditId').value;
+  const body = {
+    code: document.getElementById('affCode').value.trim(),
+    channel: document.getElementById('affChannel').value,
+    name: document.getElementById('affName').value.trim(),
+    email: document.getElementById('affEmail').value.trim(),
+    phone: document.getElementById('affPhone').value.trim(),
+    commission_rate: {
+      register: parseFloat(document.getElementById('affCommRegister').value) || 0,
+      subscription: parseFloat(document.getElementById('affCommSubscription').value) || 0,
+      purchase: parseFloat(document.getElementById('affCommPurchase').value) || 0,
+    },
+  };
+  if (!body.code || !body.name) {
+    toast('Código e nome são obrigatórios', 'error');
+    return;
+  }
+  try {
+    if (editId) {
+      await apiFetch(`/admin/affiliates/${editId}`, { method: 'PUT', body });
+    } else {
+      await apiFetch('/affiliates', { method: 'POST', body });
+    }
+    toast('Afiliado salvo com sucesso', 'success');
+    closeModal('affiliateModal');
+    clearAffiliateForm();
+    loadAffiliates();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+function clearAffiliateForm() {
+  document.getElementById('affEditId').value = '';
+  document.getElementById('affCode').value = '';
+  document.getElementById('affName').value = '';
+  document.getElementById('affEmail').value = '';
+  document.getElementById('affPhone').value = '';
+  document.getElementById('affCommRegister').value = '5.00';
+  document.getElementById('affCommSubscription').value = '15.00';
+  document.getElementById('affCommPurchase').value = '10.00';
+  document.getElementById('affiliateModalTitle').textContent = 'Novo Afiliado';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  COMMISSIONS
+// ═══════════════════════════════════════════════════════════
+async function loadCommissions() {
+  const tbody = document.getElementById('commissionsTableBody');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading">Carregando...</td></tr>';
+  const status = document.getElementById('commStatusFilter').value;
+  const query = status ? `?status=${status}` : '';
+  try {
+    const data = await apiFetch('/admin/commissions' + query);
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nenhuma comissão encontrada.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(c => `
+      <tr>
+        <td>${c.id}</td>
+        <td>${esc(c.affiliate_name || c.affiliate_id || '—')}</td>
+        <td>#${c.conversion_id || '—'}</td>
+        <td>${formatMoney(c.amount)}</td>
+        <td>${statusBadge(c.status)}</td>
+        <td>${formatDate(c.created_at)}</td>
+        <td>
+          <div class="btn-group">
+            ${c.status === 'pending' ? `
+              <button class="btn btn-sm btn-success" onclick="updateCommission(${c.id},'approved')">Aprovar</button>
+              <button class="btn btn-sm btn-danger" onclick="updateCommission(${c.id},'rejected')">Rejeitar</button>
+            ` : ''}
+            ${c.status === 'approved' ? `
+              <button class="btn btn-sm btn-success" onclick="updateCommission(${c.id},'paid')">Marcar Paga</button>
+            ` : ''}
+            ${c.status === 'paid' || c.status === 'rejected' ? '<span style="color:var(--text3);font-size:12px">—</span>' : ''}
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Não foi possível carregar comissões.</td></tr>';
+  }
+}
+
+async function updateCommission(id, status) {
+  try {
+    await apiFetch(`/admin/commissions/${id}`, { method: 'PUT', body: { status } });
+    toast('Comissão atualizada', 'success');
+    loadCommissions();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MARKETPLACE PROVIDERS
+// ═══════════════════════════════════════════════════════════
+async function loadProviders() {
+  const tbody = document.getElementById('providersTableBody');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading">Carregando...</td></tr>';
+  try {
+    const data = await apiFetch('/admin/providers');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nenhum provedor cadastrado.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(p => `
+      <tr>
+        <td>${p.id}</td>
+        <td>${esc(p.name)}</td>
+        <td>${providerTypeName(p.type)}</td>
+        <td>${((p.commission_rate || 0) * 100).toFixed(0)}%</td>
+        <td>${activeBadge(p.is_active)}</td>
+        <td>${formatDate(p.created_at)}</td>
+        <td>
+          <div class="btn-group">
+            <button class="btn btn-sm btn-outline" onclick="editProvider(${p.id})">Editar</button>
+            <button class="btn btn-sm ${p.is_active ? 'btn-warning' : 'btn-success'}" onclick="toggleProvider(${p.id}, ${!p.is_active})">
+              ${p.is_active ? 'Desativar' : 'Ativar'}
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="deleteProvider(${p.id})">Excluir</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Não foi possível carregar provedores.</td></tr>';
+  }
+}
+
+async function editProvider(id) {
+  try {
+    const providers = await apiFetch('/admin/providers');
+    const p = providers.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById('provEditId').value = p.id;
+    document.getElementById('provName').value = p.name || '';
+    document.getElementById('provType').value = p.type || 'pharmacy';
+    document.getElementById('provDescription').value = p.description || '';
+    document.getElementById('provApiEndpoint').value = p.api_endpoint || '';
+    document.getElementById('provCommission').value = p.commission_rate || 0.15;
+    document.getElementById('providerModalTitle').textContent = 'Editar Provedor';
+    openModal('providerModal');
+  } catch (e) {
+    toast('Erro ao carregar provedor', 'error');
+  }
+}
+
+async function saveProvider() {
+  const editId = document.getElementById('provEditId').value;
+  const body = {
+    name: document.getElementById('provName').value.trim(),
+    type: document.getElementById('provType').value,
+    description: document.getElementById('provDescription').value.trim(),
+    api_endpoint: document.getElementById('provApiEndpoint').value.trim(),
+    commission_rate: parseFloat(document.getElementById('provCommission').value) || 0.15,
+  };
+  if (!body.name) {
+    toast('Nome é obrigatório', 'error');
+    return;
+  }
+  try {
+    if (editId) {
+      await apiFetch(`/admin/providers/${editId}`, { method: 'PUT', body });
+    } else {
+      await apiFetch('/admin/providers', { method: 'POST', body });
+    }
+    toast('Provedor salvo com sucesso', 'success');
+    closeModal('providerModal');
+    clearProviderForm();
+    loadProviders();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+async function toggleProvider(id, active) {
+  try {
+    await apiFetch(`/admin/providers/${id}`, { method: 'PUT', body: { is_active: active } });
+    toast(active ? 'Provedor ativado' : 'Provedor desativado', 'success');
+    loadProviders();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+async function deleteProvider(id) {
+  if (!confirm('Tem certeza que deseja excluir este provedor?')) return;
+  try {
+    await apiFetch(`/admin/providers/${id}`, { method: 'DELETE' });
+    toast('Provedor excluído', 'success');
+    loadProviders();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+function clearProviderForm() {
+  document.getElementById('provEditId').value = '';
+  document.getElementById('provName').value = '';
+  document.getElementById('provDescription').value = '';
+  document.getElementById('provApiEndpoint').value = '';
+  document.getElementById('provCommission').value = '0.15';
+  document.getElementById('providerModalTitle').textContent = 'Novo Provedor';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  BOOKINGS
+// ═══════════════════════════════════════════════════════════
+async function loadBookings() {
+  const tbody = document.getElementById('bookingsTableBody');
+  tbody.innerHTML = '<tr><td colspan="9" class="loading">Carregando...</td></tr>';
+  const status = document.getElementById('bookingStatusFilter').value;
+  const query = status ? `?status=${status}` : '';
+  try {
+    const data = await apiFetch('/admin/bookings' + query);
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Nenhum agendamento encontrado.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(b => `
+      <tr>
+        <td>${b.id}</td>
+        <td>${b.user_id || '—'}</td>
+        <td>${esc(b.provider_name || b.provider_id || '—')}</td>
+        <td>${providerTypeName(b.type)}</td>
+        <td>${formatMoney(b.amount)}</td>
+        <td>${formatMoney(b.commission)}</td>
+        <td>${statusBadge(b.status)}</td>
+        <td>${formatDate(b.scheduled_at)}</td>
+        <td>${formatDate(b.created_at)}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Não foi possível carregar agendamentos.</td></tr>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INSTITUTIONS
+// ═══════════════════════════════════════════════════════════
+async function loadInstitutions() {
+  const tbody = document.getElementById('institutionsTableBody');
+  tbody.innerHTML = '<tr><td colspan="9" class="loading">Carregando...</td></tr>';
+  try {
+    const data = await apiFetch('/admin/institutions');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Nenhuma instituição cadastrada.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(i => `
+      <tr>
+        <td>${i.id}</td>
+        <td>${esc(i.name)}</td>
+        <td>${instTypeName(i.type)}</td>
+        <td>${esc(i.contact_name || '—')}</td>
+        <td>${esc(i.contact_email || '—')}</td>
+        <td>${formatMoney(i.contract_value)}</td>
+        <td>${i.max_users || '—'}</td>
+        <td>${activeBadge(i.is_active)}</td>
+        <td>
+          <div class="btn-group">
+            <button class="btn btn-sm btn-outline" onclick="editInstitution(${i.id})">Editar</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteInstitution(${i.id})">Excluir</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Não foi possível carregar instituições.</td></tr>';
+  }
+}
+
+async function editInstitution(id) {
+  try {
+    const institutions = await apiFetch('/admin/institutions');
+    const inst = institutions.find(x => x.id === id);
+    if (!inst) return;
+    document.getElementById('instEditId').value = inst.id;
+    document.getElementById('instName').value = inst.name || '';
+    document.getElementById('instType').value = inst.type || 'clinic';
+    document.getElementById('instContactName').value = inst.contact_name || '';
+    document.getElementById('instContactEmail').value = inst.contact_email || '';
+    document.getElementById('instContactPhone').value = inst.contact_phone || '';
+    document.getElementById('instContractValue').value = inst.contract_value || '';
+    document.getElementById('instMaxUsers').value = inst.max_users || '';
+    document.getElementById('institutionModalTitle').textContent = 'Editar Instituição';
+    openModal('institutionModal');
+  } catch (e) {
+    toast('Erro ao carregar instituição', 'error');
+  }
+}
+
+async function saveInstitution() {
+  const editId = document.getElementById('instEditId').value;
+  const body = {
+    name: document.getElementById('instName').value.trim(),
+    type: document.getElementById('instType').value,
+    contact_name: document.getElementById('instContactName').value.trim(),
+    contact_email: document.getElementById('instContactEmail').value.trim(),
+    contact_phone: document.getElementById('instContactPhone').value.trim(),
+    contract_value: parseFloat(document.getElementById('instContractValue').value) || null,
+    max_users: parseInt(document.getElementById('instMaxUsers').value) || null,
+  };
+  if (!body.name || !body.type) {
+    toast('Nome e tipo são obrigatórios', 'error');
+    return;
+  }
+  try {
+    if (editId) {
+      await apiFetch(`/admin/institutions/${editId}`, { method: 'PUT', body });
+    } else {
+      await apiFetch('/institutions', { method: 'POST', body });
+    }
+    toast('Instituição salva com sucesso', 'success');
+    closeModal('institutionModal');
+    clearInstitutionForm();
+    loadInstitutions();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+async function deleteInstitution(id) {
+  if (!confirm('Tem certeza que deseja excluir esta instituição?')) return;
+  try {
+    await apiFetch(`/admin/institutions/${id}`, { method: 'DELETE' });
+    toast('Instituição excluída', 'success');
+    loadInstitutions();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+function clearInstitutionForm() {
+  document.getElementById('instEditId').value = '';
+  document.getElementById('instName').value = '';
+  document.getElementById('instContactName').value = '';
+  document.getElementById('instContactEmail').value = '';
+  document.getElementById('instContactPhone').value = '';
+  document.getElementById('instContractValue').value = '';
+  document.getElementById('instMaxUsers').value = '';
+  document.getElementById('institutionModalTitle').textContent = 'Nova Instituição';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CONVERSIONS
+// ═══════════════════════════════════════════════════════════
+async function loadConversions() {
+  const tbody = document.getElementById('conversionsTableBody');
+  const statsEl = document.getElementById('conversionStats');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading">Carregando...</td></tr>';
+  try {
+    const data = await apiFetch('/admin/conversions');
+    // Calculate stats
+    const totalRevenue = data.reduce((s, c) => s + (c.revenue || 0), 0);
+    const uniqueEvents = [...new Set(data.map(c => c.event))];
+    const today = new Date().toISOString().slice(0, 10);
+    const todayConversions = data.filter(c => c.created_at && c.created_at.startsWith(today));
+
+    statsEl.innerHTML = `
+      <div class="stat-card primary">
+        <div class="stat-label">Total de Conversões</div>
+        <div class="stat-value">${data.length}</div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-label">Receita Total</div>
+        <div class="stat-value">${formatMoney(totalRevenue)}</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="stat-label">Conversões Hoje</div>
+        <div class="stat-value">${todayConversions.length}</div>
+      </div>
+      <div class="stat-card info">
+        <div class="stat-label">Tipos de Evento</div>
+        <div class="stat-value">${uniqueEvents.length}</div>
+        <div class="stat-sub">${uniqueEvents.slice(0, 5).join(', ')}</div>
+      </div>
+    `;
+
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nenhuma conversão registrada.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.slice(0, 200).map(c => `
+      <tr>
+        <td>${c.id}</td>
+        <td>${esc(c.event)}</td>
+        <td>${formatMoney(c.revenue)}</td>
+        <td>${esc(c.affiliate_code || '—')}</td>
+        <td>${esc(c.affiliate_channel || '—')}</td>
+        <td>${c.user_id || '—'}</td>
+        <td>${formatDate(c.created_at)}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    statsEl.innerHTML = '';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Não foi possível carregar conversões.</td></tr>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CONSENT (LGPD)
+// ═══════════════════════════════════════════════════════════
+async function loadConsent() {
+  const tbody = document.getElementById('consentTableBody');
+  tbody.innerHTML = '<tr><td colspan="6" class="loading">Carregando...</td></tr>';
+  try {
+    allConsentRecords = await apiFetch('/admin/consent');
+    if (!allConsentRecords.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum registro de consentimento.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = allConsentRecords.map(c => `
+      <tr>
+        <td>${c.id}</td>
+        <td>${c.user_id}</td>
+        <td>${consentTypeName(c.consent_type)}</td>
+        <td>${c.granted ? '<span class="badge badge-success">Sim</span>' : '<span class="badge badge-danger">Não</span>'}</td>
+        <td>${esc(c.ip_address || '—')}</td>
+        <td>${formatDate(c.created_at)}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Não foi possível carregar registros.</td></tr>';
+  }
+}
+
+function exportConsent() {
+  if (!allConsentRecords.length) {
+    toast('Nenhum registro para exportar', 'error');
+    return;
+  }
+  const headers = ['ID', 'Usuário ID', 'Tipo', 'Concedido', 'IP', 'User Agent', 'Data'];
+  const rows = allConsentRecords.map(c => [
+    c.id, c.user_id, c.consent_type, c.granted ? 'Sim' : 'Não',
+    c.ip_address || '', c.user_agent || '', c.created_at || '',
+  ]);
+  const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `consentimento-lgpd-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV exportado com sucesso', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GAMIFICATION
+// ═══════════════════════════════════════════════════════════
+async function loadGamification() {
+  const tbody = document.getElementById('gamificationTableBody');
+  tbody.innerHTML = '<tr><td colspan="6" class="loading">Carregando...</td></tr>';
+  try {
+    const data = await apiFetch('/admin/gamification/leaderboard');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum dado de gamificação.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map((u, i) => `
+      <tr>
+        <td><strong>${i + 1}</strong></td>
+        <td>${esc(u.name)}</td>
+        <td>${esc(u.email)}</td>
+        <td>${u.streak_days || 0}</td>
+        <td>${u.total_points || 0}</td>
+        <td>${badgesList(u.badges)}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Não foi possível carregar ranking.</td></tr>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  XSS escape
+// ═══════════════════════════════════════════════════════════
+function esc(s) {
+  if (s == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
