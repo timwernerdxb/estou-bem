@@ -1035,7 +1035,22 @@ function renderDashboard() {
 }
 
 // ─── Contacts ─────────────────────────────────────────────
+function refreshContactsFromAPI() {
+  if (!authToken) return;
+  api('GET', '/api/contacts').then(res => {
+    if (res.ok) {
+      const fresh = res.data.map(c => ({ id: c.id, name: c.name, phone: c.phone, relationship: c.relationship, priority: c.priority }));
+      if (JSON.stringify(fresh) !== JSON.stringify(state.contacts)) {
+        state.contacts = fresh;
+        save();
+        render();
+      }
+    }
+  });
+}
+
 function renderContacts() {
+  refreshContactsFromAPI();
   return `
     <div class="screen active screen-padtop">
       <h1>📞 Contatos de Emergência</h1>

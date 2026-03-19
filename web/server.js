@@ -125,13 +125,6 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Temporary debug endpoint - REMOVE AFTER DEBUG
-app.get('/api/debug-state', async (req, res) => {
-  const users = await pool.query(`SELECT id, email, name, phone, role, linked_elder_id FROM users`);
-  const contacts = await pool.query(`SELECT * FROM contacts ORDER BY user_id, priority`);
-  res.json({ users: users.rows, contacts: contacts.rows });
-});
-
 // Auth helper
 function hashPassword(pw) {
   return crypto.createHash('sha256').update(pw).digest('hex');
