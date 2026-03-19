@@ -264,6 +264,7 @@ let state = {
   checkinIntervalHours: 2,
   checkinWindowStart: '07:00',
   checkinWindowEnd: '22:00',
+  autoCheckinMode: 'manual', // manual | auto_movement | auto_wearable
   subscription: 'free', // free | familia | central
   trialStart: null, // ISO date string
   linkedElderEmail: null, // for family accounts
@@ -370,6 +371,7 @@ function syncSettings() {
     checkin_interval_hours: state.checkinIntervalHours,
     checkin_window_start: state.checkinWindowStart,
     checkin_window_end: state.checkinWindowEnd,
+    auto_checkin_mode: state.autoCheckinMode,
   });
 }
 
@@ -1171,6 +1173,27 @@ function renderSettings() {
         </div>
       ` : ''}
 
+      ${isElder ? `
+        <div class="card">
+          <h2>Modo de Confirmação</h2>
+          <div class="caption mb-md">Escolha como seus check-ins são confirmados</div>
+          ${[
+            { id:'manual', label:'Manual', desc:'Você toca o botão', icon:'🤚' },
+            { id:'auto_movement', label:'Automático (movimento)', desc:'Confirmado se detectar movimento no celular', icon:'📱' },
+            { id:'auto_wearable', label:'Automático (relógio)', desc:'Confirmado se o wearable detectar atividade', icon:'⌚' },
+          ].map(m => `
+            <button data-action="set-auto-mode" data-mode="${m.id}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px;border:2px solid ${(state.autoCheckinMode||'manual')===m.id?'var(--primary)':'var(--border)'};border-radius:12px;background:${(state.autoCheckinMode||'manual')===m.id?'#EBF4FF':'#FFF'};margin-bottom:6px;cursor:pointer">
+              <span style="font-size:24px">${m.icon}</span>
+              <div style="flex:1">
+                <div style="font-weight:600;color:${(state.autoCheckinMode||'manual')===m.id?'var(--primary)':'var(--text)'}">${m.label}</div>
+                <div style="font-size:12px;color:var(--text2)">${m.desc}</div>
+              </div>
+              ${(state.autoCheckinMode||'manual')===m.id?'<span style="color:var(--primary);font-size:20px">✓</span>':''}
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+
       ${isInTrial() ? `
         <div class="card" style="background:var(--success-light);border:1px solid var(--success)">
           <div style="display:flex;justify-content:space-between;align-items:center">
@@ -1557,6 +1580,11 @@ function handleAction(action, el) {
       break;
     case 'show-paywall':
       $('#modal-paywall')?.classList.add('visible');
+      break;
+    case 'set-auto-mode':
+      state.autoCheckinMode = el.dataset.mode;
+      save(); syncSettings();
+      render();
       break;
     case 'set-checkin-mode':
       state.checkinMode = el.dataset.mode;

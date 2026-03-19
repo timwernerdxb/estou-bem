@@ -66,6 +66,34 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
         sendMessage(message)
     }
 
+    func sendMovementStatus(isMoving: Bool, heartRate: Double?, steps: Double?) {
+        var message: [String: Any] = [
+            "action": "movement_status",
+            "is_moving": isMoving,
+            "timestamp": ISO8601DateFormatter().string(from: Date()),
+        ]
+        if let hr = heartRate { message["heart_rate"] = hr }
+        if let s = steps { message["steps"] = s }
+        sendMessage(message)
+    }
+
+    func sendAutoCheckin(source: String) {
+        let message: [String: Any] = [
+            "action": "auto_checkin",
+            "source": source,
+            "timestamp": ISO8601DateFormatter().string(from: Date()),
+        ]
+        // High priority — use transferUserInfo as backup
+        guard let session = session else { return }
+        if session.isReachable {
+            session.sendMessage(message, replyHandler: nil) { _ in
+                session.transferUserInfo(message)
+            }
+        } else {
+            session.transferUserInfo(message)
+        }
+    }
+
     private func trySendViaContext(_ message: [String: Any]) {
         // Merge into application context (last-write-wins)
         var context = session?.applicationContext ?? [:]
@@ -155,6 +183,16 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
                     userInfo: message
                 )
 
+            case "set_auto_checkin_mode":
+                // Phone configured auto check-in mode
+                if let mode = message["mode"] as? String {
+                    NotificationCenter.default.post(
+                        name: .autoCheckinModeChanged,
+                        object: nil,
+                        userInfo: ["mode": mode]
+                    )
+                }
+
             default:
                 break
             }
@@ -168,4 +206,5 @@ extension Notification.Name {
     static let checkInTimesUpdated = Notification.Name("checkInTimesUpdated")
     static let checkInReminderReceived = Notification.Name("checkInReminderReceived")
     static let escalationActive = Notification.Name("escalationActive")
+    static let autoCheckinModeChanged = Notification.Name("autoCheckinModeChanged")
 }

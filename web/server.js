@@ -81,10 +81,125 @@ async function initDB() {
         checkin_window_end TEXT DEFAULT '22:00'
       );
 
+      -- Conversion tracking
+      CREATE TABLE IF NOT EXISTS conversions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        event TEXT NOT NULL,
+        revenue REAL DEFAULT 0,
+        currency TEXT DEFAULT 'BRL',
+        affiliate_code TEXT,
+        affiliate_channel TEXT,
+        partner_id TEXT,
+        campaign_id TEXT,
+        referrer_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Affiliates / partners
+      CREATE TABLE IF NOT EXISTS affiliates (
+        id SERIAL PRIMARY KEY,
+        code TEXT UNIQUE NOT NULL,
+        channel TEXT NOT NULL CHECK (channel IN ('influencer','paid_media','ad_network','organic','referral','b2b_partner')),
+        name TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        commission_rate JSONB DEFAULT '{}',
+        total_earned REAL DEFAULT 0,
+        total_conversions INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Commission ledger
+      CREATE TABLE IF NOT EXISTS commissions (
+        id SERIAL PRIMARY KEY,
+        affiliate_id INTEGER REFERENCES affiliates(id) ON DELETE CASCADE,
+        conversion_id INTEGER REFERENCES conversions(id) ON DELETE CASCADE,
+        amount REAL NOT NULL,
+        currency TEXT DEFAULT 'BRL',
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending','approved','paid','rejected')),
+        paid_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- User referral codes
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by INTEGER REFERENCES users(id);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS affiliate_id INTEGER REFERENCES affiliates(id);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_source TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_medium TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_campaign TEXT;
+
+      -- Auto-checkin settings
+      ALTER TABLE settings ADD COLUMN IF NOT EXISTS auto_checkin_mode TEXT DEFAULT 'manual';
+
+      -- Marketplace: service providers
+      CREATE TABLE IF NOT EXISTS service_providers (
+        id SERIAL PRIMARY KEY,
+        type TEXT NOT NULL CHECK (type IN ('pharmacy','telemedicine','caregiver','physiotherapist','nutritionist','transport','meals')),
+        name TEXT NOT NULL,
+        description TEXT,
+        api_endpoint TEXT,
+        commission_rate REAL DEFAULT 0.15,
+        is_active BOOLEAN DEFAULT true,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Marketplace: service bookings
+      CREATE TABLE IF NOT EXISTS service_bookings (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        provider_id INTEGER REFERENCES service_providers(id) ON DELETE SET NULL,
+        type TEXT NOT NULL,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending','confirmed','completed','cancelled')),
+        amount REAL DEFAULT 0,
+        commission REAL DEFAULT 0,
+        scheduled_at TIMESTAMPTZ,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- B2B institutional accounts
+      CREATE TABLE IF NOT EXISTS institutions (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT CHECK (type IN ('health_insurer','ilpi','hospital','clinic')),
+        contact_name TEXT,
+        contact_email TEXT,
+        contact_phone TEXT,
+        contract_value REAL,
+        max_users INTEGER,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- LGPD consent tracking
+      CREATE TABLE IF NOT EXISTS consent_records (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        consent_type TEXT NOT NULL CHECK (consent_type IN ('terms','privacy','data_sharing','marketing','health_data')),
+        granted BOOLEAN NOT NULL,
+        ip_address TEXT,
+        user_agent TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Gamification
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS streak_days INTEGER DEFAULT 0;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS total_points INTEGER DEFAULT 0;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS badges JSONB DEFAULT '[]';
+
       CREATE INDEX IF NOT EXISTS idx_checkins_user_date ON checkins(user_id, date);
       CREATE INDEX IF NOT EXISTS idx_contacts_user ON contacts(user_id);
       CREATE INDEX IF NOT EXISTS idx_medications_user ON medications(user_id);
       CREATE INDEX IF NOT EXISTS idx_health_entries_user ON health_entries(user_id);
+      CREATE INDEX IF NOT EXISTS idx_conversions_user ON conversions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_conversions_affiliate ON conversions(affiliate_code);
+      CREATE INDEX IF NOT EXISTS idx_commissions_affiliate ON commissions(affiliate_id);
+      CREATE INDEX IF NOT EXISTS idx_consent_user ON consent_records(user_id);
     `);
     console.log('Database initialized');
 
@@ -151,7 +266,7 @@ function authMiddleware(req, res, next) {
 
 // ── Auth Routes ───────────────────────────────────────────
 app.post('/api/register', async (req, res) => {
-  const { email, password, name, phone, role } = req.body;
+  const { email, password, name, phone, role, referral_code, utm_source, utm_medium, utm_campaign } = req.body;
   if (!email || !password || !name || !role) {
     return res.status(400).json({ error: 'email, password, name, and role are required' });
   }
@@ -166,11 +281,19 @@ app.post('/api/register', async (req, res) => {
   const linkCode = Math.random().toString().slice(2, 8);
 
   try {
+    // Check referral
+    let referredBy = null;
+    if (referral_code) {
+      const referrer = await pool.query(`SELECT id FROM users WHERE referral_code = $1`, [referral_code]);
+      if (referrer.rows[0]) referredBy = referrer.rows[0].id;
+    }
+
+    const userRefCode = 'EB' + Math.random().toString(36).toUpperCase().slice(2, 6);
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, name, phone, role, link_code, trial_start)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())
-       RETURNING id, email, name, phone, role, link_code, subscription, trial_start`,
-      [email.toLowerCase(), hash, name, phone || '', role, linkCode]
+      `INSERT INTO users (email, password_hash, name, phone, role, link_code, trial_start, referral_code, referred_by, utm_source, utm_medium, utm_campaign)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11)
+       RETURNING id, email, name, phone, role, link_code, subscription, trial_start, referral_code`,
+      [email.toLowerCase(), hash, name, phone || '', role, linkCode, userRefCode, referredBy, utm_source, utm_medium, utm_campaign]
     );
 
     const user = result.rows[0];
@@ -473,6 +596,260 @@ async function getEffectiveSub(userId) {
   }
   return user.subscription;
 }
+
+// ── Conversion Tracking Routes ────────────────────────────
+app.post('/api/conversions', authMiddleware, async (req, res) => {
+  const { event, revenue, affiliate_code, affiliate_channel, partner_id, campaign_id, referrer_user_id, metadata } = req.body;
+  if (!event) return res.status(400).json({ error: 'event is required' });
+
+  const result = await pool.query(
+    `INSERT INTO conversions (user_id, event, revenue, affiliate_code, affiliate_channel, partner_id, campaign_id, referrer_user_id, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [req.userId, event, revenue || 0, affiliate_code, affiliate_channel, partner_id, campaign_id, referrer_user_id, JSON.stringify(metadata || {})]
+  );
+
+  // Auto-create commission if affiliate exists
+  if (affiliate_code) {
+    const affiliate = await pool.query(`SELECT id, commission_rate FROM affiliates WHERE code = $1 AND is_active = true`, [affiliate_code]);
+    if (affiliate.rows[0]) {
+      const rates = affiliate.rows[0].commission_rate || {};
+      const commissionAmount = rates[event] || 0;
+      if (commissionAmount > 0) {
+        await pool.query(
+          `INSERT INTO commissions (affiliate_id, conversion_id, amount) VALUES ($1, $2, $3)`,
+          [affiliate.rows[0].id, result.rows[0].id, commissionAmount]
+        );
+        await pool.query(
+          `UPDATE affiliates SET total_earned = total_earned + $1, total_conversions = total_conversions + 1 WHERE id = $2`,
+          [commissionAmount, affiliate.rows[0].id]
+        );
+      }
+    }
+  }
+
+  res.json(result.rows[0]);
+});
+
+app.get('/api/conversions', authMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `SELECT * FROM conversions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100`,
+    [req.userId]
+  );
+  res.json(result.rows);
+});
+
+// ── Affiliate Routes ─────────────────────────────────────
+app.get('/api/affiliates', async (req, res) => {
+  const result = await pool.query(`SELECT id, code, channel, name, is_active FROM affiliates WHERE is_active = true`);
+  res.json(result.rows);
+});
+
+app.post('/api/affiliates', async (req, res) => {
+  const { code, channel, name, email, phone, commission_rate } = req.body;
+  if (!code || !channel || !name) return res.status(400).json({ error: 'code, channel, and name are required' });
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO affiliates (code, channel, name, email, phone, commission_rate)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [code, channel, name, email, phone, JSON.stringify(commission_rate || {})]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Code already exists' });
+    res.status(500).json({ error: 'Failed to create affiliate' });
+  }
+});
+
+app.get('/api/affiliates/:code/dashboard', async (req, res) => {
+  const affiliate = await pool.query(`SELECT * FROM affiliates WHERE code = $1`, [req.params.code]);
+  if (affiliate.rows.length === 0) return res.status(404).json({ error: 'Affiliate not found' });
+
+  const commissions = await pool.query(
+    `SELECT c.*, cv.event, cv.revenue, cv.created_at as conversion_date
+     FROM commissions c JOIN conversions cv ON c.conversion_id = cv.id
+     WHERE c.affiliate_id = $1 ORDER BY c.created_at DESC LIMIT 100`,
+    [affiliate.rows[0].id]
+  );
+
+  const stats = await pool.query(
+    `SELECT COUNT(*) as total_conversions, SUM(amount) as total_earned,
+     SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) as pending_amount,
+     SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) as paid_amount
+     FROM commissions WHERE affiliate_id = $1`,
+    [affiliate.rows[0].id]
+  );
+
+  res.json({
+    affiliate: affiliate.rows[0],
+    commissions: commissions.rows,
+    stats: stats.rows[0],
+  });
+});
+
+// ── Referral Routes ──────────────────────────────────────
+app.get('/api/referral-code', authMiddleware, async (req, res) => {
+  let user = await pool.query(`SELECT referral_code FROM users WHERE id = $1`, [req.userId]);
+  if (!user.rows[0].referral_code) {
+    const code = 'EB' + Math.random().toString(36).toUpperCase().slice(2, 6);
+    await pool.query(`UPDATE users SET referral_code = $1 WHERE id = $2`, [code, req.userId]);
+    return res.json({ code });
+  }
+  res.json({ code: user.rows[0].referral_code });
+});
+
+app.post('/api/referral/apply', authMiddleware, async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Referral code required' });
+
+  const referrer = await pool.query(`SELECT id, name FROM users WHERE referral_code = $1`, [code]);
+  if (referrer.rows.length === 0) return res.status(404).json({ error: 'Invalid referral code' });
+  if (referrer.rows[0].id === req.userId) return res.status(400).json({ error: 'Cannot refer yourself' });
+
+  await pool.query(`UPDATE users SET referred_by = $1 WHERE id = $2`, [referrer.rows[0].id, req.userId]);
+  res.json({ ok: true, referrerName: referrer.rows[0].name });
+});
+
+// ── Service Provider / Marketplace Routes ────────────────
+app.get('/api/marketplace/providers', async (req, res) => {
+  const { type } = req.query;
+  let query = `SELECT * FROM service_providers WHERE is_active = true`;
+  const params = [];
+  if (type) { query += ` AND type = $1`; params.push(type); }
+  query += ` ORDER BY name`;
+  const result = await pool.query(query, params);
+  res.json(result.rows);
+});
+
+app.post('/api/marketplace/bookings', authMiddleware, async (req, res) => {
+  const { provider_id, type, amount, scheduled_at, notes } = req.body;
+  if (!type) return res.status(400).json({ error: 'type is required' });
+
+  let commission = 0;
+  if (provider_id && amount) {
+    const provider = await pool.query(`SELECT commission_rate FROM service_providers WHERE id = $1`, [provider_id]);
+    commission = (provider.rows[0]?.commission_rate || 0.15) * amount;
+  }
+
+  const result = await pool.query(
+    `INSERT INTO service_bookings (user_id, provider_id, type, amount, commission, scheduled_at, notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [req.userId, provider_id, type, amount || 0, commission, scheduled_at, notes]
+  );
+  res.json(result.rows[0]);
+});
+
+app.get('/api/marketplace/bookings', authMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `SELECT b.*, sp.name as provider_name FROM service_bookings b
+     LEFT JOIN service_providers sp ON b.provider_id = sp.id
+     WHERE b.user_id = $1 ORDER BY b.created_at DESC`,
+    [req.userId]
+  );
+  res.json(result.rows);
+});
+
+// ── B2B / Institutional Routes ───────────────────────────
+app.get('/api/institutions', async (req, res) => {
+  const result = await pool.query(`SELECT * FROM institutions WHERE is_active = true ORDER BY name`);
+  res.json(result.rows);
+});
+
+app.post('/api/institutions', async (req, res) => {
+  const { name, type, contact_name, contact_email, contact_phone, contract_value, max_users } = req.body;
+  if (!name || !type) return res.status(400).json({ error: 'name and type are required' });
+
+  const result = await pool.query(
+    `INSERT INTO institutions (name, type, contact_name, contact_email, contact_phone, contract_value, max_users)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [name, type, contact_name, contact_email, contact_phone, contract_value, max_users]
+  );
+  res.json(result.rows[0]);
+});
+
+// ── LGPD Consent Routes ─────────────────────────────────
+app.post('/api/consent', authMiddleware, async (req, res) => {
+  const { consent_type, granted } = req.body;
+  if (!consent_type || granted === undefined) return res.status(400).json({ error: 'consent_type and granted are required' });
+
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const ua = req.headers['user-agent'];
+
+  await pool.query(
+    `INSERT INTO consent_records (user_id, consent_type, granted, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)`,
+    [req.userId, consent_type, granted, ip, ua]
+  );
+  res.json({ ok: true });
+});
+
+app.get('/api/consent', authMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `SELECT DISTINCT ON (consent_type) consent_type, granted, created_at
+     FROM consent_records WHERE user_id = $1 ORDER BY consent_type, created_at DESC`,
+    [req.userId]
+  );
+  res.json(result.rows);
+});
+
+// ── Gamification Routes ──────────────────────────────────
+app.get('/api/gamification', authMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `SELECT streak_days, total_points, badges FROM users WHERE id = $1`,
+    [req.userId]
+  );
+  res.json(result.rows[0] || { streak_days: 0, total_points: 0, badges: [] });
+});
+
+app.post('/api/gamification/checkin-reward', authMiddleware, async (req, res) => {
+  // Award points for check-in, update streak
+  const user = await pool.query(`SELECT streak_days, total_points, badges FROM users WHERE id = $1`, [req.userId]);
+  const u = user.rows[0];
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Check if checked in yesterday for streak
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const yesterdayCheckin = await pool.query(
+    `SELECT id FROM checkins WHERE user_id = $1 AND date = $2 AND status = 'confirmed'`,
+    [req.userId, yesterday]
+  );
+
+  const newStreak = yesterdayCheckin.rows.length > 0 ? (u.streak_days || 0) + 1 : 1;
+  const points = 10 + (newStreak >= 7 ? 5 : 0) + (newStreak >= 30 ? 10 : 0);
+
+  // Check for new badges
+  const badges = u.badges || [];
+  if (newStreak >= 7 && !badges.includes('streak_7')) badges.push('streak_7');
+  if (newStreak >= 30 && !badges.includes('streak_30')) badges.push('streak_30');
+  if (newStreak >= 100 && !badges.includes('streak_100')) badges.push('streak_100');
+
+  await pool.query(
+    `UPDATE users SET streak_days = $1, total_points = total_points + $2, badges = $3 WHERE id = $4`,
+    [newStreak, points, JSON.stringify(badges), req.userId]
+  );
+
+  res.json({ streak: newStreak, pointsEarned: points, totalPoints: (u.total_points || 0) + points, badges });
+});
+
+// ── Postback endpoint for ad networks ────────────────────
+app.get('/api/postback/install', async (req, res) => {
+  const { clickid, af_siteid, af_sub1 } = req.query;
+  console.log(`[Postback] Install: clickid=${clickid} siteid=${af_siteid} sub1=${af_sub1}`);
+  // Log for attribution
+  if (af_siteid || af_sub1) {
+    await pool.query(
+      `INSERT INTO conversions (event, affiliate_code, partner_id, metadata)
+       VALUES ('app_install', $1, $2, $3)`,
+      [af_sub1 || af_siteid, af_siteid, JSON.stringify({ clickid, ...req.query })]
+    ).catch(() => {});
+  }
+  res.status(200).send('OK');
+});
+
+app.get('/api/postback/event', async (req, res) => {
+  const { clickid, event_name, revenue } = req.query;
+  console.log(`[Postback] Event: ${event_name} clickid=${clickid} revenue=${revenue}`);
+  res.status(200).send('OK');
+});
 
 // ── Static Files ──────────────────────────────────────────
 app.use(express.static(__dirname));

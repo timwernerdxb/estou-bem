@@ -7,12 +7,20 @@ import { AppProvider } from "./src/store/AppContext";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { notificationService } from "./src/services/NotificationService";
 import { revenueCatService } from "./src/services/RevenueCatService";
+import { analyticsService } from "./src/services/AnalyticsService";
+import { affiliateService } from "./src/services/AffiliateService";
+import { healthIntegrationService } from "./src/services/HealthIntegrationService";
+import { autoCheckinService } from "./src/services/AutoCheckinService";
 
 export default function App() {
   useEffect(() => {
     // Initialize core services
     notificationService.initialize();
     revenueCatService.initialize();
+    analyticsService.initialize();
+    affiliateService.initialize();
+    healthIntegrationService.initialize();
+    autoCheckinService.initialize();
 
     // Handle notification responses (e.g., check-in button tapped)
     const responseSubscription =

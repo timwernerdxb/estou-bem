@@ -18,6 +18,8 @@ import { useApp, useSubscription } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { checkInService } from "../services/CheckInService";
+import { autoCheckinService, CheckinMode } from "../services/AutoCheckinService";
+import { healthIntegrationService } from "../services/HealthIntegrationService";
 import { RootStackParamList } from "../types";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -30,6 +32,36 @@ export function SettingsScreen() {
 
   const [checkinTimes, setCheckinTimes] = useState(state.checkinTimes);
   const [newTime, setNewTime] = useState("");
+  const [autoCheckinMode, setAutoCheckinMode] = useState<CheckinMode>("manual");
+  const [healthConnected, setHealthConnected] = useState(false);
+
+  React.useEffect(() => {
+    setAutoCheckinMode(autoCheckinService.getMode());
+    setHealthConnected(healthIntegrationService.isInitialized());
+  }, []);
+
+  const handleAutoCheckinChange = async (mode: CheckinMode) => {
+    if (mode === "auto_wearable" && !healthConnected) {
+      const ok = await healthIntegrationService.initialize();
+      if (!ok) {
+        Alert.alert("Não disponível", "Não foi possível conectar ao serviço de saúde.");
+        return;
+      }
+      setHealthConnected(true);
+    }
+    await autoCheckinService.setMode(mode);
+    setAutoCheckinMode(mode);
+  };
+
+  const handleConnectHealth = async () => {
+    const ok = await healthIntegrationService.initialize();
+    if (ok) {
+      setHealthConnected(true);
+      Alert.alert("Conectado!", `${healthIntegrationService.getPlatformName()} conectado.`);
+    } else {
+      Alert.alert("Erro", "Não foi possível conectar. Verifique se o app de saúde está instalado.");
+    }
+  };
 
   const maxCheckins = CHECKIN_CONFIG.maxCheckinsPerDay[tier];
 
@@ -139,6 +171,71 @@ export function SettingsScreen() {
                 </TouchableOpacity>
               </View>
             )}
+          </Card>
+        )}
+
+        {/* Auto Check-in Mode */}
+        {isElder && (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>Modo de Check-in</Text>
+            <Text style={styles.sectionSubtitle}>
+              Escolha como deseja confirmar seus check-ins
+            </Text>
+
+            {(["manual", "auto_movement", "auto_wearable"] as CheckinMode[]).map((mode) => {
+              const labels: Record<CheckinMode, { title: string; desc: string; icon: string }> = {
+                manual: { title: "Manual", desc: "Você toca o botão para confirmar", icon: "hand-left" },
+                auto_movement: { title: "Automático (movimento)", desc: "Confirmado se o celular detectar movimento", icon: "phone-portrait" },
+                auto_wearable: { title: "Automático (relógio/pulseira)", desc: "Confirmado se o wearable detectar atividade", icon: "watch" },
+              };
+              const l = labels[mode];
+              return (
+                <TouchableOpacity
+                  key={mode}
+                  style={[
+                    styles.modeOption,
+                    autoCheckinMode === mode && styles.modeOptionActive,
+                  ]}
+                  onPress={() => handleAutoCheckinChange(mode)}
+                >
+                  <Ionicons
+                    name={l.icon as any}
+                    size={24}
+                    color={autoCheckinMode === mode ? COLORS.primary : COLORS.textLight}
+                  />
+                  <View style={{ flex: 1, marginLeft: SPACING.sm }}>
+                    <Text style={[styles.modeTitle, autoCheckinMode === mode && { color: COLORS.primary }]}>
+                      {l.title}
+                    </Text>
+                    <Text style={styles.modeDesc}>{l.desc}</Text>
+                  </View>
+                  {autoCheckinMode === mode && (
+                    <Ionicons name="checkmark-circle" size={22} color={COLORS.primary} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </Card>
+        )}
+
+        {/* Health Integration */}
+        {isElder && (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>Dados de Saúde</Text>
+            <TouchableOpacity style={styles.menuRow} onPress={handleConnectHealth}>
+              <Ionicons name="heart" size={22} color={healthConnected ? COLORS.success : COLORS.textLight} />
+              <View style={{ flex: 1, marginLeft: SPACING.sm }}>
+                <Text style={styles.menuText}>{healthIntegrationService.getPlatformName()}</Text>
+                <Text style={styles.sectionSubtitle}>
+                  {healthConnected ? "Conectado" : "Toque para conectar"}
+                </Text>
+              </View>
+              <Ionicons
+                name={healthConnected ? "checkmark-circle" : "chevron-forward"}
+                size={20}
+                color={healthConnected ? COLORS.success : COLORS.textLight}
+              />
+            </TouchableOpacity>
           </Card>
         )}
 
@@ -283,6 +380,23 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
   },
   menuText: { ...FONTS.body, flex: 1 },
+  modeOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.xs,
+  },
+  modeOptionActive: {
+    backgroundColor: "#EBF4FF",
+    borderColor: COLORS.primary,
+    borderWidth: 1,
+  },
+  modeTitle: { ...FONTS.body, fontWeight: "600" },
+  modeDesc: { ...FONTS.small, marginTop: 2 },
   version: {
     ...FONTS.small,
     textAlign: "center",
