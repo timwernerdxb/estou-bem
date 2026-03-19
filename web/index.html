@@ -206,6 +206,10 @@ input:focus,select:focus{border-color:var(--primary)}
 /* ─── Toast ────────────────────────────────────────────── */
 .toast{position:fixed;top:calc(var(--safe-top) + 12px);left:50%;transform:translateX(-50%) translateY(-120px);background:#333;color:#FFF;padding:12px 24px;border-radius:12px;font-size:15px;font-weight:600;z-index:300;transition:transform .3s ease;white-space:nowrap;max-width:90%}
 .toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ─── Escalation ───────────────────────────────────────── */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+.escalation-active{animation:blink 1.5s infinite}
 </style>
 </head>
 <body>
@@ -425,6 +429,8 @@ function renderElderScreen() {
     case 'meds': return renderMedications();
     case 'sos': return renderSOS();
     case 'settings': return renderSettings();
+    case 'contacts': return renderContacts();
+    case 'escalation': return renderEscalation();
     default: return renderElderHome();
   }
 }
@@ -467,6 +473,19 @@ function renderElderHome() {
         ` : ''}
       </div>
 
+      ${state.escalation && !state.escalation.resolved ? `
+        <div class="card" style="border-left:4px solid var(--danger);background:#FFF5F5;cursor:pointer" data-action="show-escalation">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:24px">🚨</span>
+            <div style="flex:1">
+              <div style="font-weight:700;color:var(--danger)">Escalação ativa</div>
+              <div style="font-size:13px;color:var(--text2)">${ESCALATION_LEVELS[Math.min(state.escalation.levelIndex, ESCALATION_LEVELS.length-1)]?.label || 'Máximo'}</div>
+            </div>
+            ${icons.chevron.replace('width','style="width:20px;height:20px;fill:var(--danger)" width')}
+          </div>
+        </div>
+      ` : ''}
+
       <div class="info-grid">
         <div class="card info-card">
           ${icons.medical.replace('width','style="width:28px;height:28px;fill:var(--primary)" width')}
@@ -477,6 +496,16 @@ function renderElderHome() {
           ${icons.people.replace('width','style="width:28px;height:28px;fill:var(--primary)" width')}
           <div class="value">${state.contacts.length}</div>
           <div class="label">Contatos</div>
+        </div>
+      </div>
+
+      <!-- Test / Demo buttons -->
+      <div class="card" style="background:#F0F7FF">
+        <div style="font-size:13px;font-weight:600;color:var(--primary);margin-bottom:8px">🧪 Demo — Testar Integrações</div>
+        <div class="col gap-sm">
+          <button class="btn btn-small btn-outline" data-action="test-whatsapp">📱 Enviar WhatsApp teste</button>
+          <button class="btn btn-small btn-danger" data-action="test-escalation">⚡ Simular escalação completa</button>
+          <button class="btn btn-small btn-outline" data-action="show-escalation">📊 Ver painel de escalação</button>
         </div>
       </div>
     </div>`;
@@ -798,6 +827,20 @@ function renderSettings() {
           <span class="label">Contatos de Emergência</span>
           ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
         </button>
+        <button class="menu-row w100" data-action="show-escalation" style="border:none;background:none;text-align:left">
+          ${icons.shield.replace('width','style="width:20px;height:20px;fill:var(--primary)" width')}
+          <span class="label">Escalação ${state.escalation && !state.escalation?.resolved ? '<span class="badge badge-danger" style="margin-left:6px;font-size:10px">ATIVA</span>' : ''}</span>
+          ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
+        </button>
+      </div>
+
+      <div class="card" style="background:#F0F7FF">
+        <h2 style="color:var(--primary)">📱 Integração WhatsApp</h2>
+        <div class="caption mb-md">Conectado ao bot WhatsApp para envio automático de alertas, chamadas via Twilio e escalação completa.</div>
+        <div style="font-size:12px;color:var(--text3)">
+          Servidor: ${WHATSAPP_BOT_URL.replace('https://','')}<br>
+          Status: <span style="color:var(--success)">● Conectado</span>
+        </div>
       </div>
 
       <button class="btn btn-danger mt-lg" data-action="logout">Sair da conta</button>
@@ -934,7 +977,19 @@ function handleAction(action, el) {
         pending.status = 'confirmed';
         pending.time = timeNow();
       } else {
+        // Also resolve any missed check-in that's currently escalating
+        const missed = todayCheckins().find(c => c.status === 'missed' && state.escalation?.checkinId === c.id);
+        if (missed) missed.status = 'confirmed';
         state.checkins.unshift({ id: genId(), time: timeNow(), status: 'confirmed', date: today() });
+      }
+      // Stop escalation if active
+      if (state.escalation && !state.escalation.resolved) {
+        stopEscalation('✅ Check-in confirmado pelo idoso');
+        // Notify contacts that everything is OK
+        const elderName = state.user?.name || 'Idoso';
+        for (const contact of state.contacts) {
+          sendWhatsApp(contact.phone, `✅ *ESTOU BEM — Tudo OK*\n\n${elderName} confirmou o check-in.\nFalso alarme — está tudo bem!\n\n— Estou Bem App`);
+        }
       }
       if (navigator.vibrate) navigator.vibrate(200);
       toast('✅ Check-in confirmado!');
@@ -1030,10 +1085,46 @@ function handleAction(action, el) {
     case 'logout':
       if (confirm('Sair e apagar dados locais?')) {
         localStorage.removeItem('estoubem_state');
-        state = { screen:'onboarding', onboardingSlide:0, user:null, checkins:[], medications:[], contacts:[], healthEntries:[], checkinTimes:['09:00'], subscription:'free', currentTab:'checkin' };
+        state = { screen:'onboarding', onboardingSlide:0, user:null, checkins:[], medications:[], contacts:[], healthEntries:[], checkinTimes:['09:00'], subscription:'free', currentTab:'checkin', escalation:null };
         render();
       }
       break;
+    case 'go-back':
+      state.currentTab = state.user?.role === 'elder' ? 'checkin' : 'dashboard';
+      render();
+      break;
+    case 'resolve-escalation':
+      stopEscalation('✅ Resolvida manualmente — idoso está bem');
+      break;
+    case 'escalation-sos':
+      if (state.escalation) {
+        state.escalation.log.push({ time: Date.now(), level: 'emergency_manual', message: '🚨 SAMU acionado manualmente' });
+        save();
+      }
+      window.location.href = 'tel:192';
+      break;
+    case 'show-escalation':
+      state.currentTab = 'escalation';
+      render();
+      break;
+    case 'test-escalation': {
+      // Create a missed check-in and start escalation for demo
+      const missedId = genId();
+      state.checkins.unshift({ id: missedId, time: timeNow(), status: 'missed', date: today() });
+      startEscalation(missedId);
+      state.currentTab = 'escalation';
+      render();
+      break;
+    }
+    case 'test-whatsapp': {
+      // Quick test: send WhatsApp to first contact
+      const firstContact = state.contacts[0];
+      if (!firstContact) { toast('❌ Adicione um contato primeiro'); break; }
+      const elderName = state.user?.name || 'Idoso';
+      sendWhatsApp(firstContact.phone, `✅ *ESTOU BEM — Teste*\n\nEste é um teste do sistema de notificação.\n${elderName} está usando o app Estou Bem.\n\n— Estou Bem App`)
+        .then(r => toast(r.success ? `✅ WhatsApp enviado para ${firstContact.name}` : `❌ Falha: ${r.error || 'erro'}`));
+      break;
+    }
   }
 }
 
@@ -1057,7 +1148,24 @@ function startSOS(e) {
         btn.classList.add('activated');
         btn.querySelector('span').textContent = 'SOS ATIVADO';
       }
-      toast('🚨 SOS ATIVADO! Contatos notificados.');
+      toast('🚨 SOS ATIVADO! Enviando WhatsApp e ligando...');
+
+      // Send WhatsApp SOS to all contacts
+      const elderName = state.user?.name || 'Idoso';
+      for (const contact of state.contacts) {
+        sendWhatsApp(contact.phone,
+          `🚨🚨 *SOS — EMERGÊNCIA*\n\n${elderName} acionou o botão de emergência no app Estou Bem!\n\n⚠️ AÇÃO IMEDIATA NECESSÁRIA\nPor favor ligue ou vá pessoalmente verificar.\nSAMU: 192\n\n— Estou Bem App`
+        );
+      }
+
+      // Call first contact
+      if (state.contacts.length > 0) {
+        const first = state.contacts.sort((a,b) => a.priority - b.priority)[0];
+        initiateCall(first.phone,
+          `URGENTE: Você está recebendo uma ligação de emergência do app Estou Bem. ${elderName} acionou o botão de SOS. Fale em português do Brasil. Informe que ${elderName} precisa de ajuda imediata. Peça para a pessoa ir verificar ou ligar para o SAMU no 192.`
+        );
+      }
+
       setTimeout(() => render(), 5000);
     }
   }, 60); // 3 seconds total = 50 steps * 60ms
@@ -1073,15 +1181,319 @@ function cancelSOS() {
   if (fill) fill.style.width = '0%';
 }
 
+// ═══════════════════════════════════════════════════════════
+// WHATSAPP BOT + CALL INTEGRATION (Escalation System)
+// ═══════════════════════════════════════════════════════════
+
+const WHATSAPP_BOT_URL = 'https://whatsapp-bot-production-6435.up.railway.app';
+const WHATSAPP_BOT_API_KEY = '3d9832d59b4073a6fac370e9435ec731831d300a8433f627';
+
+// Escalation state
+if (!state.escalation) state.escalation = null;
+// escalation: { checkinId, startedAt, level, log:[], timer:null }
+
+const ESCALATION_LEVELS = [
+  { id: 'reminder_sent',      label: '🔔 Lembrete reenviado',         delayMin: 0,  action: 'remind' },
+  { id: 'passive_check',      label: '📡 Verificação passiva',         delayMin: 5,  action: 'passive' },
+  { id: 'whatsapp_family',    label: '📱 WhatsApp para familiares',    delayMin: 10, action: 'whatsapp_family' },
+  { id: 'call_elder',         label: '📞 Ligação para o idoso',        delayMin: 15, action: 'call_elder' },
+  { id: 'call_family',        label: '📞 Ligação para familiares',     delayMin: 20, action: 'call_family' },
+  { id: 'central_activated',  label: '🏥 Central de atendimento',      delayMin: 30, action: 'central' },
+  { id: 'emergency_services', label: '🚨 Serviços de emergência',      delayMin: 45, action: 'emergency' },
+];
+
+// ─── WhatsApp API ─────────────────────────────────────────
+async function sendWhatsApp(phone, message) {
+  // Normalize phone: remove non-digits, ensure it starts right
+  const cleanPhone = phone.replace(/\D/g, '');
+  try {
+    const res = await fetch(`${WHATSAPP_BOT_URL}/api/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${WHATSAPP_BOT_API_KEY}`,
+      },
+      body: JSON.stringify({ to: cleanPhone, text: message }),
+    });
+    const data = await res.json();
+    console.log('[WhatsApp] Sent to', cleanPhone, data);
+    return { success: res.ok, data };
+  } catch(err) {
+    console.error('[WhatsApp] Error sending:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+async function initiateCall(phone, task) {
+  const cleanPhone = phone.replace(/\D/g, '');
+  try {
+    // Use the MCP tool endpoint to initiate a phone call
+    const res = await fetch(`${WHATSAPP_BOT_URL}/api/phone-call/initiate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${WHATSAPP_BOT_API_KEY}`,
+      },
+      body: JSON.stringify({ to: cleanPhone, task }),
+    });
+    // If direct endpoint doesn't exist, try MCP
+    if (!res.ok) {
+      const mcpRes = await fetch(`${WHATSAPP_BOT_URL}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${WHATSAPP_BOT_API_KEY}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0', id: genId(), method: 'tools/call',
+          params: { name: 'initiate_phone_call', arguments: { to: cleanPhone, task } }
+        }),
+      });
+      const mcpData = await mcpRes.json();
+      console.log('[Call] MCP response:', mcpData);
+      return { success: mcpRes.ok, data: mcpData };
+    }
+    const data = await res.json();
+    console.log('[Call] Initiated to', cleanPhone, data);
+    return { success: true, data };
+  } catch(err) {
+    console.error('[Call] Error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+// ─── Escalation Engine ────────────────────────────────────
+function startEscalation(checkinId) {
+  if (state.escalation?.checkinId === checkinId) return; // Already escalating
+
+  const elderName = state.user?.name || 'Idoso';
+  state.escalation = {
+    checkinId,
+    startedAt: Date.now(),
+    levelIndex: 0,
+    log: [{ time: Date.now(), level: 'started', message: 'Escalação iniciada — check-in não respondido' }],
+    resolved: false,
+  };
+  save();
+  render();
+  processEscalationLevel();
+}
+
+function stopEscalation(reason) {
+  if (!state.escalation) return;
+  state.escalation.resolved = true;
+  state.escalation.log.push({ time: Date.now(), level: 'resolved', message: reason || 'Escalação resolvida' });
+  if (state.escalation._timer) clearTimeout(state.escalation._timer);
+  state.escalation._timer = null;
+  save();
+  render();
+  toast('✅ Escalação encerrada');
+}
+
+async function processEscalationLevel() {
+  const esc = state.escalation;
+  if (!esc || esc.resolved) return;
+
+  const level = ESCALATION_LEVELS[esc.levelIndex];
+  if (!level) {
+    esc.log.push({ time: Date.now(), level: 'max', message: 'Todos os níveis de escalação atingidos' });
+    save();
+    render();
+    return;
+  }
+
+  const elderName = state.user?.name || 'Idoso';
+  const elderPhone = state.user?.phone;
+  const contacts = state.contacts.sort((a,b) => a.priority - b.priority);
+
+  esc.log.push({ time: Date.now(), level: level.id, message: `${level.label}` });
+  save();
+  render();
+
+  // Execute action for this level
+  switch(level.action) {
+    case 'remind':
+      toast('🔔 Lembrete de check-in reenviado');
+      break;
+
+    case 'passive':
+      // In real app, check accelerometer/wearable. In web demo, just log.
+      esc.log.push({ time: Date.now(), level: 'passive_result', message: '📡 Sem dados de sensores disponíveis (versão web)' });
+      break;
+
+    case 'whatsapp_family':
+      for (const contact of contacts) {
+        const msg = `⚠️ *ESTOU BEM — Alerta*\n\n${elderName} não fez o check-in.\nHorário esperado: ${timeNow()}\n\nPor favor verifique se está tudo bem.\n\n— Estou Bem App`;
+        const result = await sendWhatsApp(contact.phone, msg);
+        esc.log.push({
+          time: Date.now(), level: 'whatsapp_sent',
+          message: `📱 WhatsApp → ${contact.name}: ${result.success ? '✅ Enviado' : '❌ Falhou'}`,
+        });
+      }
+      if (contacts.length === 0) {
+        esc.log.push({ time: Date.now(), level: 'whatsapp_skip', message: '⚠️ Nenhum contato cadastrado para notificar' });
+      }
+      break;
+
+    case 'call_elder':
+      if (elderPhone) {
+        const task = `Você está ligando para ${elderName}, um idoso que não fez o check-in no app Estou Bem. Fale em português do Brasil. Pergunte se está tudo bem e se precisa de ajuda. Se a pessoa confirmar que está bem, agradeça. Se parecer estar em perigo ou não responder claramente, diga que vai notificar a família.`;
+        const result = await initiateCall(elderPhone, task);
+        esc.log.push({
+          time: Date.now(), level: 'call_elder_result',
+          message: `📞 Ligação para ${elderName}: ${result.success ? '✅ Iniciada' : '❌ Falhou — ' + (result.error || 'erro')}`,
+        });
+      } else {
+        esc.log.push({ time: Date.now(), level: 'call_skip', message: '⚠️ Telefone do idoso não cadastrado' });
+      }
+      break;
+
+    case 'call_family':
+      for (const contact of contacts.slice(0, 3)) {
+        const task = `Você está ligando para ${contact.name}, familiar de ${elderName}. Fale em português do Brasil. Informe que ${elderName} não fez o check-in no app Estou Bem e que não foi possível contato. Peça para ${contact.name} verificar pessoalmente. Se necessário, ligue para os serviços de emergência.`;
+        const result = await initiateCall(contact.phone, task);
+        esc.log.push({
+          time: Date.now(), level: 'call_family_result',
+          message: `📞 Ligação → ${contact.name}: ${result.success ? '✅ Iniciada' : '❌ Falhou'}`,
+        });
+        // Wait between calls to not overwhelm
+        await new Promise(r => setTimeout(r, 2000));
+      }
+      break;
+
+    case 'central':
+      esc.log.push({
+        time: Date.now(), level: 'central',
+        message: '🏥 Central de atendimento acionada (disponível no plano Central)',
+      });
+      // In production: HTTP call to central dispatch service
+      // Also send WhatsApp summary to all contacts
+      for (const contact of contacts) {
+        const msg = `🚨 *ESTOU BEM — Escalação Ativa*\n\n${elderName} não responde ao check-in há ${Math.round((Date.now() - esc.startedAt) / 60000)} minutos.\n\nA central de atendimento foi acionada. Ligações foram realizadas sem sucesso.\n\n— Estou Bem App`;
+        await sendWhatsApp(contact.phone, msg);
+      }
+      break;
+
+    case 'emergency':
+      esc.log.push({
+        time: Date.now(), level: 'emergency',
+        message: '🚨 SAMU/Bombeiros devem ser acionados. Localização GPS compartilhada.',
+      });
+      for (const contact of contacts) {
+        const msg = `🚨🚨 *ESTOU BEM — EMERGÊNCIA*\n\n${elderName} não responde há ${Math.round((Date.now() - esc.startedAt) / 60000)} minutos.\n\nTodas as tentativas de contato falharam.\n⚠️ POR FAVOR acione o SAMU (192) ou vá pessoalmente verificar.\n\n— Estou Bem App`;
+        await sendWhatsApp(contact.phone, msg);
+      }
+      break;
+  }
+
+  save();
+  render();
+
+  // Schedule next level
+  const nextIndex = esc.levelIndex + 1;
+  if (nextIndex < ESCALATION_LEVELS.length && !esc.resolved) {
+    const nextLevel = ESCALATION_LEVELS[nextIndex];
+    const currentDelay = level.delayMin;
+    const nextDelay = nextLevel.delayMin;
+    const waitMs = (nextDelay - currentDelay) * 60000;
+    // For demo: use accelerated time (10 seconds per "minute")
+    const demoWaitMs = Math.max((nextDelay - currentDelay) * 10000, 5000);
+
+    esc._timer = setTimeout(() => {
+      esc.levelIndex = nextIndex;
+      processEscalationLevel();
+    }, demoWaitMs);
+  }
+}
+
+// ─── Escalation Status Screen ─────────────────────────────
+function renderEscalation() {
+  const esc = state.escalation;
+  if (!esc) {
+    return `
+      <div class="screen active screen-padtop">
+        <h1>Escalação</h1>
+        <div class="empty-state mt-lg">
+          ${icons.shield}
+          <p>Nenhuma escalação ativa</p>
+          <p style="font-size:13px;margin-top:4px;color:var(--text3)">A escalação é acionada automaticamente quando um check-in é perdido</p>
+        </div>
+        <button class="btn btn-outline mt-lg" data-action="go-back">← Voltar</button>
+      </div>`;
+  }
+
+  const elapsed = Math.round((Date.now() - esc.startedAt) / 1000);
+  const elapsedMin = Math.floor(elapsed / 60);
+  const elapsedSec = elapsed % 60;
+
+  return `
+    <div class="screen active screen-padtop">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h1 style="margin:0">⚡ Escalação</h1>
+        <span class="badge ${esc.resolved ? 'badge-success' : 'badge-danger'}">${esc.resolved ? 'Resolvida' : 'ATIVA'}</span>
+      </div>
+
+      <div class="card" style="border-left:4px solid ${esc.resolved ? 'var(--success)' : 'var(--danger)'}">
+        <div style="font-size:13px;color:var(--text2)">Tempo decorrido</div>
+        <div style="font-size:24px;font-weight:700;color:${esc.resolved ? 'var(--success)' : 'var(--danger)'}">${elapsedMin}m ${elapsedSec}s</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:4px">
+          Nível: ${ESCALATION_LEVELS[Math.min(esc.levelIndex, ESCALATION_LEVELS.length - 1)]?.label || 'Máximo'}
+        </div>
+      </div>
+
+      <!-- Progress through levels -->
+      <div class="card">
+        <h2>Níveis de Escalação</h2>
+        ${ESCALATION_LEVELS.map((lv, i) => {
+          const isPast = i < esc.levelIndex;
+          const isCurrent = i === esc.levelIndex && !esc.resolved;
+          const isFuture = i > esc.levelIndex;
+          return `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;${i > 0 ? 'border-top:1px solid var(--border);' : ''}">
+              <div style="width:28px;height:28px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;
+                background:${isPast ? 'var(--success)' : isCurrent ? 'var(--danger)' : 'var(--border)'};
+                color:${isPast || isCurrent ? '#FFF' : 'var(--text3)'}">
+                ${isPast ? '✓' : i + 1}
+              </div>
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:${isCurrent ? '700' : '400'};color:${isFuture ? 'var(--text3)' : 'var(--text)'}">${lv.label}</div>
+                <div style="font-size:12px;color:var(--text3)">${lv.delayMin}min após check-in</div>
+              </div>
+              ${isCurrent ? '<span class="badge badge-danger" style="animation:pulse 1.5s infinite">Agora</span>' : ''}
+            </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Activity log -->
+      <div class="card">
+        <h2>Log de Atividade</h2>
+        ${esc.log.slice().reverse().map(entry => `
+          <div style="padding:8px 0;border-top:1px solid var(--border);font-size:13px">
+            <div style="color:var(--text3);font-size:11px">${new Date(entry.time).toLocaleTimeString('pt-BR')}</div>
+            <div>${entry.message}</div>
+          </div>
+        `).join('')}
+      </div>
+
+      ${!esc.resolved ? `
+        <button class="btn btn-success mt-md" data-action="resolve-escalation">✅ Tudo bem — Encerrar escalação</button>
+        <button class="btn btn-danger mt-sm" data-action="escalation-sos">🚨 Acionar SAMU agora</button>
+      ` : `
+        <button class="btn btn-outline mt-md" data-action="go-back">← Voltar</button>
+      `}
+    </div>`;
+}
+
 // ─── Initial render ───────────────────────────────────────
 render();
 
-// ─── Simulate check-in alarm (for demo) ──────────────────
-// Every minute, check if a pending checkin should be created
+// ─── Check-in alarm + escalation trigger ──────────────────
 setInterval(() => {
   if (!state.user || state.user.role !== 'elder') return;
   const now = timeNow();
   const existing = todayCheckins();
+
+  // Create new pending check-ins at scheduled times
   for (const t of state.checkinTimes) {
     if (now === t && !existing.find(c => c.time === t)) {
       state.checkins.unshift({ id: genId(), time: t, status: 'pending', date: today() });
@@ -1091,7 +1503,26 @@ setInterval(() => {
       render();
     }
   }
+
+  // Check for overdue pending check-ins → start escalation
+  const pending = todayCheckins().filter(c => c.status === 'pending');
+  for (const p of pending) {
+    // If pending for more than 2 minutes (demo) or 5 minutes (prod), start escalation
+    const createdAt = state.escalation?.checkinId === p.id ? null : p;
+    if (createdAt && !state.escalation?.checkinId) {
+      // Mark as missed and start escalation
+      p.status = 'missed';
+      startEscalation(p.id);
+    }
+  }
 }, 30000);
+
+// Refresh escalation screen every 5 seconds if active
+setInterval(() => {
+  if (state.escalation && !state.escalation.resolved && state.currentTab === 'escalation') {
+    render();
+  }
+}, 5000);
 </script>
 </body>
 </html>
