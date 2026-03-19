@@ -279,9 +279,103 @@ try {
 function save() {
   try {
     localStorage.setItem('estoubem_state', JSON.stringify(state));
-    // Also persist per-user if logged in
     if (state.auth?.email) saveUserState(state.auth.email, state);
   } catch(e) {}
+}
+
+// ─── API Client ──────────────────────────────────────────
+const API_BASE = '';  // same origin
+let authToken = localStorage.getItem('estoubem_token') || null;
+
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (authToken) opts.headers['Authorization'] = `Bearer ${authToken}`;
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, opts);
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.error || 'Request failed', status: res.status };
+    return { ok: true, data };
+  } catch(err) {
+    console.warn('[API] offline or error:', err.message);
+    return { ok: false, error: 'Network error', offline: true };
+  }
+}
+
+function setToken(token) {
+  authToken = token;
+  if (token) localStorage.setItem('estoubem_token', token);
+  else localStorage.removeItem('estoubem_token');
+}
+
+// Sync full state from API after login/register
+async function syncFromAPI() {
+  if (!authToken) return;
+  const [me, checkins, contacts, meds, health, settings] = await Promise.all([
+    api('GET', '/api/me'),
+    api('GET', '/api/checkins?limit=200'),
+    api('GET', '/api/contacts'),
+    api('GET', '/api/medications'),
+    api('GET', '/api/health?limit=100'),
+    api('GET', '/api/settings'),
+  ]);
+  if (me.ok) {
+    const u = me.data;
+    state.user = { name: u.name, phone: u.phone, role: u.role, email: u.email, linkCode: u.link_code };
+    state.auth = { email: u.email };
+    state.subscription = u.subscription;
+    state.trialStart = u.trial_start;
+    state.linkedElderEmail = u.linked_elder_id ? String(u.linked_elder_id) : null;
+    state._userId = u.id;
+    state._linkedElderId = u.linked_elder_id;
+  }
+  if (checkins.ok) state.checkins = checkins.data.map(c => ({ id: c.id, time: c.time, status: c.status, date: c.date }));
+  if (contacts.ok) state.contacts = contacts.data.map(c => ({ id: c.id, name: c.name, phone: c.phone, relationship: c.relationship, priority: c.priority }));
+  if (meds.ok) state.medications = meds.data.map(m => ({ id: m.id, name: m.name, dosage: m.dosage, frequency: m.frequency, time: m.time, stock: m.stock, unit: m.unit, lowThreshold: m.low_threshold }));
+  if (health.ok) state.healthEntries = health.data.map(h => ({ id: h.id, type: h.type, value: h.value, unit: h.unit, time: h.time, date: h.date, notes: h.notes }));
+  if (settings.ok) {
+    const s = settings.data;
+    state.checkinTimes = s.checkin_times || ['09:00'];
+    state.checkinMode = s.checkin_mode || 'scheduled';
+    state.checkinIntervalHours = s.checkin_interval_hours || 2;
+    state.checkinWindowStart = s.checkin_window_start || '07:00';
+    state.checkinWindowEnd = s.checkin_window_end || '22:00';
+  }
+  save();
+}
+
+// Check if we have a valid token on load
+async function tryAutoLogin() {
+  if (!authToken) return false;
+  const res = await api('GET', '/api/me');
+  if (res.ok) {
+    await syncFromAPI();
+    state.currentTab = state.user?.role === 'elder' ? 'checkin' : 'dashboard';
+    return true;
+  }
+  // Token expired
+  setToken(null);
+  return false;
+}
+
+// ─── Settings & Subscription sync ─────────────────────────
+function syncSettings() {
+  if (!authToken) return;
+  api('PUT', '/api/settings', {
+    checkin_times: state.checkinTimes,
+    checkin_mode: state.checkinMode,
+    checkin_interval_hours: state.checkinIntervalHours,
+    checkin_window_start: state.checkinWindowStart,
+    checkin_window_end: state.checkinWindowEnd,
+  });
+}
+
+function syncSubscription(plan) {
+  if (!authToken) return;
+  api('PUT', '/api/subscription', { plan });
 }
 
 // ─── Utility ──────────────────────────────────────────────
@@ -788,10 +882,26 @@ function renderFamilyApp() {
 }
 
 function renderDashboard() {
-  // If linked to an elder, load their data
+  // If linked to an elder via API, fetch their data
+  if (authToken && state._linkedElderId && !state._elderDashboard) {
+    api('GET', '/api/elder-dashboard').then(res => {
+      if (res.ok) {
+        state._elderDashboard = res.data;
+        render();
+      }
+    });
+  }
   let elderData = state;
   let elderName = state.user?.name || '';
-  if (state.linkedElderEmail) {
+  if (state._elderDashboard) {
+    const d = state._elderDashboard;
+    elderData = {
+      checkins: d.checkins || [],
+      medications: d.medications || [],
+      healthEntries: d.healthEntries || [],
+    };
+    elderName = d.elder?.name || 'Idoso vinculado';
+  } else if (state.linkedElderEmail) {
     const loaded = loadUserState(state.linkedElderEmail);
     if (loaded) { elderData = loaded; elderName = loaded.user?.name || state.linkedElderEmail; }
   }
@@ -1146,6 +1256,7 @@ function bindEvents() {
     const plan = el.dataset.plan;
     if (plan !== 'free' && plan !== state.subscription) {
       state.subscription = plan;
+      syncSubscription(plan);
       toast(`✅ Plano ${plan==='familia'?'Família':'Central'} ativado!`);
       save();
       render();
@@ -1155,8 +1266,8 @@ function bindEvents() {
   // Interval window inputs
   const intStart = $('#interval-start');
   const intEnd = $('#interval-end');
-  if (intStart) intStart.addEventListener('change', () => { state.checkinWindowStart = intStart.value; render(); });
-  if (intEnd) intEnd.addEventListener('change', () => { state.checkinWindowEnd = intEnd.value; render(); });
+  if (intStart) intStart.addEventListener('change', () => { state.checkinWindowStart = intStart.value; save(); syncSettings(); render(); });
+  if (intEnd) intEnd.addEventListener('change', () => { state.checkinWindowEnd = intEnd.value; save(); syncSettings(); render(); });
 
   // SOS hold
   const sosBtn = $('#sos-btn');
@@ -1205,19 +1316,11 @@ function handleAction(action, el) {
       if (!role) { toast('❌ Selecione seu perfil'); return; }
       if (!pw || pw.length < 6) { toast('❌ Senha deve ter no mínimo 6 caracteres'); return; }
       if (pw !== pw2) { toast('❌ Senhas não conferem'); return; }
-      const accs = getAccounts();
-      if (accs[email]) { toast('❌ E-mail já cadastrado'); return; }
-      hashPw(pw).then(hash => {
-        const linkCode = Math.random().toString().slice(2,8);
-        accs[email] = { email, hash, name, phone, role, linkCode, createdAt: new Date().toISOString() };
-        saveAccounts(accs);
-        state.auth = { email };
-        state.user = { name, phone, role, email, linkCode };
-        state.trialStart = new Date().toISOString();
+      api('POST', '/api/register', { email, password: pw, name, phone, role }).then(async res => {
+        if (!res.ok) { toast(`❌ ${res.error}`); return; }
+        setToken(res.data.token);
+        await syncFromAPI();
         state.currentTab = role === 'elder' ? 'checkin' : 'dashboard';
-        if (role === 'elder') {
-          state.checkins.push({ id: genId(), time: getEffectiveCheckinTimes()[0] || '09:00', status: 'pending', date: today() });
-        }
         toast('🎁 Conta criada! 30 dias grátis com todos os recursos');
         render();
       });
@@ -1227,20 +1330,12 @@ function handleAction(action, el) {
       const email = $('#login-email')?.value?.trim()?.toLowerCase();
       const pw = $('#login-password')?.value;
       if (!email || !pw) { toast('❌ Preencha e-mail e senha'); return; }
-      const accs = getAccounts();
-      const acc = accs[email];
-      if (!acc) { toast('❌ Conta não encontrada'); return; }
-      hashPw(pw).then(hash => {
-        if (hash !== acc.hash) { toast('❌ Senha incorreta'); return; }
-        // Load user state if exists
-        const saved = loadUserState(email);
-        if (saved) {
-          Object.assign(state, saved);
-        }
-        state.auth = { email };
-        state.user = { name: acc.name, phone: acc.phone, role: acc.role, email, linkCode: acc.linkCode };
-        state.currentTab = acc.role === 'elder' ? 'checkin' : 'dashboard';
-        toast(`Bem-vindo de volta, ${acc.name}!`);
+      api('POST', '/api/login', { email, password: pw }).then(async res => {
+        if (!res.ok) { toast(`❌ ${res.error}`); return; }
+        setToken(res.data.token);
+        await syncFromAPI();
+        state.currentTab = state.user?.role === 'elder' ? 'checkin' : 'dashboard';
+        toast(`Bem-vindo de volta, ${state.user?.name}!`);
         render();
       });
       break;
@@ -1248,17 +1343,14 @@ function handleAction(action, el) {
     case 'link-elder': {
       const code = $('#link-code')?.value?.trim();
       if (!code) { toast('❌ Digite o código'); return; }
-      const accs = getAccounts();
-      const elder = Object.values(accs).find(a => a.linkCode === code && a.role === 'elder');
-      if (!elder) { toast('❌ Código inválido'); return; }
-      state.linkedElderEmail = elder.email;
-      // Also update account record
-      if (state.auth?.email) {
-        accs[state.auth.email].linkedElderEmail = elder.email;
-        saveAccounts(accs);
-      }
-      toast(`✅ Vinculado a ${elder.name}!`);
-      render();
+      api('POST', '/api/link-elder', { code }).then(res => {
+        if (!res.ok) { toast(`❌ ${res.error}`); return; }
+        state.linkedElderEmail = String(res.data.elderId);
+        state._linkedElderId = res.data.elderId;
+        toast(`✅ Vinculado a ${res.data.elderName}!`);
+        save();
+        render();
+      });
       break;
     }
     case 'complete-setup': {
@@ -1282,11 +1374,14 @@ function handleAction(action, el) {
       if (pending) {
         pending.status = 'confirmed';
         pending.time = timeNow();
+        if (authToken) api('PUT', `/api/checkins/${pending.id}`, { status: 'confirmed', time: timeNow() });
       } else {
         // Also resolve any missed check-in that's currently escalating
         const missed = todayCheckins().find(c => c.status === 'missed' && state.escalation?.checkinId === c.id);
         if (missed) missed.status = 'confirmed';
-        state.checkins.unshift({ id: genId(), time: timeNow(), status: 'confirmed', date: today() });
+        const newCheckin = { id: genId(), time: timeNow(), status: 'confirmed', date: today() };
+        state.checkins.unshift(newCheckin);
+        if (authToken) api('POST', '/api/checkins', { time: newCheckin.time, status: 'confirmed', date: newCheckin.date });
       }
       // Stop escalation if active
       if (state.escalation && !state.escalation.resolved) {
@@ -1319,7 +1414,7 @@ function handleAction(action, el) {
       const name = $('#med-name')?.value?.trim();
       if (!name) { toast('❌ Digite o nome'); return; }
       const activeFreq = $('[data-freq].active');
-      state.medications.push({
+      const med = {
         id: genId(), name,
         dosage: $('#med-dosage')?.value?.trim() || '',
         frequency: activeFreq?.dataset?.freq || '1x ao dia',
@@ -1327,7 +1422,9 @@ function handleAction(action, el) {
         stock: parseInt($('#med-stock')?.value) || 30,
         unit: $('#med-unit')?.value?.trim() || 'comprimidos',
         lowThreshold: 5,
-      });
+      };
+      state.medications.push(med);
+      if (authToken) api('POST', '/api/medications', { name: med.name, dosage: med.dosage, frequency: med.frequency, time: med.time, stock: med.stock, unit: med.unit, low_threshold: med.lowThreshold }).then(r => { if (r.ok) { med.id = r.data.id; save(); } });
       toast('✅ Medicamento adicionado!');
       render();
       break;
@@ -1337,12 +1434,14 @@ function handleAction(action, el) {
       if (!med) return;
       if (med.stock <= 0) { toast('❌ Estoque vazio!'); return; }
       med.stock--;
+      if (authToken) api('PUT', `/api/medications/${med.id}`, { stock: med.stock });
       if (med.stock <= med.lowThreshold) toast(`⚠️ Estoque baixo: ${med.name} — ${med.stock} ${med.unit}`);
       else toast(`✅ ${med.name} registrado!`);
       render();
       break;
     }
     case 'delete-med':
+      if (authToken) api('DELETE', `/api/medications/${el.dataset.id}`);
       state.medications = state.medications.filter(m => m.id !== el.dataset.id);
       toast('Medicamento removido');
       render();
@@ -1360,16 +1459,19 @@ function handleAction(action, el) {
         $('#modal-paywall')?.classList.add('visible');
         return;
       }
-      state.contacts.push({
+      const contact = {
         id: genId(), name, phone,
         relationship: $('#contact-rel')?.value?.trim() || '',
         priority: state.contacts.length + 1,
-      });
+      };
+      state.contacts.push(contact);
+      if (authToken) api('POST', '/api/contacts', contact).then(r => { if (r.ok) { contact.id = r.data.id; save(); } });
       toast('✅ Contato adicionado!');
       render();
       break;
     }
     case 'delete-contact':
+      if (authToken) api('DELETE', `/api/contacts/${el.dataset.id}`);
       state.contacts = state.contacts.filter(c => c.id !== el.dataset.id);
       toast('Contato removido');
       render();
@@ -1379,10 +1481,12 @@ function handleAction(action, el) {
       break;
     case 'set-checkin-mode':
       state.checkinMode = el.dataset.mode;
+      save(); syncSettings();
       render();
       break;
     case 'set-interval':
       state.checkinIntervalHours = parseInt(el.dataset.hours);
+      save(); syncSettings();
       render();
       break;
     case 'add-time': {
@@ -1394,17 +1498,19 @@ function handleAction(action, el) {
       }
       state.checkinTimes.push(t);
       state.checkinTimes.sort();
+      save(); syncSettings();
       toast(`✅ Check-in às ${t} adicionado`);
       render();
       break;
     }
     case 'remove-time':
       state.checkinTimes = state.checkinTimes.filter(t => t !== el.dataset.time);
+      save(); syncSettings();
       render();
       break;
     case 'logout':
       if (confirm('Sair da conta?')) {
-        // Save current state for re-login
+        setToken(null);
         if (state.auth?.email) saveUserState(state.auth.email, state);
         localStorage.removeItem('estoubem_state');
         state = { screen:'login', onboardingSlide:0, auth:null, user:null, checkins:[], medications:[], contacts:[], healthEntries:[], checkinTimes:['09:00'], checkinMode:'scheduled', checkinIntervalHours:2, checkinWindowStart:'07:00', checkinWindowEnd:'22:00', subscription:'free', trialStart:null, linkedElderEmail:null, currentTab:'checkin', escalation:null };
@@ -1813,8 +1919,14 @@ function renderEscalation() {
     </div>`;
 }
 
-// ─── Initial render ───────────────────────────────────────
-render();
+// ─── Initial render (with auto-login) ─────────────────────
+(async () => {
+  if (authToken) {
+    const ok = await tryAutoLogin();
+    if (ok) { save(); render(); return; }
+  }
+  render();
+})();
 
 // ─── Check-in alarm + escalation trigger ──────────────────
 setInterval(() => {
