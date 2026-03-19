@@ -857,15 +857,11 @@ function renderAddMedModal() {
 function renderFamilyApp() {
   const tabs = [
     { id:'dashboard', label:'Painel', icon:'grid' },
-    { id:'contacts', label:'Contatos', icon:'people' },
-    { id:'meds', label:'Remédios', icon:'medical' },
     { id:'settings', label:'Config', icon:'settings' },
   ];
   let screen;
   switch(state.currentTab) {
     case 'dashboard': screen = renderDashboard(); break;
-    case 'contacts': screen = renderContacts(); break;
-    case 'meds': screen = renderMedications(); break;
     case 'settings': screen = renderSettings(); break;
     default: screen = renderDashboard();
   }
@@ -878,6 +874,54 @@ function renderFamilyApp() {
           <span>${t.label}</span>
         </button>
       `).join('')}
+    </div>`;
+}
+
+function renderHealthSection(elderData) {
+  const entries = elderData.healthEntries || [];
+  if (entries.length === 0) {
+    return `
+      <div class="card">
+        <h2>${icons.heart.replace('width','style="width:22px;height:22px;fill:var(--danger);vertical-align:middle;margin-right:6px" width')} Saúde</h2>
+        <p class="caption text-center" style="padding:16px 0">Nenhum dado de saúde disponível.<br>Conecte o Apple Watch ou Samsung Health no app do idoso.</p>
+      </div>`;
+  }
+  // Group by type, show latest of each
+  const byType = {};
+  for (const e of entries) {
+    if (!byType[e.type]) byType[e.type] = e;
+  }
+  const typeLabels = { heart_rate:'Freq. Cardíaca', steps:'Passos', blood_pressure:'Pressão', blood_oxygen:'Oxigênio', temperature:'Temperatura', weight:'Peso', sleep:'Sono', falls:'Quedas' };
+  const typeIcons = { heart_rate:'❤️', steps:'🚶', blood_pressure:'🩸', blood_oxygen:'🫁', temperature:'🌡️', weight:'⚖️', sleep:'😴', falls:'⚠️' };
+  const typeColors = { heart_rate:'var(--danger)', steps:'var(--primary)', blood_pressure:'var(--warning)', blood_oxygen:'#2196F3', temperature:'#FF5722', weight:'var(--text)', sleep:'#9C27B0', falls:'var(--danger)' };
+
+  return `
+    <div class="card">
+      <h2>${icons.heart.replace('width','style="width:22px;height:22px;fill:var(--danger);vertical-align:middle;margin-right:6px" width')} Dados de Saúde</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        ${Object.entries(byType).map(([type, e]) => `
+          <div style="background:var(--bg);border-radius:12px;padding:12px;text-align:center">
+            <div style="font-size:24px">${typeIcons[type]||'📊'}</div>
+            <div style="font-size:22px;font-weight:700;color:${typeColors[type]||'var(--text)'}">${e.value}${e.unit?' '+e.unit:''}</div>
+            <div style="font-size:12px;color:var(--text2)">${typeLabels[type]||type}</div>
+            <div style="font-size:11px;color:var(--text3)">${e.time||''} ${e.date||''}</div>
+          </div>
+        `).join('')}
+      </div>
+      ${entries.length > Object.keys(byType).length ? `
+        <details style="margin-top:12px">
+          <summary style="font-size:13px;color:var(--primary);cursor:pointer;font-weight:600">Ver histórico (${entries.length} registros)</summary>
+          <div style="margin-top:8px;max-height:200px;overflow-y:auto">
+            ${entries.slice(0, 20).map(e => `
+              <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-top:1px solid var(--border)">
+                <span>${typeIcons[e.type]||'📊'} ${typeLabels[e.type]||e.type}</span>
+                <span style="font-weight:600">${e.value}${e.unit?' '+e.unit:''}</span>
+                <span style="color:var(--text3)">${e.time||''}</span>
+              </div>
+            `).join('')}
+          </div>
+        </details>
+      ` : ''}
     </div>`;
 }
 
@@ -958,6 +1002,25 @@ function renderDashboard() {
           `).join('')}
         </div>
       ` : ''}
+
+      ${elderMeds.length ? `
+        <div class="card">
+          <h2>💊 Medicamentos</h2>
+          ${elderMeds.map(m => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;${elderMeds.indexOf(m)>0?'border-top:1px solid var(--border);':''}">
+              <div>
+                <div style="font-weight:600">${m.name}</div>
+                <div class="caption">${m.dosage || ''} ${m.frequency || ''} ${m.time ? '• '+m.time : ''}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-weight:600;color:${m.stock<=m.lowThreshold?'var(--danger)':'var(--text)'}">${m.stock} ${m.unit||'un.'}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      ${renderHealthSection(elderData)}
 
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
