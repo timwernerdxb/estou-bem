@@ -215,6 +215,24 @@ app.post('/api/link-elder', authMiddleware, async (req, res) => {
   if (elder.rows.length === 0) return res.status(404).json({ error: 'Invalid code' });
 
   await pool.query(`UPDATE users SET linked_elder_id = $1 WHERE id = $2`, [elder.rows[0].id, req.userId]);
+
+  // Auto-add family member as emergency contact on the elder's account
+  const familyUser = await pool.query(`SELECT name, phone FROM users WHERE id = $1`, [req.userId]);
+  if (familyUser.rows[0]?.phone) {
+    // Check if this phone isn't already a contact for the elder
+    const existing = await pool.query(
+      `SELECT id FROM contacts WHERE user_id = $1 AND phone = $2`,
+      [elder.rows[0].id, familyUser.rows[0].phone]
+    );
+    if (existing.rows.length === 0) {
+      const nextPriority = await pool.query(`SELECT COALESCE(MAX(priority),0)+1 as p FROM contacts WHERE user_id = $1`, [elder.rows[0].id]);
+      await pool.query(
+        `INSERT INTO contacts (user_id, name, phone, relationship, priority) VALUES ($1, $2, $3, $4, $5)`,
+        [elder.rows[0].id, familyUser.rows[0].name, familyUser.rows[0].phone, 'Familiar (vinculado)', nextPriority.rows[0].p]
+      );
+    }
+  }
+
   res.json({ ok: true, elderName: elder.rows[0].name, elderId: elder.rows[0].id });
 });
 
