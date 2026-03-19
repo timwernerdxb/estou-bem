@@ -1203,9 +1203,17 @@ const ESCALATION_LEVELS = [
 ];
 
 // ─── WhatsApp API ─────────────────────────────────────────
+function normalizePhone(raw) {
+  let p = raw.replace(/\D/g, '');
+  // Brazilian numbers: if starts with local area code (2 digits) + 9-digit mobile, prepend 55
+  if (/^[1-9]{2}9\d{8}$/.test(p)) p = '55' + p;
+  // Also handle 8-digit landlines with area code
+  if (/^[1-9]{2}[2-5]\d{7}$/.test(p)) p = '55' + p;
+  return p;
+}
+
 async function sendWhatsApp(phone, message) {
-  // Normalize phone: remove non-digits, ensure it starts right
-  const cleanPhone = phone.replace(/\D/g, '');
+  const cleanPhone = normalizePhone(phone);
   try {
     const res = await fetch(`${WHATSAPP_BOT_URL}/api/send`, {
       method: 'POST',
@@ -1225,7 +1233,7 @@ async function sendWhatsApp(phone, message) {
 }
 
 async function initiateCall(phone, task) {
-  const cleanPhone = phone.replace(/\D/g, '');
+  const cleanPhone = normalizePhone(phone);
   try {
     // Use the MCP tool endpoint to initiate a phone call
     const res = await fetch(`${WHATSAPP_BOT_URL}/api/phone-call/initiate`, {
