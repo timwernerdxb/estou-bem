@@ -1158,10 +1158,9 @@ function startSOS(e) {
         );
       }
 
-      // Call first contact
-      if (state.contacts.length > 0) {
-        const first = state.contacts.sort((a,b) => a.priority - b.priority)[0];
-        initiateCall(first.phone,
+      // Call all contacts
+      for (const contact of state.contacts.sort((a,b) => a.priority - b.priority)) {
+        initiateCall(contact.phone,
           `URGENTE: Você está recebendo uma ligação de emergência do app Estou Bem. ${elderName} acionou o botão de SOS. Fale em português do Brasil. Informe que ${elderName} precisa de ajuda imediata. Peça para a pessoa ir verificar ou ligar para o SAMU no 192.`
         );
       }
