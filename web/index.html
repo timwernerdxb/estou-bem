@@ -69,7 +69,7 @@ h2{font-size:20px;font-weight:600;margin-bottom:8px}
 .row{display:flex;align-items:center}.col{display:flex;flex-direction:column}
 .flex1{flex:1}
 .w100{width:100%}
-input[type="text"],input[type="tel"],input[type="number"],input[type="time"],select{
+input[type="text"],input[type="tel"],input[type="number"],input[type="time"],input[type="email"],input[type="password"],select{
   width:100%;padding:14px;border:1px solid var(--border);border-radius:12px;font-size:17px;
   background:#FFF;color:var(--text);outline:none;transition:border-color .2s}
 input:focus,select:focus{border-color:var(--primary)}
@@ -251,15 +251,22 @@ const icons = {
 
 // ─── State ────────────────────────────────────────────────
 let state = {
-  screen: 'onboarding', // onboarding | setup | elder | family
+  screen: 'onboarding', // onboarding | login | register | setup | elder | family
   onboardingSlide: 0,
-  user: null, // { name, phone, role }
+  auth: null, // { email }
+  user: null, // { name, phone, role, email, linkCode }
   checkins: [], // { id, time, status, date }
   medications: [], // { id, name, dosage, frequency, time, stock, unit, lowThreshold }
   contacts: [], // { id, name, phone, relationship, priority }
   healthEntries: [], // { id, type, value, unit, time, date, notes }
   checkinTimes: ['09:00'],
+  checkinMode: 'scheduled', // 'scheduled' | 'interval'
+  checkinIntervalHours: 2,
+  checkinWindowStart: '07:00',
+  checkinWindowEnd: '22:00',
   subscription: 'free', // free | familia | central
+  trialStart: null, // ISO date string
+  linkedElderEmail: null, // for family accounts
   currentTab: 'checkin', // elder: checkin|meds|sos|settings  family: dashboard|contacts|meds|settings
 };
 
@@ -270,7 +277,11 @@ try {
 } catch(e) {}
 
 function save() {
-  try { localStorage.setItem('estoubem_state', JSON.stringify(state)); } catch(e) {}
+  try {
+    localStorage.setItem('estoubem_state', JSON.stringify(state));
+    // Also persist per-user if logged in
+    if (state.auth?.email) saveUserState(state.auth.email, state);
+  } catch(e) {}
 }
 
 // ─── Utility ──────────────────────────────────────────────
@@ -318,7 +329,65 @@ function lowStockMeds() {
 }
 
 function maxCheckins() {
-  return state.subscription === 'central' ? 5 : state.subscription === 'familia' ? 3 : 1;
+  const sub = getEffectiveSub();
+  return sub === 'central' ? 5 : sub === 'familia' ? 3 : 1;
+}
+
+function maxContacts() {
+  const sub = getEffectiveSub();
+  return sub === 'free' ? 1 : Infinity;
+}
+
+function getEffectiveSub() {
+  if (isInTrial()) return 'central'; // all features during trial
+  return state.subscription;
+}
+
+function isInTrial() {
+  if (!state.trialStart) return false;
+  return Date.now() - new Date(state.trialStart).getTime() < 30 * 86400000;
+}
+
+function trialDaysLeft() {
+  if (!state.trialStart) return 0;
+  return Math.max(0, 30 - Math.floor((Date.now() - new Date(state.trialStart).getTime()) / 86400000));
+}
+
+function getEffectiveCheckinTimes() {
+  if (state.checkinMode === 'interval' && state.checkinIntervalHours) {
+    const times = [];
+    const [sh] = (state.checkinWindowStart || '07:00').split(':').map(Number);
+    const [eh] = (state.checkinWindowEnd || '22:00').split(':').map(Number);
+    let cur = sh * 60;
+    const end = eh * 60;
+    while (cur <= end) {
+      times.push(`${String(Math.floor(cur/60)).padStart(2,'0')}:${String(cur%60).padStart(2,'0')}`);
+      cur += state.checkinIntervalHours * 60;
+    }
+    return times;
+  }
+  return state.checkinTimes;
+}
+
+async function hashPw(pw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function getAccounts() {
+  try { return JSON.parse(localStorage.getItem('estoubem_accounts') || '{}'); } catch(e) { return {}; }
+}
+
+function saveAccounts(accs) {
+  localStorage.setItem('estoubem_accounts', JSON.stringify(accs));
+}
+
+function saveUserState(email, data) {
+  localStorage.setItem('estoubem_user_' + email, JSON.stringify(data));
+}
+
+function loadUserState(email) {
+  try { return JSON.parse(localStorage.getItem('estoubem_user_' + email) || 'null'); } catch(e) { return null; }
 }
 
 // ─── Render Engine ────────────────────────────────────────
@@ -326,11 +395,10 @@ function render() {
   const app = $('#app');
 
   if (!state.user) {
-    if (state.screen === 'setup') {
-      app.innerHTML = renderSetup();
-    } else {
-      app.innerHTML = renderOnboarding();
-    }
+    if (state.screen === 'login') app.innerHTML = renderLogin();
+    else if (state.screen === 'register') app.innerHTML = renderRegister();
+    else if (state.screen === 'setup') app.innerHTML = renderSetup();
+    else app.innerHTML = renderOnboarding();
   } else if (state.user.role === 'elder') {
     app.innerHTML = renderElderApp();
   } else {
@@ -368,6 +436,74 @@ function renderOnboarding() {
           }
         </div>
       </div>
+    </div>`;
+}
+
+function renderLogin() {
+  return `
+    <div class="screen active screen-padtop" style="padding-bottom:40px;justify-content:center">
+      <div style="text-align:center;margin-bottom:24px">
+        <div class="onboarding-icon">${icons.shield}</div>
+        <h1>Entrar</h1>
+        <p class="subtitle">Acesse sua conta Estou Bem</p>
+      </div>
+
+      <div class="input-label">E-mail</div>
+      <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
+
+      <div class="input-label">Senha</div>
+      <input type="password" id="login-password" placeholder="Sua senha" autocomplete="current-password">
+
+      <button class="btn btn-elder mt-lg" data-action="do-login">Entrar</button>
+      <button class="btn-ghost btn mt-sm" data-action="go-register">Criar conta</button>
+      <button class="btn-ghost btn mt-sm" style="font-size:14px;color:var(--text3)" data-action="skip-login">Usar sem conta (demo)</button>
+    </div>`;
+}
+
+function renderRegister() {
+  return `
+    <div class="screen active screen-padtop" style="padding-bottom:40px">
+      <h1>Criar conta</h1>
+      <p class="subtitle">Configure seu perfil para usar o Estou Bem</p>
+
+      <div class="input-label" style="margin-top:20px;font-size:17px;font-weight:700">Quem é você?</div>
+      <div class="role-grid mt-sm">
+        <button class="role-card" data-role="elder" id="role-elder">
+          ${icons.person}
+          Sou o Idoso
+        </button>
+        <button class="role-card" data-role="family" id="role-family">
+          ${icons.people}
+          Sou Familiar
+        </button>
+        <button class="role-card" data-role="caregiver" id="role-caregiver">
+          ${icons.medkit}
+          Sou Cuidador
+        </button>
+      </div>
+
+      <div class="input-label">Seu nome</div>
+      <input type="text" id="reg-name" placeholder="Como devemos te chamar?" autocomplete="name">
+
+      <div class="input-label">E-mail</div>
+      <input type="email" id="reg-email" placeholder="seu@email.com" autocomplete="email">
+
+      <div class="input-label">Telefone</div>
+      <input type="tel" id="reg-phone" placeholder="(11) 99999-9999" autocomplete="tel">
+
+      <div class="input-label">Senha</div>
+      <input type="password" id="reg-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+
+      <div class="input-label">Confirmar senha</div>
+      <input type="password" id="reg-password2" placeholder="Repita a senha">
+
+      <div class="card mt-md" style="background:var(--success-light);border:1px solid var(--success)">
+        <div style="font-weight:700;font-size:14px;color:var(--success)">🎁 30 dias grátis!</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:4px">Todos os recursos liberados por 30 dias. Depois, escolha seu plano ou continue no gratuito.</div>
+      </div>
+
+      <button class="btn btn-elder mt-lg" data-action="do-register">Criar conta</button>
+      <button class="btn-ghost btn mt-sm" data-action="go-login">Já tenho conta</button>
     </div>`;
 }
 
@@ -652,18 +788,27 @@ function renderFamilyApp() {
 }
 
 function renderDashboard() {
-  const tc = todayCheckins();
+  // If linked to an elder, load their data
+  let elderData = state;
+  let elderName = state.user?.name || '';
+  if (state.linkedElderEmail) {
+    const loaded = loadUserState(state.linkedElderEmail);
+    if (loaded) { elderData = loaded; elderName = loaded.user?.name || state.linkedElderEmail; }
+  }
+  const tc = elderData.checkins?.filter(c => c.date === today()) || [];
   const conf = tc.filter(c => c.status==='confirmed');
   const missed = tc.filter(c => c.status==='missed');
   const pending = tc.filter(c => c.status==='pending');
   const statusClass = missed.length ? 'alert' : pending.length ? 'warn' : conf.length ? 'ok' : '';
   const statusText = missed.length ? `⚠️ ${missed.length} check-in(s) perdido(s)` : pending.length ? `⏳ ${pending.length} check-in(s) pendente(s)` : conf.length ? '✅ Todos confirmados' : 'Nenhum check-in hoje';
-  const lsm = lowStockMeds();
+  const elderMeds = elderData.medications || [];
+  const lsm = elderMeds.filter(m => m.stock <= m.lowThreshold);
+  const allCheckins = elderData.checkins || [];
 
   return `
     <div class="screen active screen-padtop">
       <h1>Painel Familiar</h1>
-      <p class="subtitle">Acompanhando: ${state.user.name}</p>
+      <p class="subtitle">Acompanhando: ${elderName}${state.linkedElderEmail ? '' : ' (você mesmo — vincule um idoso nas configurações)'}</p>
 
       <div class="card status-card ${statusClass}">
         <div style="font-weight:600;font-size:16px">${statusText}</div>
@@ -671,16 +816,16 @@ function renderDashboard() {
       </div>
 
       <div class="stats-grid">
-        <div class="card stat-card"><div class="value">${adherenceRate7d()}%</div><div class="label">Aderência (7 dias)</div></div>
-        <div class="card stat-card"><div class="value">${state.medications.length}</div><div class="label">Medicamentos</div></div>
-        <div class="card stat-card"><div class="value">${state.checkins.length}</div><div class="label">Check-ins total</div></div>
+        <div class="card stat-card"><div class="value">${(() => { const now=Date.now(); const week=allCheckins.filter(c=>now-new Date(c.date+'T12:00:00').getTime()<7*86400000); return week.length?Math.round(week.filter(c=>c.status==='confirmed').length/week.length*100):0; })()}%</div><div class="label">Aderência (7 dias)</div></div>
+        <div class="card stat-card"><div class="value">${elderMeds.length}</div><div class="label">Medicamentos</div></div>
+        <div class="card stat-card"><div class="value">${allCheckins.length}</div><div class="label">Check-ins total</div></div>
         <div class="card stat-card"><div class="value" ${lsm.length?'style="color:var(--danger)"':''}>${lsm.length}</div><div class="label">Estoque baixo</div></div>
       </div>
 
       <div class="card">
         <h2>Check-ins Recentes</h2>
-        ${state.checkins.length === 0 ? '<p class="caption text-center" style="padding:16px 0">Nenhum check-in ainda</p>' :
-          state.checkins.slice(0,5).map(c => `
+        ${allCheckins.length === 0 ? '<p class="caption text-center" style="padding:16px 0">Nenhum check-in ainda</p>' :
+          allCheckins.slice(0,5).map(c => `
             <div class="checkin-row">
               <div>
                 <div style="font-weight:600">${c.date} ${c.time}</div>
@@ -745,7 +890,10 @@ function renderContacts() {
         </div>
       `).join('')}
 
-      <button class="btn mt-md" data-action="show-add-contact">+ Adicionar Contato</button>
+      ${state.contacts.length >= maxContacts()
+        ? `<button class="btn btn-outline mt-md" data-action="show-paywall">🔒 Upgrade para mais contatos</button>`
+        : `<button class="btn mt-md" data-action="show-add-contact">+ Adicionar Contato</button>`
+      }
     </div>
     ${renderAddContactModal()}`;
 }
@@ -792,21 +940,56 @@ function renderSettings() {
 
       ${isElder ? `
         <div class="card">
-          <h2>Horários de Check-in</h2>
+          <h2>Check-ins</h2>
           <div class="caption mb-md">Seu plano permite até ${mc} check-in(s)/dia</div>
-          ${state.checkinTimes.map(t => `
-            <div class="time-row">
-              ${icons.alarm.replace('width','style="width:20px;height:20px;fill:var(--primary)" width')}
-              <span class="time-text">${t}</span>
-              <button data-action="remove-time" data-time="${t}" style="background:none;border:none;padding:4px">${icons.close.replace('width','style="width:20px;height:20px;fill:var(--danger)" width')}</button>
+
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button class="btn btn-small ${state.checkinMode!=='interval'?'':'btn-outline'}" style="flex:1" data-action="set-checkin-mode" data-mode="scheduled">Horários fixos</button>
+            <button class="btn btn-small ${state.checkinMode==='interval'?'':'btn-outline'}" style="flex:1" data-action="set-checkin-mode" data-mode="interval">A cada X horas</button>
+          </div>
+
+          ${state.checkinMode === 'interval' ? `
+            <div class="caption mb-md">Intervalo entre check-ins:</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+              ${[1,2,3,4,6].map(h => `
+                <button class="btn btn-small ${state.checkinIntervalHours===h?'':'btn-outline'}" style="width:auto;min-width:50px" data-action="set-interval" data-hours="${h}">${h}h</button>
+              `).join('')}
             </div>
-          `).join('')}
-          ${state.checkinTimes.length < mc ? `
-            <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
-              <input type="time" id="new-checkin-time" style="flex:1" value="14:00">
-              <button class="btn btn-small" style="width:auto" data-action="add-time">+ Adicionar</button>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <span class="caption" style="white-space:nowrap">Das</span>
+              <input type="time" id="interval-start" value="${state.checkinWindowStart||'07:00'}" style="flex:1" data-action-blur="set-window-start">
+              <span class="caption" style="white-space:nowrap">às</span>
+              <input type="time" id="interval-end" value="${state.checkinWindowEnd||'22:00'}" style="flex:1" data-action-blur="set-window-end">
             </div>
-          ` : ''}
+            <div class="caption" style="color:var(--primary)">
+              Horários: ${getEffectiveCheckinTimes().join(', ')}
+            </div>
+          ` : `
+            ${state.checkinTimes.map(t => `
+              <div class="time-row">
+                ${icons.alarm.replace('width','style="width:20px;height:20px;fill:var(--primary)" width')}
+                <span class="time-text">${t}</span>
+                <button data-action="remove-time" data-time="${t}" style="background:none;border:none;padding:4px">${icons.close.replace('width','style="width:20px;height:20px;fill:var(--danger)" width')}</button>
+              </div>
+            `).join('')}
+            ${state.checkinTimes.length < mc ? `
+              <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+                <input type="time" id="new-checkin-time" style="flex:1" value="14:00">
+                <button class="btn btn-small" style="width:auto" data-action="add-time">+ Adicionar</button>
+              </div>
+            ` : ''}
+          `}
+        </div>
+      ` : ''}
+
+      ${isInTrial() ? `
+        <div class="card" style="background:var(--success-light);border:1px solid var(--success)">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:700;font-size:14px;color:var(--success)">🎁 Período de teste: ${trialDaysLeft()} dias restantes</div>
+              <div style="font-size:12px;color:var(--text2);margin-top:4px">Todos os recursos liberados. Assine antes do fim para continuar.</div>
+            </div>
+          </div>
         </div>
       ` : ''}
 
@@ -814,11 +997,41 @@ function renderSettings() {
         <h2>Assinatura</h2>
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
-            <div style="font-weight:600;color:var(--primary)">${state.subscription==='free'?'Plano Gratuito':state.subscription==='familia'?'Plano Família':'Plano Central'}</div>
+            <div style="font-weight:600;color:var(--primary)">${getEffectiveSub()==='free'?'Plano Gratuito':getEffectiveSub()==='familia'?'Plano Família':'Plano Central'}${isInTrial()?' (teste)':''}</div>
           </div>
           <button class="btn btn-small" style="width:auto" data-action="show-paywall">${state.subscription==='free'?'Upgrade':'Gerenciar'}</button>
         </div>
       </div>
+
+      ${state.user?.linkCode && isElder ? `
+        <div class="card">
+          <h2>Vincular Familiar</h2>
+          <div class="caption mb-md">Compartilhe este código com seu familiar para vincular as contas:</div>
+          <div style="text-align:center;font-size:32px;font-weight:700;letter-spacing:8px;color:var(--primary);background:var(--bg);padding:16px;border-radius:12px">${state.user.linkCode}</div>
+          <div class="caption text-center mt-sm">O familiar digita este código na conta dele</div>
+        </div>
+      ` : ''}
+
+      ${!isElder ? `
+        <div class="card">
+          <h2>Vincular ao Idoso</h2>
+          ${state.linkedElderEmail ? `
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="color:var(--success);font-size:20px">✅</span>
+              <div>
+                <div style="font-weight:600">Vinculado a: ${getAccounts()[state.linkedElderEmail]?.name || state.linkedElderEmail}</div>
+                <div class="caption">Você pode ver os check-ins e status</div>
+              </div>
+            </div>
+          ` : `
+            <div class="caption mb-md">Digite o código de 6 dígitos do idoso para vincular:</div>
+            <div style="display:flex;gap:8px">
+              <input type="text" id="link-code" placeholder="000000" maxlength="6" style="flex:1;text-align:center;font-size:24px;letter-spacing:4px">
+              <button class="btn btn-small" style="width:auto" data-action="link-elder">Vincular</button>
+            </div>
+          `}
+        </div>
+      ` : ''}
 
       <div class="card">
         <h2>Mais</h2>
@@ -852,10 +1065,10 @@ function renderSettings() {
 // ─── Paywall ──────────────────────────────────────────────
 const plans = [
   { id:'free', name:'Gratuito', price:'R$ 0', desc:'Check-in básico para sua tranquilidade',
-    features:['1 check-in diário','Alarme de lembrete','Até 3 familiares','Botão de SOS','Histórico 7 dias'],
-    missing:['Múltiplos check-ins','Medicamentos','Sensores/Wearable','GPS/Geofencing','Central 24h','Telemedicina']},
+    features:['1 check-in diário','Alarme de lembrete','1 contato de emergência','Botão de SOS','Histórico 7 dias'],
+    missing:['Múltiplos check-ins','Contatos ilimitados','Medicamentos','Sensores/Wearable','GPS/Geofencing','Central 24h']},
   { id:'familia', name:'Família', price:'R$ 49,90/mês', desc:'Monitoramento completo', highlighted:true,
-    features:['Até 3 check-ins/dia','Familiares ilimitados','Medicamentos + estoque','Sensores + wearable','GPS e geofencing','Dashboard completo','Histórico ilimitado'],
+    features:['Até 3 check-ins/dia','Contatos ilimitados','Medicamentos + estoque','Sensores + wearable','GPS e geofencing','Dashboard completo','Histórico ilimitado'],
     missing:['Central 24h','Telemedicina','SAMU com GPS']},
   { id:'central', name:'Central', price:'R$ 89,90/mês', desc:'Proteção total com central humana 24h',
     features:['Até 5 check-ins/dia','Tudo do Família','Central humana 24h','Telemedicina integrada','Acionamento SAMU','Relatório mensal'],
@@ -884,8 +1097,14 @@ function renderPaywallModal() {
               </div>
             </div>
           `).join('')}
+          ${isInTrial() ? `
+            <div style="background:var(--success-light);padding:12px;border-radius:10px;margin-bottom:12px;text-align:center">
+              <div style="font-weight:700;color:var(--success)">🎁 ${trialDaysLeft()} dias restantes no período de teste</div>
+              <div style="font-size:12px;color:var(--text2);margin-top:4px">Todos os recursos já estão liberados. Escolha um plano para continuar após o teste.</div>
+            </div>
+          ` : ''}
           <div class="legal-text">
-            A assinatura será cobrada na sua conta da App Store/Google Play na confirmação.
+            A assinatura inicia imediatamente. Cancele a qualquer momento antes do 2º mês para não ser cobrado.
             Renova automaticamente. Gerencie nas configurações do dispositivo.
           </div>
         </div>
@@ -933,6 +1152,12 @@ function bindEvents() {
     }
   }));
 
+  // Interval window inputs
+  const intStart = $('#interval-start');
+  const intEnd = $('#interval-end');
+  if (intStart) intStart.addEventListener('change', () => { state.checkinWindowStart = intStart.value; render(); });
+  if (intEnd) intEnd.addEventListener('change', () => { state.checkinWindowEnd = intEnd.value; render(); });
+
   // SOS hold
   const sosBtn = $('#sos-btn');
   if (sosBtn) {
@@ -952,9 +1177,90 @@ function handleAction(action, el) {
       render();
       break;
     case 'skip-onboarding':
+      state.screen = 'login';
+      render();
+      break;
+    case 'go-login':
+      state.screen = 'login';
+      render();
+      break;
+    case 'go-register':
+      state.screen = 'register';
+      render();
+      break;
+    case 'skip-login':
       state.screen = 'setup';
       render();
       break;
+    case 'do-register': {
+      const name = $('#reg-name')?.value?.trim();
+      const email = $('#reg-email')?.value?.trim()?.toLowerCase();
+      const phone = $('#reg-phone')?.value?.trim();
+      const pw = $('#reg-password')?.value;
+      const pw2 = $('#reg-password2')?.value;
+      const activeRole = $('[data-role].active');
+      const role = activeRole?.dataset?.role;
+      if (!name) { toast('❌ Digite seu nome'); return; }
+      if (!email || !email.includes('@')) { toast('❌ E-mail inválido'); return; }
+      if (!role) { toast('❌ Selecione seu perfil'); return; }
+      if (!pw || pw.length < 6) { toast('❌ Senha deve ter no mínimo 6 caracteres'); return; }
+      if (pw !== pw2) { toast('❌ Senhas não conferem'); return; }
+      const accs = getAccounts();
+      if (accs[email]) { toast('❌ E-mail já cadastrado'); return; }
+      hashPw(pw).then(hash => {
+        const linkCode = Math.random().toString().slice(2,8);
+        accs[email] = { email, hash, name, phone, role, linkCode, createdAt: new Date().toISOString() };
+        saveAccounts(accs);
+        state.auth = { email };
+        state.user = { name, phone, role, email, linkCode };
+        state.trialStart = new Date().toISOString();
+        state.currentTab = role === 'elder' ? 'checkin' : 'dashboard';
+        if (role === 'elder') {
+          state.checkins.push({ id: genId(), time: getEffectiveCheckinTimes()[0] || '09:00', status: 'pending', date: today() });
+        }
+        toast('🎁 Conta criada! 30 dias grátis com todos os recursos');
+        render();
+      });
+      break;
+    }
+    case 'do-login': {
+      const email = $('#login-email')?.value?.trim()?.toLowerCase();
+      const pw = $('#login-password')?.value;
+      if (!email || !pw) { toast('❌ Preencha e-mail e senha'); return; }
+      const accs = getAccounts();
+      const acc = accs[email];
+      if (!acc) { toast('❌ Conta não encontrada'); return; }
+      hashPw(pw).then(hash => {
+        if (hash !== acc.hash) { toast('❌ Senha incorreta'); return; }
+        // Load user state if exists
+        const saved = loadUserState(email);
+        if (saved) {
+          Object.assign(state, saved);
+        }
+        state.auth = { email };
+        state.user = { name: acc.name, phone: acc.phone, role: acc.role, email, linkCode: acc.linkCode };
+        state.currentTab = acc.role === 'elder' ? 'checkin' : 'dashboard';
+        toast(`Bem-vindo de volta, ${acc.name}!`);
+        render();
+      });
+      break;
+    }
+    case 'link-elder': {
+      const code = $('#link-code')?.value?.trim();
+      if (!code) { toast('❌ Digite o código'); return; }
+      const accs = getAccounts();
+      const elder = Object.values(accs).find(a => a.linkCode === code && a.role === 'elder');
+      if (!elder) { toast('❌ Código inválido'); return; }
+      state.linkedElderEmail = elder.email;
+      // Also update account record
+      if (state.auth?.email) {
+        accs[state.auth.email].linkedElderEmail = elder.email;
+        saveAccounts(accs);
+      }
+      toast(`✅ Vinculado a ${elder.name}!`);
+      render();
+      break;
+    }
     case 'complete-setup': {
       const name = $('#setup-name')?.value?.trim();
       const phone = $('#setup-phone')?.value?.trim();
@@ -1048,6 +1354,12 @@ function handleAction(action, el) {
       const name = $('#contact-name')?.value?.trim();
       const phone = $('#contact-phone')?.value?.trim();
       if (!name || !phone) { toast('❌ Nome e telefone obrigatórios'); return; }
+      if (state.contacts.length >= maxContacts()) {
+        toast('❌ Plano gratuito permite apenas 1 contato. Faça upgrade!');
+        $('#modal-add-contact')?.classList.remove('visible');
+        $('#modal-paywall')?.classList.add('visible');
+        return;
+      }
       state.contacts.push({
         id: genId(), name, phone,
         relationship: $('#contact-rel')?.value?.trim() || '',
@@ -1064,6 +1376,14 @@ function handleAction(action, el) {
       break;
     case 'show-paywall':
       $('#modal-paywall')?.classList.add('visible');
+      break;
+    case 'set-checkin-mode':
+      state.checkinMode = el.dataset.mode;
+      render();
+      break;
+    case 'set-interval':
+      state.checkinIntervalHours = parseInt(el.dataset.hours);
+      render();
       break;
     case 'add-time': {
       const t = $('#new-checkin-time')?.value;
@@ -1083,9 +1403,11 @@ function handleAction(action, el) {
       render();
       break;
     case 'logout':
-      if (confirm('Sair e apagar dados locais?')) {
+      if (confirm('Sair da conta?')) {
+        // Save current state for re-login
+        if (state.auth?.email) saveUserState(state.auth.email, state);
         localStorage.removeItem('estoubem_state');
-        state = { screen:'onboarding', onboardingSlide:0, user:null, checkins:[], medications:[], contacts:[], healthEntries:[], checkinTimes:['09:00'], subscription:'free', currentTab:'checkin', escalation:null };
+        state = { screen:'login', onboardingSlide:0, auth:null, user:null, checkins:[], medications:[], contacts:[], healthEntries:[], checkinTimes:['09:00'], checkinMode:'scheduled', checkinIntervalHours:2, checkinWindowStart:'07:00', checkinWindowEnd:'22:00', subscription:'free', trialStart:null, linkedElderEmail:null, currentTab:'checkin', escalation:null };
         render();
       }
       break;
@@ -1501,7 +1823,7 @@ setInterval(() => {
   const existing = todayCheckins();
 
   // Create new pending check-ins at scheduled times
-  for (const t of state.checkinTimes) {
+  for (const t of getEffectiveCheckinTimes()) {
     if (now === t && !existing.find(c => c.time === t)) {
       state.checkins.unshift({ id: genId(), time: t, status: 'pending', date: today() });
       if (navigator.vibrate) navigator.vibrate([300,200,300]);
