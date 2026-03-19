@@ -355,6 +355,14 @@ app.post('/api/contacts', authMiddleware, async (req, res) => {
 });
 
 app.delete('/api/contacts/:id', authMiddleware, async (req, res) => {
+  // Check if this contact is a linked family member — if so, unlink them too
+  const contact = await pool.query(`SELECT phone FROM contacts WHERE id = $1 AND user_id = $2`, [req.params.id, req.userId]);
+  if (contact.rows[0]) {
+    await pool.query(
+      `UPDATE users SET linked_elder_id = NULL WHERE linked_elder_id = $1 AND phone = $2`,
+      [req.userId, contact.rows[0].phone]
+    );
+  }
   await pool.query(`DELETE FROM contacts WHERE id = $1 AND user_id = $2`, [req.params.id, req.userId]);
   res.json({ ok: true });
 });
