@@ -1,0 +1,38 @@
+App Review Notes for Apple / Google:
+
+1. SUBSCRIPTION INFORMATION
+   - This app offers auto-renewable subscriptions
+   - Plans: Família (Family) and Central
+   - Subscriptions are managed through RevenueCat
+   - Payment is processed through the App Store / Google Play
+   - Users can manage/cancel subscriptions through their device settings
+   - Free tier available with no payment required
+
+2. BACKGROUND LOCATION
+   - Used for geofencing (safe zone monitoring for elderly users)
+   - Alerts family when elderly user leaves predefined safe zones
+   - Required for emergency SOS location sharing
+   - Permission requested with clear purpose explanation
+
+3. HEALTH/SENSOR DATA
+   - Accelerometer used for fall detection only
+   - No data is sent to external servers without explicit consent
+   - All health data stored locally on device
+   - LGPD compliant (Brazilian data protection law)
+
+4. NOTIFICATIONS
+   - Critical for check-in system functionality
+   - Used for medication reminders
+   - Emergency SOS alerts
+   - Fall detection alerts
+
+5. TEST ACCOUNT
+   - Create account during onboarding (no external auth required)
+   - Select "Sou o Idoso" (I'm the elder) or "Sou Familiar" (I'm family)
+   - All features testable in free tier
+   - Subscription paywall accessible from Settings
+
+6. EMERGENCY SERVICES
+   - App provides direct dial to Brazilian emergency services (SAMU 192, Fire 193, Police 190)
+   - SOS requires 3-second hold to prevent accidental activation
+   - App does not replace professional emergency services

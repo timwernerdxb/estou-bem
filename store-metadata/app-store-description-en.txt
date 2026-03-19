@@ -1,0 +1,35 @@
+Estou Bem — Smart care for the ones you love
+
+Estou Bem (I'm OK) is a daily check-in app that connects families and protects elderly loved ones. Simple for the user, complete for the caregiver.
+
+HOW IT WORKS
+• The elderly person receives an alarm and taps a button to confirm they're OK
+• If they don't respond, family members are notified automatically
+• Sensors detect movement and falls to reduce false alarms
+• In emergencies, a 24/7 human response center can be activated
+
+FEATURES
+✅ One-tap daily check-in — large, accessible interface
+✅ Medication management with stock tracking and refill alerts
+✅ SOS button with direct calls to family and emergency services
+✅ Fall detection via phone accelerometer
+✅ GPS and geofencing — alerts when the elderly leaves safe zones
+✅ Complete family dashboard with history and statistics
+✅ Health diary (blood pressure, glucose, weight, temperature)
+✅ Apple Watch and wearable integration
+
+PLANS
+• Free: 1 check-in/day, 3 contacts, SOS button
+• Family ($9.99/mo): Multiple check-ins, medications, sensors, GPS
+• Central ($17.99/mo): Everything + 24/7 human response center, telemedicine
+
+WHY ESTOU BEM?
+→ Peace of mind at a fraction of the cost of a caregiver
+→ Interface designed for elderly users: large fonts, minimal steps
+→ No biometric data blocks the alarm — all data informs who will act
+→ Full privacy: encrypted data, LGPD/GDPR compliant
+
+For families who can't be there all the time but want to care. Estou Bem: care that connects.
+
+Terms of Use: https://estoubem.app/terms
+Privacy Policy: https://estoubem.app/privacy

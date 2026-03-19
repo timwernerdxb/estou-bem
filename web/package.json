@@ -1,0 +1,12 @@
+{
+  "name": "estou-bem-web",
+  "version": "1.0.0",
+  "description": "Estou Bem - Mobile web preview",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

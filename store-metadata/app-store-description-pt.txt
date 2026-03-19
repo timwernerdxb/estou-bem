@@ -1,0 +1,35 @@
+Estou Bem — Cuidado inteligente para quem você ama
+
+O Estou Bem é o app de check-in diário que conecta famílias e protege idosos. Simples para quem usa, completo para quem cuida.
+
+COMO FUNCIONA
+• O idoso recebe um alarme e toca um botão para confirmar que está bem
+• Se não responder, familiares são notificados automaticamente
+• Sensores detectam movimento e quedas para reduzir falsos alarmes
+• Em caso de emergência, a central humana 24h pode ser acionada
+
+FUNCIONALIDADES
+✅ Check-in diário com um toque — interface gigante e acessível
+✅ Controle de medicamentos com estoque e alertas de reposição
+✅ Botão SOS com ligação direta para familiares e SAMU
+✅ Detecção de quedas via acelerômetro do celular
+✅ GPS e geofencing — alerta quando o idoso sai de zonas seguras
+✅ Dashboard familiar completo com histórico e estatísticas
+✅ Diário de saúde (pressão, glicemia, peso, temperatura)
+✅ Integração com Apple Watch e wearables
+
+PLANOS
+• Gratuito: 1 check-in/dia, 3 contatos, botão SOS
+• Família (R$ 49,90/mês): Múltiplos check-ins, medicamentos, sensores, GPS
+• Central (R$ 89,90/mês): Tudo + central humana 24h, telemedicina, SAMU
+
+POR QUE ESTOU BEM?
+→ Tranquilidade por R$ 3/dia vs. R$ 200/dia de um cuidador
+→ Interface projetada para idosos: fontes grandes, poucos passos
+→ Nenhum dado biométrico impede o alarme — todos informam quem vai agir
+→ Privacidade total: dados criptografados, compatível com LGPD
+
+Para famílias que não podem estar presentes o tempo todo mas querem cuidar. Estou Bem: cuidado que conecta.
+
+Termos de uso: https://estoubem.app/termos
+Política de privacidade: https://estoubem.app/privacidade

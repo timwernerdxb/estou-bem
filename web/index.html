@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#4A90D9">
+<title>Estou Bem</title>
+<link rel="manifest" href="manifest.json">
+<style>
+/* ─── Reset & Base ─────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F5F7FA;color:#1A1A2E}
+body{display:flex;flex-direction:column}
+input,button,select,textarea{font-family:inherit;font-size:inherit}
+button{cursor:pointer;border:none;background:none}
+
+/* ─── CSS Variables ────────────────────────────────────── */
+:root{
+  --primary:#4A90D9;--primary-dark:#2E6DB4;--primary-light:#7CB3E8;
+  --success:#4CAF50;--success-light:#C8E6C9;
+  --warning:#FF9800;--warning-light:#FFE0B2;
+  --danger:#F44336;--danger-light:#FFCDD2;
+  --bg:#F5F7FA;--card:#FFF;--border:#E0E6ED;
+  --text:#1A1A2E;--text2:#6B7280;--text3:#9CA3AF;
+  --disabled:#D1D5DB;
+  --safe-top:env(safe-area-inset-top,20px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --tab-height:72px;
+}
+
+/* ─── App Shell ────────────────────────────────────────── */
+#app{display:flex;flex-direction:column;height:100%;width:100%;max-width:430px;margin:0 auto;background:var(--bg);position:relative;overflow:hidden}
+.screen{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px calc(var(--tab-height) + var(--safe-bottom) + 16px);display:none;flex-direction:column}
+.screen.active{display:flex}
+.screen-padtop{padding-top:calc(var(--safe-top) + 12px)}
+
+/* ─── Tab Bar ──────────────────────────────────────────── */
+.tab-bar{display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;height:calc(var(--tab-height) + var(--safe-bottom));padding-bottom:var(--safe-bottom);background:#FFF;border-top:1px solid var(--border);z-index:100;flex-direction:row}
+.tab-bar.visible{display:flex}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--text3);font-size:11px;font-weight:600;transition:color .2s}
+.tab.active{color:var(--primary)}
+.tab.sos-tab{color:var(--danger)}
+.tab svg{width:26px;height:26px;fill:currentColor}
+
+/* ─── Common ───────────────────────────────────────────── */
+.card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:12px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 28px;border-radius:12px;font-weight:700;font-size:16px;color:#FFF;background:var(--primary);box-shadow:0 2px 6px rgba(0,0,0,.12);transition:transform .15s,opacity .15s;width:100%}
+.btn:active{transform:scale(.97);opacity:.9}
+.btn-success{background:var(--success)}
+.btn-danger{background:var(--danger)}
+.btn-outline{background:transparent;color:var(--primary);border:2px solid var(--primary);box-shadow:none}
+.btn-ghost{background:transparent;color:var(--primary);box-shadow:none}
+.btn-elder{padding:20px 40px;font-size:22px;border-radius:16px}
+.btn-small{padding:10px 18px;font-size:14px}
+.badge{display:inline-flex;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.badge-success{background:var(--success-light);color:var(--success)}
+.badge-warning{background:var(--warning-light);color:var(--warning)}
+.badge-danger{background:var(--danger-light);color:var(--danger)}
+h1{font-size:28px;font-weight:700;margin-bottom:4px}
+h2{font-size:20px;font-weight:600;margin-bottom:8px}
+.subtitle{color:var(--text2);font-size:15px;margin-bottom:16px}
+.caption{color:var(--text2);font-size:13px}
+.text-center{text-align:center}
+.mt-sm{margin-top:8px}.mt-md{margin-top:16px}.mt-lg{margin-top:24px}.mt-xl{margin-top:32px}
+.mb-md{margin-bottom:16px}
+.gap-sm{gap:8px}.gap-md{gap:12px}
+.row{display:flex;align-items:center}.col{display:flex;flex-direction:column}
+.flex1{flex:1}
+.w100{width:100%}
+input[type="text"],input[type="tel"],input[type="number"],input[type="time"],select{
+  width:100%;padding:14px;border:1px solid var(--border);border-radius:12px;font-size:17px;
+  background:#FFF;color:var(--text);outline:none;transition:border-color .2s}
+input:focus,select:focus{border-color:var(--primary)}
+.input-label{font-weight:600;font-size:15px;margin:12px 0 6px;color:var(--text)}
+
+/* ─── Onboarding ───────────────────────────────────────── */
+.onboarding-slides{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.onboarding-slides::-webkit-scrollbar{display:none}
+.onboarding-slide{min-width:100%;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 32px;text-align:center;min-height:60vh}
+.onboarding-icon{width:140px;height:140px;border-radius:70px;background:var(--bg);display:flex;align-items:center;justify-content:center;margin-bottom:32px}
+.onboarding-icon svg{width:70px;height:70px;fill:var(--primary)}
+.onboarding-slide h1{font-size:26px;margin-bottom:12px}
+.onboarding-slide p{font-size:18px;color:var(--text2);line-height:1.5}
+.dots{display:flex;gap:8px;justify-content:center;margin:16px 0}
+.dot{width:10px;height:10px;border-radius:5px;background:var(--border);transition:all .3s}
+.dot.active{background:var(--primary);width:24px}
+
+/* ─── Setup ────────────────────────────────────────────── */
+.role-grid{display:flex;gap:10px;margin-bottom:16px}
+.role-card{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 8px;border-radius:16px;border:2px solid var(--border);background:#FFF;font-size:13px;font-weight:600;color:var(--text2);transition:all .2s}
+.role-card.active{border-color:var(--primary);background:var(--primary);color:#FFF}
+.role-card svg{width:32px;height:32px;fill:currentColor}
+
+/* ─── Elder Home ───────────────────────────────────────── */
+.greeting{font-size:28px;font-weight:700;text-align:center;margin-top:8px}
+.date-text{font-size:18px;color:var(--text2);text-align:center;text-transform:capitalize;margin-bottom:8px}
+.checkin-container{display:flex;flex-direction:column;align-items:center;margin:24px 0}
+.checkin-btn{width:220px;height:220px;border-radius:110px;background:var(--success);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#FFF;font-size:24px;font-weight:700;box-shadow:0 4px 20px rgba(76,175,80,.4);transition:transform .3s,box-shadow .3s;border:none;animation:pulse 2s ease-in-out infinite}
+.checkin-btn.pending{background:var(--warning);box-shadow:0 4px 20px rgba(255,152,0,.4)}
+.checkin-btn.confirmed{background:#388E3C;animation:none;transform:scale(.95)}
+.checkin-btn svg{width:70px;height:70px;fill:#FFF}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}
+.info-card{text-align:center;padding:16px}
+.info-card .value{font-size:28px;font-weight:700;color:var(--primary)}
+.info-card .label{font-size:13px;color:var(--text2);margin-top:4px}
+
+/* ─── SOS ──────────────────────────────────────────────── */
+.sos-btn{width:200px;height:200px;border-radius:100px;background:var(--danger);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#FFF;font-size:22px;font-weight:700;box-shadow:0 4px 20px rgba(244,67,54,.4);border:none;transition:transform .1s}
+.sos-btn:active{transform:scale(.92)}
+.sos-btn.activated{background:#B71C1C}
+.sos-btn svg{width:64px;height:64px;fill:#FFF}
+.progress-bar-track{width:220px;height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:16px}
+.progress-bar-fill{height:100%;background:var(--danger);border-radius:4px;width:0%;transition:width .05s linear}
+.quick-call{display:flex;align-items:center;gap:10px;padding:14px;background:#FFF;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);font-weight:600;color:var(--danger);font-size:16px;text-decoration:none}
+.quick-call svg{width:22px;height:22px;fill:var(--danger)}
+
+/* ─── Medications ──────────────────────────────────────── */
+.med-card{position:relative}
+.med-name{font-size:17px;font-weight:600}
+.med-dosage{font-size:14px;color:var(--text2)}
+.med-freq{font-size:13px;color:var(--text3);margin-top:2px}
+.stock-row{display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;color:var(--text2)}
+.stock-row.low{color:var(--danger);font-weight:600}
+.take-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;background:var(--success);border-radius:10px;color:#FFF;font-size:16px;font-weight:700;margin-top:10px;border:none}
+.take-btn:active{opacity:.85}
+.delete-btn{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--danger);padding:4px}
+.delete-btn svg{width:20px;height:20px;fill:var(--danger)}
+
+/* ─── Dashboard ────────────────────────────────────────── */
+.status-card{border-left:4px solid var(--text3)}
+.status-card.ok{border-left-color:var(--success)}
+.status-card.warn{border-left-color:var(--warning)}
+.status-card.alert{border-left-color:var(--danger)}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat-card{text-align:center;padding:14px}
+.stat-card .value{font-size:26px;font-weight:700;color:var(--primary)}
+.stat-card .label{font-size:12px;color:var(--text2);margin-top:4px}
+.checkin-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--border)}
+
+/* ─── Emergency Contacts ───────────────────────────────── */
+.contact-card{display:flex;align-items:center;gap:12px}
+.priority-badge{width:32px;height:32px;border-radius:16px;background:var(--primary-light);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+.contact-info{flex:1}
+.contact-name{font-weight:600;font-size:16px}
+.contact-rel{font-size:13px;color:var(--text2)}
+.contact-phone{color:var(--primary);font-size:15px}
+.contact-actions{display:flex;gap:12px}
+.contact-actions button{padding:6px}
+.contact-actions svg{width:22px;height:22px}
+
+/* ─── Health Log ───────────────────────────────────────── */
+.health-entry{display:flex;align-items:center;gap:10px}
+.health-entry .info{flex:1}
+.health-entry .value{font-size:17px;font-weight:600;color:var(--primary)}
+.metric-chips{display:flex;flex-wrap:wrap;gap:6px}
+.metric-chip{padding:6px 12px;border-radius:999px;border:1px solid var(--border);font-size:12px;background:#FFF;color:var(--text2)}
+.metric-chip.active{background:var(--primary);color:#FFF;border-color:var(--primary)}
+
+/* ─── Paywall ──────────────────────────────────────────── */
+.plan-card{border:2px solid transparent;cursor:pointer;transition:border-color .2s}
+.plan-card.selected{border-color:var(--primary)}
+.plan-card.highlighted{position:relative}
+.popular-badge{position:absolute;top:-10px;right:12px;background:var(--primary);color:#FFF;padding:2px 12px;border-radius:999px;font-size:11px;font-weight:700}
+.plan-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.plan-name{font-size:20px;font-weight:700}
+.plan-price{font-size:16px;font-weight:600;color:var(--primary)}
+.plan-desc{font-size:13px;color:var(--text2);margin-bottom:12px}
+.feature-list{display:flex;flex-direction:column;gap:6px}
+.feature-row{display:flex;align-items:center;gap:6px;font-size:13px}
+.feature-row.disabled{color:var(--disabled)}
+.feature-row svg{width:16px;height:16px;flex-shrink:0}
+.feature-row .check{fill:var(--success)}
+.feature-row .cross{fill:var(--disabled)}
+.legal-text{font-size:11px;color:var(--text3);text-align:center;line-height:1.6;margin-top:24px}
+
+/* ─── Settings ─────────────────────────────────────────── */
+.profile-row{display:flex;align-items:center;gap:14px}
+.avatar{width:48px;height:48px;border-radius:24px;background:var(--primary);color:#FFF;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0}
+.time-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.time-text{flex:1;font-size:17px;font-weight:600}
+.menu-row{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.menu-row .label{flex:1;font-size:16px}
+
+/* ─── Modal ────────────────────────────────────────────── */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.visible{display:flex}
+.modal{background:var(--bg);width:100%;max-width:430px;max-height:90vh;border-radius:20px 20px 0 0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--safe-bottom) + 16px)}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:1}
+.modal-header h2{margin:0}
+.modal-close{padding:4px;background:none;border:none;font-size:24px;line-height:1}
+.modal-body{padding:16px}
+
+/* ─── Freq chips ───────────────────────────────────────── */
+.freq-chips{display:flex;flex-wrap:wrap;gap:6px}
+.freq-chip{padding:8px 14px;border-radius:999px;border:1px solid var(--border);font-size:13px;background:#FFF;color:var(--text2)}
+.freq-chip.active{background:var(--primary);color:#FFF;border-color:var(--primary)}
+
+/* ─── Empty state ──────────────────────────────────────── */
+.empty-state{display:flex;flex-direction:column;align-items:center;padding:48px 24px;color:var(--text3)}
+.empty-state svg{width:48px;height:48px;fill:var(--text3);margin-bottom:12px}
+.empty-state p{font-size:15px;text-align:center}
+
+/* ─── Toast ────────────────────────────────────────────── */
+.toast{position:fixed;top:calc(var(--safe-top) + 12px);left:50%;transform:translateX(-50%) translateY(-120px);background:#333;color:#FFF;padding:12px 24px;border-radius:12px;font-size:15px;font-weight:600;z-index:300;transition:transform .3s ease;white-space:nowrap;max-width:90%}
+.toast.show{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Screens injected by JS -->
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// ESTOU BEM — Mobile Web Prototype
+// ═══════════════════════════════════════════════════════════
+
+// ─── SVG Icons ────────────────────────────────────────────
+const icons = {
+  checkmark: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>`,
+  hand: `<svg viewBox="0 0 24 24"><path d="M18.5 8c-.51 0-.97.18-1.34.47L17 8.41V4.5C17 3.12 15.88 2 14.5 2S12 3.12 12 4.5v5.89l-.73-.36C10.3 9.55 9.2 9.36 8.19 9.64c-1.22.34-2.18 1.32-2.48 2.55-.36 1.47.18 2.93 1.37 3.76L12 19.75V22h8v-2.5l1.75-5.25c.16-.49.25-1 .25-1.52V10.5C22 9.12 20.88 8 19.5 8h-1z"/></svg>`,
+  medical: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>`,
+  warning: `<svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>`,
+  settings: `<svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>`,
+  people: `<svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>`,
+  grid: `<svg viewBox="0 0 24 24"><path d="M3 3v8h8V3H3zm6 6H5V5h4v4zm-6 4v8h8v-8H3zm6 6H5v-4h4v4zm4-16v8h8V3h-8zm6 6h-4V5h4v4zm-6 4v8h8v-8h-8zm6 6h-4v-4h4v4z"/></svg>`,
+  call: `<svg viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>`,
+  shield: `<svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>`,
+  alarm: `<svg viewBox="0 0 24 24"><path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>`,
+  analytics: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>`,
+  trash: `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`,
+  add: `<svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>`,
+  close: `<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`,
+  chevron: `<svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>`,
+  heart: `<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`,
+  cube: `<svg viewBox="0 0 24 24"><path d="M21 16.5c0 .38-.21.71-.53.88l-7.9 4.44c-.36.2-.8.2-1.14 0l-7.9-4.44C3.21 17.21 3 16.88 3 16.5v-9c0-.38.21-.71.53-.88l7.9-4.44c.36-.2.8-.2 1.14 0l7.9 4.44c.32.17.53.5.53.88v9z"/></svg>`,
+  fitness: `<svg viewBox="0 0 24 24"><path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z"/></svg>`,
+  medkit: `<svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm6 11h-3v3h-2v-3H8v-2h3v-3h2v3h3v2z"/></svg>`,
+  person: `<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`,
+};
+
+// ─── State ────────────────────────────────────────────────
+let state = {
+  screen: 'onboarding', // onboarding | setup | elder | family
+  onboardingSlide: 0,
+  user: null, // { name, phone, role }
+  checkins: [], // { id, time, status, date }
+  medications: [], // { id, name, dosage, frequency, time, stock, unit, lowThreshold }
+  contacts: [], // { id, name, phone, relationship, priority }
+  healthEntries: [], // { id, type, value, unit, time, date, notes }
+  checkinTimes: ['09:00'],
+  subscription: 'free', // free | familia | central
+  currentTab: 'checkin', // elder: checkin|meds|sos|settings  family: dashboard|contacts|meds|settings
+};
+
+// Load from localStorage
+try {
+  const saved = localStorage.getItem('estoubem_state');
+  if (saved) state = { ...state, ...JSON.parse(saved) };
+} catch(e) {}
+
+function save() {
+  try { localStorage.setItem('estoubem_state', JSON.stringify(state)); } catch(e) {}
+}
+
+// ─── Utility ──────────────────────────────────────────────
+function $(sel, ctx=document) { return ctx.querySelector(sel); }
+function $$(sel, ctx=document) { return [...ctx.querySelectorAll(sel)]; }
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function today() { return new Date().toISOString().slice(0,10); }
+function timeNow() { return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+
+function toast(msg, duration=2500) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Bom dia';
+  if (h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+function formatDate(d) {
+  return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+}
+
+function todayCheckins() {
+  return state.checkins.filter(c => c.date === today());
+}
+
+function confirmedToday() {
+  return todayCheckins().filter(c => c.status === 'confirmed').length;
+}
+
+function adherenceRate7d() {
+  const now = Date.now();
+  const week = state.checkins.filter(c => now - new Date(c.date+'T12:00:00').getTime() < 7*86400000);
+  if (!week.length) return 0;
+  return Math.round(week.filter(c => c.status==='confirmed').length / week.length * 100);
+}
+
+function lowStockMeds() {
+  return state.medications.filter(m => m.stock <= m.lowThreshold);
+}
+
+function maxCheckins() {
+  return state.subscription === 'central' ? 5 : state.subscription === 'familia' ? 3 : 1;
+}
+
+// ─── Render Engine ────────────────────────────────────────
+function render() {
+  const app = $('#app');
+
+  if (!state.user) {
+    if (state.screen === 'setup') {
+      app.innerHTML = renderSetup();
+    } else {
+      app.innerHTML = renderOnboarding();
+    }
+  } else if (state.user.role === 'elder') {
+    app.innerHTML = renderElderApp();
+  } else {
+    app.innerHTML = renderFamilyApp();
+  }
+
+  bindEvents();
+  save();
+}
+
+// ─── Onboarding ───────────────────────────────────────────
+const slides = [
+  { icon: 'shield', title: 'Bem-vindo ao Estou Bem', desc: 'O app que cuida de quem você ama. Check-ins diários para garantir que seu familiar idoso está seguro.' },
+  { icon: 'alarm', title: 'Check-in Simples', desc: 'O idoso recebe um alarme e toca um botão. Se não responder, você é avisado imediatamente.' },
+  { icon: 'medical', title: 'Medicamentos e Saúde', desc: 'Controle de medicamentos com estoque, lembretes e diário de saúde completo.' },
+  { icon: 'people', title: 'Proteção em Família', desc: 'Conecte toda a família. Todos acompanham, todos cuidam. Juntos.' },
+];
+
+function renderOnboarding() {
+  const s = slides[state.onboardingSlide];
+  return `
+    <div class="screen active screen-padtop" style="justify-content:space-between;padding-bottom:40px">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center">
+        <div class="onboarding-icon">${icons[s.icon]}</div>
+        <h1>${s.title}</h1>
+        <p style="font-size:17px;color:var(--text2);line-height:1.5;margin-top:12px">${s.desc}</p>
+      </div>
+      <div>
+        <div class="dots">${slides.map((_,i) => `<div class="dot ${i===state.onboardingSlide?'active':''}"></div>`).join('')}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0 16px">
+          ${state.onboardingSlide < 3
+            ? `<button class="btn-ghost btn" style="width:auto" data-action="skip-onboarding">Pular</button>
+               <button class="btn" style="width:auto;min-width:120px" data-action="next-slide">Próximo</button>`
+            : `<button class="btn btn-elder w100" data-action="skip-onboarding">Começar!</button>`
+          }
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderSetup() {
+  return `
+    <div class="screen active screen-padtop" style="padding-bottom:40px">
+      <h1>Vamos começar!</h1>
+      <p class="subtitle">Configure seu perfil para usar o Estou Bem</p>
+
+      <div class="input-label" style="margin-top:20px;font-size:17px;font-weight:700">Quem é você?</div>
+      <div class="role-grid mt-sm">
+        <button class="role-card" data-role="elder" id="role-elder">
+          ${icons.person}
+          Sou o Idoso
+        </button>
+        <button class="role-card" data-role="family" id="role-family">
+          ${icons.people}
+          Sou Familiar
+        </button>
+        <button class="role-card" data-role="caregiver" id="role-caregiver">
+          ${icons.medkit}
+          Sou Cuidador
+        </button>
+      </div>
+
+      <div class="input-label">Seu nome</div>
+      <input type="text" id="setup-name" placeholder="Como devemos te chamar?" autocomplete="name">
+
+      <div class="input-label">Telefone (opcional)</div>
+      <input type="tel" id="setup-phone" placeholder="(11) 99999-9999" autocomplete="tel">
+
+      <button class="btn btn-elder mt-lg" data-action="complete-setup">Começar a usar!</button>
+    </div>`;
+}
+
+// ─── Elder App ────────────────────────────────────────────
+function renderElderApp() {
+  const tabs = [
+    { id:'checkin', label:'Check-in', icon:'checkmark' },
+    { id:'meds', label:'Remédios', icon:'medical' },
+    { id:'sos', label:'SOS', icon:'warning', cls:'sos-tab' },
+    { id:'settings', label:'Config', icon:'settings' },
+  ];
+  return `
+    ${renderElderScreen()}
+    <div class="tab-bar visible">
+      ${tabs.map(t => `
+        <button class="tab ${state.currentTab===t.id?'active':''} ${t.cls||''}" data-tab="${t.id}">
+          ${icons[t.icon]}
+          <span>${t.label}</span>
+        </button>
+      `).join('')}
+    </div>`;
+}
+
+function renderElderScreen() {
+  switch(state.currentTab) {
+    case 'checkin': return renderElderHome();
+    case 'meds': return renderMedications();
+    case 'sos': return renderSOS();
+    case 'settings': return renderSettings();
+    default: return renderElderHome();
+  }
+}
+
+function renderElderHome() {
+  const pending = todayCheckins().find(c => c.status === 'pending');
+  const conf = confirmedToday();
+  const btnClass = pending ? 'pending' : '';
+
+  return `
+    <div class="screen active screen-padtop">
+      <div class="greeting">${getGreeting()}, ${state.user.name}! 👋</div>
+      <div class="date-text">${formatDate(today())}</div>
+
+      <div class="checkin-container">
+        <button class="checkin-btn ${btnClass}" data-action="do-checkin">
+          ${icons.hand}
+          <span>${pending ? 'TOQUE AQUI' : 'ESTOU BEM'}</span>
+        </button>
+        ${pending ? '<p style="color:var(--warning);font-size:17px;font-weight:600;margin-top:12px">Você tem um check-in pendente</p>' : ''}
+      </div>
+
+      <div class="card">
+        <div class="row gap-sm">
+          ${icons.alarm.replace('width','style="width:22px;height:22px;fill:var(--primary)" width')}
+          <span style="flex:1;font-weight:600;font-size:16px">Check-ins hoje</span>
+          <span style="font-size:22px;font-weight:700;color:var(--primary)">${conf}</span>
+        </div>
+        ${todayCheckins().length > 0 ? `
+          <div style="margin-top:10px">
+            ${todayCheckins().slice(0,5).map(c => `
+              <div class="checkin-row">
+                <span style="font-weight:600">${c.time}</span>
+                <span class="badge ${c.status==='confirmed'?'badge-success':c.status==='pending'?'badge-warning':'badge-danger'}">
+                  ${c.status==='confirmed'?'✅ Confirmado':c.status==='pending'?'⏳ Pendente':'❌ Perdido'}
+                </span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="info-grid">
+        <div class="card info-card">
+          ${icons.medical.replace('width','style="width:28px;height:28px;fill:var(--primary)" width')}
+          <div class="value">${state.medications.length}</div>
+          <div class="label">Medicamentos</div>
+        </div>
+        <div class="card info-card">
+          ${icons.people.replace('width','style="width:28px;height:28px;fill:var(--primary)" width')}
+          <div class="value">${state.contacts.length}</div>
+          <div class="label">Contatos</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderSOS() {
+  return `
+    <div class="screen active screen-padtop" style="align-items:center">
+      <h1>🆘 Emergência</h1>
+      <p class="subtitle text-center">Segure o botão por 3 segundos para acionar emergência</p>
+
+      <div style="display:flex;flex-direction:column;align-items:center;margin:20px 0">
+        <button class="sos-btn" id="sos-btn" data-action="sos-hold">
+          ${icons.warning}
+          <span>SOS</span>
+        </button>
+        <div class="progress-bar-track mt-md" id="sos-progress-track" style="display:none">
+          <div class="progress-bar-fill" id="sos-progress"></div>
+        </div>
+      </div>
+
+      <div class="col gap-sm w100">
+        <a href="tel:192" class="quick-call">${icons.call} SAMU (192)</a>
+        <a href="tel:193" class="quick-call">${icons.call} Bombeiros (193)</a>
+        <a href="tel:190" class="quick-call">${icons.call} Polícia (190)</a>
+      </div>
+
+      ${state.contacts.length > 0 ? `
+        <div class="w100 mt-lg">
+          <h2>Contatos de emergência</h2>
+          ${state.contacts.sort((a,b)=>a.priority-b.priority).map(c => `
+            <a href="tel:${c.phone}" class="card" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
+              <div><div class="contact-name">${c.name}</div><div class="contact-rel">${c.relationship}</div></div>
+              <div style="margin-left:auto">${icons.call.replace('width','style="width:22px;height:22px;fill:var(--primary)" width')}</div>
+            </a>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>`;
+}
+
+// ─── Medications (shared) ─────────────────────────────────
+function renderMedications() {
+  return `
+    <div class="screen active screen-padtop">
+      <h1>💊 Medicamentos</h1>
+      ${state.medications.length === 0 ? `
+        <div class="empty-state mt-lg">
+          ${icons.medical}
+          <p>Nenhum medicamento cadastrado</p>
+          <p style="font-size:13px;color:var(--text3);margin-top:4px">Adicione seus medicamentos para receber lembretes</p>
+        </div>
+      ` : state.medications.map(m => `
+        <div class="card med-card">
+          <button class="delete-btn" data-action="delete-med" data-id="${m.id}">${icons.trash}</button>
+          <div class="med-name">${m.name}</div>
+          <div class="med-dosage">${m.dosage}</div>
+          <div class="med-freq">${m.frequency} — ${m.time}</div>
+          <div class="stock-row ${m.stock <= m.lowThreshold ? 'low' : ''}">
+            ${icons.cube.replace('width','style="width:16px;height:16px;fill:currentColor" width')}
+            Estoque: ${m.stock} ${m.unit}${m.stock <= m.lowThreshold ? ' ⚠️ Baixo!' : ''}
+          </div>
+          <button class="take-btn" data-action="take-med" data-id="${m.id}">
+            ${icons.checkmark.replace('width','style="width:20px;height:20px;fill:#FFF" width')}
+            Tomei
+          </button>
+        </div>
+      `).join('')}
+      <button class="btn mt-md" data-action="show-add-med">+ Adicionar Medicamento</button>
+    </div>
+    ${renderAddMedModal()}`;
+}
+
+function renderAddMedModal() {
+  return `
+    <div class="modal-overlay" id="modal-add-med">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>Novo Medicamento</h2>
+          <button class="modal-close" data-action="close-modal" data-modal="modal-add-med">${icons.close}</button>
+        </div>
+        <div class="modal-body">
+          <div class="input-label">Nome do medicamento *</div>
+          <input type="text" id="med-name" placeholder="Ex: Losartana">
+
+          <div class="input-label">Dosagem</div>
+          <input type="text" id="med-dosage" placeholder="Ex: 50mg">
+
+          <div class="input-label">Frequência</div>
+          <div class="freq-chips" id="freq-chips">
+            <button class="freq-chip active" data-freq="1x ao dia">1x ao dia</button>
+            <button class="freq-chip" data-freq="2x ao dia">2x ao dia</button>
+            <button class="freq-chip" data-freq="3x ao dia">3x ao dia</button>
+            <button class="freq-chip" data-freq="Semanal">Semanal</button>
+            <button class="freq-chip" data-freq="Quando necessário">Quando necessário</button>
+          </div>
+
+          <div class="input-label">Horário</div>
+          <input type="time" id="med-time" value="08:00">
+
+          <div style="display:flex;gap:8px">
+            <div style="flex:1">
+              <div class="input-label">Estoque</div>
+              <input type="number" id="med-stock" placeholder="30" value="30">
+            </div>
+            <div style="flex:1">
+              <div class="input-label">Unidade</div>
+              <input type="text" id="med-unit" placeholder="comprimidos" value="comprimidos">
+            </div>
+          </div>
+
+          <button class="btn btn-elder mt-lg" data-action="save-med">Salvar Medicamento</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── Family Dashboard ─────────────────────────────────────
+function renderFamilyApp() {
+  const tabs = [
+    { id:'dashboard', label:'Painel', icon:'grid' },
+    { id:'contacts', label:'Contatos', icon:'people' },
+    { id:'meds', label:'Remédios', icon:'medical' },
+    { id:'settings', label:'Config', icon:'settings' },
+  ];
+  let screen;
+  switch(state.currentTab) {
+    case 'dashboard': screen = renderDashboard(); break;
+    case 'contacts': screen = renderContacts(); break;
+    case 'meds': screen = renderMedications(); break;
+    case 'settings': screen = renderSettings(); break;
+    default: screen = renderDashboard();
+  }
+  return `
+    ${screen}
+    <div class="tab-bar visible">
+      ${tabs.map(t => `
+        <button class="tab ${state.currentTab===t.id?'active':''}" data-tab="${t.id}">
+          ${icons[t.icon]}
+          <span>${t.label}</span>
+        </button>
+      `).join('')}
+    </div>`;
+}
+
+function renderDashboard() {
+  const tc = todayCheckins();
+  const conf = tc.filter(c => c.status==='confirmed');
+  const missed = tc.filter(c => c.status==='missed');
+  const pending = tc.filter(c => c.status==='pending');
+  const statusClass = missed.length ? 'alert' : pending.length ? 'warn' : conf.length ? 'ok' : '';
+  const statusText = missed.length ? `⚠️ ${missed.length} check-in(s) perdido(s)` : pending.length ? `⏳ ${pending.length} check-in(s) pendente(s)` : conf.length ? '✅ Todos confirmados' : 'Nenhum check-in hoje';
+  const lsm = lowStockMeds();
+
+  return `
+    <div class="screen active screen-padtop">
+      <h1>Painel Familiar</h1>
+      <p class="subtitle">Acompanhando: ${state.user.name}</p>
+
+      <div class="card status-card ${statusClass}">
+        <div style="font-weight:600;font-size:16px">${statusText}</div>
+        <div class="caption mt-sm">${conf.length}/${tc.length} check-ins confirmados hoje</div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="card stat-card"><div class="value">${adherenceRate7d()}%</div><div class="label">Aderência (7 dias)</div></div>
+        <div class="card stat-card"><div class="value">${state.medications.length}</div><div class="label">Medicamentos</div></div>
+        <div class="card stat-card"><div class="value">${state.checkins.length}</div><div class="label">Check-ins total</div></div>
+        <div class="card stat-card"><div class="value" ${lsm.length?'style="color:var(--danger)"':''}>${lsm.length}</div><div class="label">Estoque baixo</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Check-ins Recentes</h2>
+        ${state.checkins.length === 0 ? '<p class="caption text-center" style="padding:16px 0">Nenhum check-in ainda</p>' :
+          state.checkins.slice(0,5).map(c => `
+            <div class="checkin-row">
+              <div>
+                <div style="font-weight:600">${c.date} ${c.time}</div>
+              </div>
+              <span class="badge ${c.status==='confirmed'?'badge-success':c.status==='pending'?'badge-warning':'badge-danger'}">
+                ${c.status==='confirmed'?'✅ Confirmado':c.status==='pending'?'⏳ Pendente':'❌ Perdido'}
+              </span>
+            </div>
+          `).join('')}
+      </div>
+
+      ${lsm.length ? `
+        <div class="card" style="border-left:4px solid var(--danger)">
+          <div style="font-weight:600;color:var(--danger);margin-bottom:8px">⚠️ Estoque baixo</div>
+          ${lsm.map(m => `
+            <div style="display:flex;justify-content:space-between;padding:4px 0">
+              <span>${m.name}</span>
+              <span style="color:var(--danger);font-weight:600">${m.stock} ${m.unit}</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="caption">Plano atual</div>
+            <div style="font-weight:600;color:var(--primary)">${state.subscription==='free'?'Gratuito':state.subscription==='familia'?'Família':'Central'}</div>
+          </div>
+          ${state.subscription==='free'?`<button class="btn btn-small" data-action="show-paywall">Upgrade</button>`:''}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── Contacts ─────────────────────────────────────────────
+function renderContacts() {
+  return `
+    <div class="screen active screen-padtop">
+      <h1>📞 Contatos de Emergência</h1>
+      <p class="subtitle">Essas pessoas serão notificadas quando um check-in for perdido ou o SOS for acionado</p>
+
+      ${state.contacts.length === 0 ? `
+        <div class="empty-state">
+          ${icons.people}
+          <p>Nenhum contato cadastrado</p>
+        </div>
+      ` : state.contacts.sort((a,b)=>a.priority-b.priority).map((c,i) => `
+        <div class="card">
+          <div class="contact-card">
+            <div class="priority-badge">${i+1}º</div>
+            <div class="contact-info">
+              <div class="contact-name">${c.name}</div>
+              <div class="contact-rel">${c.relationship || 'Não informado'}</div>
+              <div class="contact-phone">${c.phone}</div>
+            </div>
+            <div class="contact-actions">
+              <a href="tel:${c.phone}">${icons.call.replace('width','style="width:22px;height:22px;fill:var(--success)" width')}</a>
+              <button data-action="delete-contact" data-id="${c.id}">${icons.trash.replace('width','style="width:22px;height:22px;fill:var(--danger)" width')}</button>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+
+      <button class="btn mt-md" data-action="show-add-contact">+ Adicionar Contato</button>
+    </div>
+    ${renderAddContactModal()}`;
+}
+
+function renderAddContactModal() {
+  return `
+    <div class="modal-overlay" id="modal-add-contact">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>Novo Contato</h2>
+          <button class="modal-close" data-action="close-modal" data-modal="modal-add-contact">${icons.close}</button>
+        </div>
+        <div class="modal-body">
+          <div class="input-label">Nome *</div>
+          <input type="text" id="contact-name" placeholder="Nome do contato">
+          <div class="input-label">Telefone *</div>
+          <input type="tel" id="contact-phone" placeholder="(11) 99999-9999">
+          <div class="input-label">Parentesco</div>
+          <input type="text" id="contact-rel" placeholder="Ex: Filho(a), Vizinho(a)">
+          <button class="btn btn-elder mt-lg" data-action="save-contact">Salvar Contato</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── Settings ─────────────────────────────────────────────
+function renderSettings() {
+  const isElder = state.user?.role === 'elder';
+  const mc = maxCheckins();
+  return `
+    <div class="screen active screen-padtop">
+      <h1>⚙️ Configurações</h1>
+
+      <div class="card">
+        <h2>Perfil</h2>
+        <div class="profile-row">
+          <div class="avatar">${(state.user?.name||'?')[0].toUpperCase()}</div>
+          <div>
+            <div style="font-weight:600;font-size:16px">${state.user?.name}</div>
+            <div class="caption">${state.user?.role==='elder'?'Idoso':state.user?.role==='family'?'Familiar':'Cuidador'}</div>
+          </div>
+        </div>
+      </div>
+
+      ${isElder ? `
+        <div class="card">
+          <h2>Horários de Check-in</h2>
+          <div class="caption mb-md">Seu plano permite até ${mc} check-in(s)/dia</div>
+          ${state.checkinTimes.map(t => `
+            <div class="time-row">
+              ${icons.alarm.replace('width','style="width:20px;height:20px;fill:var(--primary)" width')}
+              <span class="time-text">${t}</span>
+              <button data-action="remove-time" data-time="${t}" style="background:none;border:none;padding:4px">${icons.close.replace('width','style="width:20px;height:20px;fill:var(--danger)" width')}</button>
+            </div>
+          `).join('')}
+          ${state.checkinTimes.length < mc ? `
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+              <input type="time" id="new-checkin-time" style="flex:1" value="14:00">
+              <button class="btn btn-small" style="width:auto" data-action="add-time">+ Adicionar</button>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+
+      <div class="card">
+        <h2>Assinatura</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:600;color:var(--primary)">${state.subscription==='free'?'Plano Gratuito':state.subscription==='familia'?'Plano Família':'Plano Central'}</div>
+          </div>
+          <button class="btn btn-small" style="width:auto" data-action="show-paywall">${state.subscription==='free'?'Upgrade':'Gerenciar'}</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Mais</h2>
+        <button class="menu-row w100" data-tab="contacts" style="border:none;background:none;text-align:left">
+          ${icons.call.replace('width','style="width:20px;height:20px;fill:var(--primary)" width')}
+          <span class="label">Contatos de Emergência</span>
+          ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
+        </button>
+      </div>
+
+      <button class="btn btn-danger mt-lg" data-action="logout">Sair da conta</button>
+      <p class="caption text-center mt-md">Estou Bem v1.0.0 — Web Preview</p>
+    </div>
+    ${renderPaywallModal()}`;
+}
+
+// ─── Paywall ──────────────────────────────────────────────
+const plans = [
+  { id:'free', name:'Gratuito', price:'R$ 0', desc:'Check-in básico para sua tranquilidade',
+    features:['1 check-in diário','Alarme de lembrete','Até 3 familiares','Botão de SOS','Histórico 7 dias'],
+    missing:['Múltiplos check-ins','Medicamentos','Sensores/Wearable','GPS/Geofencing','Central 24h','Telemedicina']},
+  { id:'familia', name:'Família', price:'R$ 49,90/mês', desc:'Monitoramento completo', highlighted:true,
+    features:['Até 3 check-ins/dia','Familiares ilimitados','Medicamentos + estoque','Sensores + wearable','GPS e geofencing','Dashboard completo','Histórico ilimitado'],
+    missing:['Central 24h','Telemedicina','SAMU com GPS']},
+  { id:'central', name:'Central', price:'R$ 89,90/mês', desc:'Proteção total com central humana 24h',
+    features:['Até 5 check-ins/dia','Tudo do Família','Central humana 24h','Telemedicina integrada','Acionamento SAMU','Relatório mensal'],
+    missing:[]},
+];
+
+function renderPaywallModal() {
+  return `
+    <div class="modal-overlay" id="modal-paywall">
+      <div class="modal" style="max-height:95vh">
+        <div class="modal-header">
+          <h2>Escolha seu plano</h2>
+          <button class="modal-close" data-action="close-modal" data-modal="modal-paywall">${icons.close}</button>
+        </div>
+        <div class="modal-body">
+          <p class="subtitle text-center">Proteja quem você ama com o plano ideal</p>
+          ${plans.map(p => `
+            <div class="card plan-card ${state.subscription===p.id?'selected':''} ${p.highlighted?'highlighted':''}" data-action="select-plan" data-plan="${p.id}" style="cursor:pointer;position:relative">
+              ${p.highlighted?'<div class="popular-badge">MAIS POPULAR</div>':''}
+              ${state.subscription===p.id?'<div style="position:absolute;top:-10px;left:12px;background:var(--success);color:#FFF;padding:2px 12px;border-radius:999px;font-size:11px;font-weight:700">ATUAL</div>':''}
+              <div class="plan-header"><div class="plan-name">${p.name}</div><div class="plan-price">${p.price}</div></div>
+              <div class="plan-desc">${p.desc}</div>
+              <div class="feature-list">
+                ${p.features.map(f => `<div class="feature-row"><svg class="check" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>${f}</div>`).join('')}
+                ${p.missing.map(f => `<div class="feature-row disabled"><svg class="cross" viewBox="0 0 24 24"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>${f}</div>`).join('')}
+              </div>
+            </div>
+          `).join('')}
+          <div class="legal-text">
+            A assinatura será cobrada na sua conta da App Store/Google Play na confirmação.
+            Renova automaticamente. Gerencie nas configurações do dispositivo.
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── Event Binding ────────────────────────────────────────
+let sosTimer = null, sosInterval = null, sosProgress = 0;
+
+function bindEvents() {
+  // Tab switching
+  $$('[data-tab]').forEach(el => el.addEventListener('click', () => {
+    state.currentTab = el.dataset.tab;
+    render();
+  }));
+
+  // Actions
+  $$('[data-action]').forEach(el => el.addEventListener('click', (e) => {
+    const action = el.dataset.action;
+    handleAction(action, el);
+  }));
+
+  // Roles
+  $$('[data-role]').forEach(el => el.addEventListener('click', () => {
+    $$('[data-role]').forEach(r => r.classList.remove('active'));
+    el.classList.add('active');
+    el._selectedRole = el.dataset.role;
+  }));
+
+  // Freq chips
+  $$('[data-freq]').forEach(el => el.addEventListener('click', () => {
+    $$('[data-freq]').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }));
+
+  // Plan selection
+  $$('[data-action="select-plan"]').forEach(el => el.addEventListener('click', () => {
+    const plan = el.dataset.plan;
+    if (plan !== 'free' && plan !== state.subscription) {
+      state.subscription = plan;
+      toast(`✅ Plano ${plan==='familia'?'Família':'Central'} ativado!`);
+      save();
+      render();
+    }
+  }));
+
+  // SOS hold
+  const sosBtn = $('#sos-btn');
+  if (sosBtn) {
+    sosBtn.addEventListener('touchstart', startSOS, { passive: true });
+    sosBtn.addEventListener('mousedown', startSOS);
+    sosBtn.addEventListener('touchend', cancelSOS);
+    sosBtn.addEventListener('touchcancel', cancelSOS);
+    sosBtn.addEventListener('mouseup', cancelSOS);
+    sosBtn.addEventListener('mouseleave', cancelSOS);
+  }
+}
+
+function handleAction(action, el) {
+  switch(action) {
+    case 'next-slide':
+      state.onboardingSlide = Math.min(state.onboardingSlide + 1, slides.length - 1);
+      render();
+      break;
+    case 'skip-onboarding':
+      state.screen = 'setup';
+      render();
+      break;
+    case 'complete-setup': {
+      const name = $('#setup-name')?.value?.trim();
+      const phone = $('#setup-phone')?.value?.trim();
+      const activeRole = $('[data-role].active');
+      const role = activeRole?.dataset?.role;
+      if (!name) { toast('❌ Digite seu nome'); return; }
+      if (!role) { toast('❌ Selecione seu perfil'); return; }
+      state.user = { name, phone, role };
+      state.currentTab = role === 'elder' ? 'checkin' : 'dashboard';
+      // Create initial pending checkin for elder
+      if (role === 'elder') {
+        state.checkins.push({ id: genId(), time: state.checkinTimes[0], status: 'pending', date: today() });
+      }
+      render();
+      break;
+    }
+    case 'do-checkin': {
+      const pending = todayCheckins().find(c => c.status === 'pending');
+      if (pending) {
+        pending.status = 'confirmed';
+        pending.time = timeNow();
+      } else {
+        state.checkins.unshift({ id: genId(), time: timeNow(), status: 'confirmed', date: today() });
+      }
+      if (navigator.vibrate) navigator.vibrate(200);
+      toast('✅ Check-in confirmado!');
+      save();
+      // Animate button
+      const btn = $('.checkin-btn');
+      if (btn) {
+        btn.classList.add('confirmed');
+        btn.querySelector('span').textContent = 'Confirmado! ✅';
+        setTimeout(() => render(), 1500);
+      }
+      break;
+    }
+    case 'show-add-med':
+      $('#modal-add-med')?.classList.add('visible');
+      break;
+    case 'close-modal':
+      $(`#${el.dataset.modal}`)?.classList.remove('visible');
+      break;
+    case 'save-med': {
+      const name = $('#med-name')?.value?.trim();
+      if (!name) { toast('❌ Digite o nome'); return; }
+      const activeFreq = $('[data-freq].active');
+      state.medications.push({
+        id: genId(), name,
+        dosage: $('#med-dosage')?.value?.trim() || '',
+        frequency: activeFreq?.dataset?.freq || '1x ao dia',
+        time: $('#med-time')?.value || '08:00',
+        stock: parseInt($('#med-stock')?.value) || 30,
+        unit: $('#med-unit')?.value?.trim() || 'comprimidos',
+        lowThreshold: 5,
+      });
+      toast('✅ Medicamento adicionado!');
+      render();
+      break;
+    }
+    case 'take-med': {
+      const med = state.medications.find(m => m.id === el.dataset.id);
+      if (!med) return;
+      if (med.stock <= 0) { toast('❌ Estoque vazio!'); return; }
+      med.stock--;
+      if (med.stock <= med.lowThreshold) toast(`⚠️ Estoque baixo: ${med.name} — ${med.stock} ${med.unit}`);
+      else toast(`✅ ${med.name} registrado!`);
+      render();
+      break;
+    }
+    case 'delete-med':
+      state.medications = state.medications.filter(m => m.id !== el.dataset.id);
+      toast('Medicamento removido');
+      render();
+      break;
+    case 'show-add-contact':
+      $('#modal-add-contact')?.classList.add('visible');
+      break;
+    case 'save-contact': {
+      const name = $('#contact-name')?.value?.trim();
+      const phone = $('#contact-phone')?.value?.trim();
+      if (!name || !phone) { toast('❌ Nome e telefone obrigatórios'); return; }
+      state.contacts.push({
+        id: genId(), name, phone,
+        relationship: $('#contact-rel')?.value?.trim() || '',
+        priority: state.contacts.length + 1,
+      });
+      toast('✅ Contato adicionado!');
+      render();
+      break;
+    }
+    case 'delete-contact':
+      state.contacts = state.contacts.filter(c => c.id !== el.dataset.id);
+      toast('Contato removido');
+      render();
+      break;
+    case 'show-paywall':
+      $('#modal-paywall')?.classList.add('visible');
+      break;
+    case 'add-time': {
+      const t = $('#new-checkin-time')?.value;
+      if (!t) return;
+      if (state.checkinTimes.length >= maxCheckins()) {
+        toast(`❌ Limite de ${maxCheckins()} check-ins no seu plano`);
+        return;
+      }
+      state.checkinTimes.push(t);
+      state.checkinTimes.sort();
+      toast(`✅ Check-in às ${t} adicionado`);
+      render();
+      break;
+    }
+    case 'remove-time':
+      state.checkinTimes = state.checkinTimes.filter(t => t !== el.dataset.time);
+      render();
+      break;
+    case 'logout':
+      if (confirm('Sair e apagar dados locais?')) {
+        localStorage.removeItem('estoubem_state');
+        state = { screen:'onboarding', onboardingSlide:0, user:null, checkins:[], medications:[], contacts:[], healthEntries:[], checkinTimes:['09:00'], subscription:'free', currentTab:'checkin' };
+        render();
+      }
+      break;
+  }
+}
+
+function startSOS(e) {
+  e.preventDefault();
+  sosProgress = 0;
+  const track = $('#sos-progress-track');
+  const fill = $('#sos-progress');
+  if (track) track.style.display = 'block';
+  if (navigator.vibrate) navigator.vibrate([100,100,100]);
+  sosInterval = setInterval(() => {
+    sosProgress += 2;
+    if (fill) fill.style.width = Math.min(sosProgress, 100) + '%';
+    if (sosProgress >= 100) {
+      clearInterval(sosInterval);
+      sosInterval = null;
+      // SOS activated!
+      if (navigator.vibrate) navigator.vibrate([500,200,500,200,500]);
+      const btn = $('#sos-btn');
+      if (btn) {
+        btn.classList.add('activated');
+        btn.querySelector('span').textContent = 'SOS ATIVADO';
+      }
+      toast('🚨 SOS ATIVADO! Contatos notificados.');
+      setTimeout(() => render(), 5000);
+    }
+  }, 60); // 3 seconds total = 50 steps * 60ms
+}
+
+function cancelSOS() {
+  if (sosInterval) clearInterval(sosInterval);
+  sosInterval = null;
+  sosProgress = 0;
+  const track = $('#sos-progress-track');
+  const fill = $('#sos-progress');
+  if (track) track.style.display = 'none';
+  if (fill) fill.style.width = '0%';
+}
+
+// ─── Initial render ───────────────────────────────────────
+render();
+
+// ─── Simulate check-in alarm (for demo) ──────────────────
+// Every minute, check if a pending checkin should be created
+setInterval(() => {
+  if (!state.user || state.user.role !== 'elder') return;
+  const now = timeNow();
+  const existing = todayCheckins();
+  for (const t of state.checkinTimes) {
+    if (now === t && !existing.find(c => c.time === t)) {
+      state.checkins.unshift({ id: genId(), time: t, status: 'pending', date: today() });
+      if (navigator.vibrate) navigator.vibrate([300,200,300]);
+      toast('🔔 Hora do check-in!');
+      save();
+      render();
+    }
+  }
+}, 30000);
+</script>
+</body>
+</html>
