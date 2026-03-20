@@ -10,6 +10,9 @@
       "ios": {
         "simulator": true
       },
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "REVENUECAT_APPLE_API_KEY": "",
         "REVENUECAT_GOOGLE_API_KEY": ""

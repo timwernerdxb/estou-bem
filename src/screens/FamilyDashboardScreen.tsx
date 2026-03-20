@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +16,8 @@ import { useApp, useSubscription } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { StatusBadge } from "../components/StatusBadge";
 import { CheckIn } from "../types";
+
+const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
 export function FamilyDashboardScreen() {
   const { state } = useApp();
@@ -65,14 +68,14 @@ export function FamilyDashboardScreen() {
   const getStatusColor = () => {
     if (missed.length > 0) return COLORS.danger;
     if (pending.length > 0) return COLORS.warning;
-    if (confirmed.length > 0) return COLORS.success;
+    if (confirmed.length > 0) return COLORS.primary;
     return COLORS.textLight;
   };
 
   const getStatusText = () => {
-    if (missed.length > 0) return `⚠️ ${missed.length} check-in(s) perdido(s)`;
-    if (pending.length > 0) return `⏳ ${pending.length} check-in(s) pendente(s)`;
-    if (confirmed.length > 0) return "✅ Todos os check-ins confirmados";
+    if (missed.length > 0) return `${missed.length} check-in(s) perdido(s)`;
+    if (pending.length > 0) return `${pending.length} check-in(s) pendente(s)`;
+    if (confirmed.length > 0) return "Todos os check-ins confirmados";
     return "Nenhum check-in hoje ainda";
   };
 
@@ -93,7 +96,7 @@ export function FamilyDashboardScreen() {
           style={{
             ...styles.statusCard,
             borderLeftColor: getStatusColor(),
-            borderLeftWidth: 4,
+            borderLeftWidth: 3,
           }}
         >
           <View style={styles.statusHeader}>
@@ -122,7 +125,7 @@ export function FamilyDashboardScreen() {
         <View style={styles.statsGrid}>
           <Card style={styles.statCard}>
             <Text style={styles.statValue}>{adherenceRate}%</Text>
-            <Text style={styles.statLabel}>Aderência (7 dias)</Text>
+            <Text style={styles.statLabel}>Aderencia (7 dias)</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text style={styles.statValue}>{state.medications.length}</Text>
@@ -152,7 +155,7 @@ export function FamilyDashboardScreen() {
             <TouchableOpacity
               onPress={() => navigation.navigate("CheckInHistory")}
             >
-              <Text style={styles.seeAll}>Ver todos →</Text>
+              <Text style={styles.seeAll}>VER TODOS</Text>
             </TouchableOpacity>
           </View>
           {state.checkins.length === 0 ? (
@@ -186,7 +189,7 @@ export function FamilyDashboardScreen() {
         {/* Low stock alerts */}
         {lowStockMeds.length > 0 && (
           <Card style={styles.alertCard}>
-            <Text style={styles.alertTitle}>⚠️ Medicamentos com estoque baixo</Text>
+            <Text style={styles.alertTitle}>Medicamentos com estoque baixo</Text>
             {lowStockMeds.map((m) => (
               <View key={m.id} style={styles.alertRow}>
                 <Text style={styles.alertMedName}>{m.name}</Text>
@@ -207,7 +210,7 @@ export function FamilyDashboardScreen() {
                 {tier === "free"
                   ? "Gratuito"
                   : tier === "familia"
-                  ? "Família"
+                  ? "Familia"
                   : "Central"}
               </Text>
             </View>
@@ -216,7 +219,7 @@ export function FamilyDashboardScreen() {
                 style={styles.upgradeButton}
                 onPress={() => navigation.navigate("Paywall")}
               >
-                <Text style={styles.upgradeText}>Upgrade</Text>
+                <Text style={styles.upgradeText}>UPGRADE</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -228,13 +231,17 @@ export function FamilyDashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollContent: { padding: SPACING.md },
-  title: { ...FONTS.title, marginBottom: SPACING.xs },
+  scrollContent: { padding: SPACING.lg },
+  title: {
+    ...FONTS.title,
+    fontSize: 28,
+    marginBottom: SPACING.xs,
+  },
   subtitle: { ...FONTS.caption, marginBottom: SPACING.lg },
   statusCard: { marginBottom: SPACING.md },
   statusHeader: { flexDirection: "row", alignItems: "center", gap: SPACING.md },
   statusInfo: { flex: 1 },
-  statusText: { ...FONTS.subtitle },
+  statusText: { ...FONTS.subtitle, fontWeight: "500" },
   statusSubtext: { ...FONTS.caption, marginTop: 2 },
   statsGrid: {
     flexDirection: "row",
@@ -248,7 +255,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: SPACING.md,
   },
-  statValue: { fontSize: 28, fontWeight: "700", color: COLORS.primary },
+  statValue: {
+    fontSize: 28,
+    fontWeight: "300",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    color: COLORS.primary,
+  },
   statLabel: { ...FONTS.caption, marginTop: SPACING.xs, textAlign: "center" },
   sectionCard: { marginBottom: SPACING.md },
   sectionHeader: {
@@ -257,8 +269,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: SPACING.sm,
   },
-  sectionTitle: { ...FONTS.subtitle },
-  seeAll: { ...FONTS.caption, color: COLORS.primary },
+  sectionTitle: { ...FONTS.subtitle, fontWeight: "500" },
+  seeAll: {
+    ...FONTS.small,
+    color: COLORS.primary,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
   emptyText: { ...FONTS.caption, textAlign: "center", paddingVertical: SPACING.md },
   checkinRow: {
     flexDirection: "row",
@@ -272,17 +289,17 @@ const styles = StyleSheet.create({
   autoText: { ...FONTS.small, color: COLORS.primary },
   alertCard: {
     marginBottom: SPACING.md,
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
     borderLeftColor: COLORS.danger,
   },
-  alertTitle: { ...FONTS.subtitle, color: COLORS.danger, marginBottom: SPACING.sm },
+  alertTitle: { ...FONTS.subtitle, color: COLORS.danger, fontWeight: "500", marginBottom: SPACING.sm },
   alertRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: SPACING.xs,
   },
   alertMedName: { ...FONTS.body },
-  alertStock: { ...FONTS.body, color: COLORS.danger, fontWeight: "600" },
+  alertStock: { ...FONTS.body, color: COLORS.danger, fontWeight: "500" },
   subCard: { marginBottom: SPACING.xl },
   subRow: {
     flexDirection: "row",
@@ -295,7 +312,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
+    borderRadius: RADIUS.md,
   },
-  upgradeText: { color: COLORS.white, fontWeight: "700" },
+  upgradeText: {
+    color: COLORS.white,
+    fontWeight: "600",
+    fontSize: 12,
+    letterSpacing: 1,
+  },
 });

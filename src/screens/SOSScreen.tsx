@@ -8,6 +8,7 @@ import {
   Alert,
   Vibration,
   Linking,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +18,7 @@ import { useApp } from "../store/AppContext";
 import { notificationService } from "../services/NotificationService";
 import { locationService } from "../services/LocationService";
 
+const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 const HOLD_DURATION = 3000; // 3 seconds to activate SOS
 
 export function SOSScreen() {
@@ -71,10 +73,10 @@ export function SOSScreen() {
       const firstContact = sorted[0];
 
       Alert.alert(
-        "🚨 SOS Ativado!",
-        `Emergência enviada para ${state.emergencyContacts.length} contatos.\n\nDeseja ligar para ${firstContact.name}?`,
+        "SOS Ativado",
+        `Emergencia enviada para ${state.emergencyContacts.length} contatos.\n\nDeseja ligar para ${firstContact.name}?`,
         [
-          { text: "Não", style: "cancel" },
+          { text: "Nao", style: "cancel" },
           {
             text: `Ligar para ${firstContact.name}`,
             onPress: () => Linking.openURL(`tel:${firstContact.phone}`),
@@ -88,8 +90,8 @@ export function SOSScreen() {
       );
     } else {
       Alert.alert(
-        "🚨 SOS Ativado!",
-        "Nenhum contato de emergência cadastrado.\nDeseja ligar para o SAMU?",
+        "SOS Ativado",
+        "Nenhum contato de emergencia cadastrado.\nDeseja ligar para o SAMU?",
         [
           { text: "Cancelar", style: "cancel" },
           {
@@ -116,11 +118,11 @@ export function SOSScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>🆘 Emergência</Text>
+        <Text style={styles.title}>Emergencia</Text>
         <Text style={styles.subtitle}>
           {sosActivated
-            ? "SOS ativado! Socorro a caminho."
-            : "Segure o botão por 3 segundos para acionar emergência"}
+            ? "SOS ativado. Socorro a caminho."
+            : "Segure o botao por 3 segundos para acionar emergencia"}
         </Text>
 
         {/* SOS Button */}
@@ -178,14 +180,14 @@ export function SOSScreen() {
             onPress={() => Linking.openURL("tel:190")}
           >
             <Ionicons name="call" size={24} color={COLORS.danger} />
-            <Text style={styles.quickCallText}>Polícia (190)</Text>
+            <Text style={styles.quickCallText}>Policia (190)</Text>
           </TouchableOpacity>
         </View>
 
         {/* Emergency contacts */}
         {state.emergencyContacts.length > 0 && (
           <View style={styles.contactsSection}>
-            <Text style={styles.contactsTitle}>Contatos de emergência</Text>
+            <Text style={styles.contactsTitle}>Contatos de emergencia</Text>
             {state.emergencyContacts
               .sort((a, b) => a.priority - b.priority)
               .map((contact) => (
@@ -215,12 +217,18 @@ const SOS_SIZE = Math.min(SCREEN.width * 0.55, 220);
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { flex: 1, padding: SPACING.lg, alignItems: "center" },
-  title: { ...FONTS.elderTitle, marginBottom: SPACING.xs },
+  title: {
+    ...FONTS.elderTitle,
+    marginBottom: SPACING.xs,
+    color: COLORS.danger,
+  },
   subtitle: {
-    ...FONTS.elderBody,
+    ...FONTS.body,
+    fontSize: 18,
     color: COLORS.textSecondary,
     textAlign: "center",
     marginBottom: SPACING.xl,
+    lineHeight: 26,
   },
   sosContainer: { alignItems: "center", marginBottom: SPACING.xl },
   sosButton: {
@@ -230,20 +238,19 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.danger,
     justifyContent: "center",
     alignItems: "center",
-    ...SHADOWS.large,
   },
-  sosButtonHolding: { backgroundColor: "#D32F2F", transform: [{ scale: 0.95 }] },
-  sosButtonActivated: { backgroundColor: "#B71C1C" },
-  sosText: { ...FONTS.elderButton, marginTop: SPACING.xs },
+  sosButtonHolding: { backgroundColor: "#6B2A2A", transform: [{ scale: 0.95 }] },
+  sosButtonActivated: { backgroundColor: "#4A1E1E" },
+  sosText: { ...FONTS.elderButton, marginTop: SPACING.xs, letterSpacing: 2 },
   progressContainer: {
     width: SOS_SIZE + 20,
-    height: 8,
+    height: 6,
     backgroundColor: COLORS.border,
-    borderRadius: 4,
+    borderRadius: 3,
     marginTop: SPACING.md,
     overflow: "hidden",
   },
-  progressBar: { height: "100%", backgroundColor: COLORS.danger, borderRadius: 4 },
+  progressBar: { height: "100%", backgroundColor: COLORS.danger, borderRadius: 3 },
   quickCalls: { width: "100%", gap: SPACING.sm, marginBottom: SPACING.lg },
   quickCallButton: {
     flexDirection: "row",
@@ -251,10 +258,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     padding: SPACING.md,
     borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     gap: SPACING.sm,
-    ...SHADOWS.small,
   },
-  quickCallText: { ...FONTS.subtitle, color: COLORS.danger },
+  quickCallText: { ...FONTS.subtitle, color: COLORS.danger, fontWeight: "500" },
   contactsSection: { width: "100%" },
   contactsTitle: { ...FONTS.subtitle, marginBottom: SPACING.sm },
   contactRow: {
@@ -264,9 +272,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     padding: SPACING.md,
     borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     marginBottom: SPACING.xs,
-    ...SHADOWS.small,
   },
-  contactName: { ...FONTS.body, fontWeight: "600" },
+  contactName: { ...FONTS.body, fontWeight: "500" },
   contactRel: { ...FONTS.caption },
 });

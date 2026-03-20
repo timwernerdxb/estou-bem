@@ -34,19 +34,20 @@ function ElderTabNavigator() {
     <ElderTab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textLight,
+        tabBarActiveTintColor: COLORS.tabBarActive,
+        tabBarInactiveTintColor: COLORS.tabBarInactive,
         tabBarStyle: {
           height: 90,
           paddingBottom: 20,
           paddingTop: 10,
-          backgroundColor: COLORS.white,
-          borderTopWidth: 1,
-          borderTopColor: COLORS.border,
+          backgroundColor: COLORS.tabBar,
+          borderTopWidth: 0,
         },
         tabBarLabelStyle: {
-          fontSize: 14,
-          fontWeight: "600",
+          fontSize: 12,
+          fontWeight: "500",
+          letterSpacing: 0.5,
+          textTransform: "uppercase",
         },
       }}
     >
@@ -64,7 +65,7 @@ function ElderTabNavigator() {
         name="Medications"
         component={MedicationsScreen}
         options={{
-          tabBarLabel: "Remédios",
+          tabBarLabel: "Remedios",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="medical" size={size + 4} color={color} />
           ),
@@ -79,8 +80,10 @@ function ElderTabNavigator() {
             <Ionicons name="warning" size={size + 4} color={COLORS.danger} />
           ),
           tabBarLabelStyle: {
-            fontSize: 14,
-            fontWeight: "700",
+            fontSize: 12,
+            fontWeight: "600",
+            letterSpacing: 0.5,
+            textTransform: "uppercase",
             color: COLORS.danger,
           },
         }}
@@ -105,19 +108,20 @@ function FamilyTabNavigator() {
     <FamilyTab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textLight,
+        tabBarActiveTintColor: COLORS.tabBarActive,
+        tabBarInactiveTintColor: COLORS.tabBarInactive,
         tabBarStyle: {
           height: 80,
           paddingBottom: 16,
           paddingTop: 8,
-          backgroundColor: COLORS.white,
-          borderTopWidth: 1,
-          borderTopColor: COLORS.border,
+          backgroundColor: COLORS.tabBar,
+          borderTopWidth: 0,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "600",
+          fontSize: 11,
+          fontWeight: "500",
+          letterSpacing: 0.5,
+          textTransform: "uppercase",
         },
       }}
     >
@@ -145,7 +149,7 @@ function FamilyTabNavigator() {
         name="FamilyMedications"
         component={MedicationsScreen}
         options={{
-          tabBarLabel: "Remédios",
+          tabBarLabel: "Remedios",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="medical" size={size} color={color} />
           ),

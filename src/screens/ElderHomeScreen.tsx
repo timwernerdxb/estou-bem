@@ -7,6 +7,7 @@ import {
   Animated,
   Vibration,
   ScrollView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,8 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Card } from "../components/Card";
 import { CheckIn } from "../types";
 
+const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
+
 export function ElderHomeScreen() {
   const { state, dispatch } = useApp();
   const { isFamilia } = useSubscription();
@@ -25,7 +28,7 @@ export function ElderHomeScreen() {
   const [lastCheckin, setLastCheckin] = useState<CheckIn | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
 
-  const elderName = state.elderProfile?.name || state.currentUser?.name || "Você";
+  const elderName = state.elderProfile?.name || state.currentUser?.name || "Voce";
   const todayCheckins = state.checkins.filter((c) => {
     const today = new Date().toDateString();
     return new Date(c.scheduledAt).toDateString() === today;
@@ -102,7 +105,7 @@ export function ElderHomeScreen() {
       >
         {/* Header */}
         <Text style={styles.greeting}>
-          {getGreeting()}, {elderName}! 👋
+          {getGreeting()}, {elderName}
         </Text>
         <Text style={styles.dateText}>
           {new Date().toLocaleDateString("pt-BR", {
@@ -131,7 +134,7 @@ export function ElderHomeScreen() {
               />
               <Text style={styles.checkinButtonText}>
                 {isConfirming
-                  ? "Confirmado! ✅"
+                  ? "Confirmado"
                   : pendingCheckin
                   ? "TOQUE AQUI"
                   : "ESTOU BEM"}
@@ -141,7 +144,7 @@ export function ElderHomeScreen() {
 
           {pendingCheckin && (
             <Text style={styles.pendingText}>
-              Você tem um check-in pendente
+              Voce tem um check-in pendente
             </Text>
           )}
         </View>
@@ -192,9 +195,9 @@ export function ElderHomeScreen() {
         {isFamilia && (
           <Card style={styles.sensorCard}>
             <View style={styles.sensorRow}>
-              <Ionicons name="fitness" size={20} color={COLORS.success} />
+              <Ionicons name="fitness" size={20} color={COLORS.primary} />
               <Text style={styles.sensorText}>
-                Detecção de quedas: {fallDetectionService.isActive() ? "Ativa" : "Inativa"}
+                Deteccao de quedas: {fallDetectionService.isActive() ? "Ativa" : "Inativa"}
               </Text>
             </View>
           </Card>
@@ -223,6 +226,7 @@ const styles = StyleSheet.create({
   dateText: {
     ...FONTS.elderBody,
     color: COLORS.textSecondary,
+    fontSize: 18,
     textAlign: "center",
     marginTop: SPACING.xs,
     textTransform: "capitalize",
@@ -237,7 +241,6 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_SIZE / 2,
     justifyContent: "center",
     alignItems: "center",
-    ...SHADOWS.large,
   },
   checkinConfirmed: {
     backgroundColor: COLORS.checkinGreenDark,
@@ -250,8 +253,9 @@ const styles = StyleSheet.create({
   pendingText: {
     ...FONTS.elderBody,
     color: COLORS.warning,
+    fontSize: 18,
     marginTop: SPACING.md,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   statusCard: {
     width: "100%",
@@ -284,7 +288,7 @@ const styles = StyleSheet.create({
   },
   checkinTime: {
     ...FONTS.body,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   infoRow: {
     flexDirection: "row",

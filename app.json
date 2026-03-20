@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "estou-bem",
+    "name": "Estou Bem",
     "slug": "estou-bem",
     "version": "1.1.0",
     "orientation": "portrait",
@@ -9,22 +9,47 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F5F0EB"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.estoubem.app",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Estou Bem usa dados de saúde para monitorar o bem-estar do idoso e alertar familiares.",
+        "NSHealthUpdateUsageDescription": "Estou Bem registra check-ins de saúde para acompanhamento familiar.",
+        "NSMotionUsageDescription": "Estou Bem detecta movimento para verificar automaticamente se o idoso está ativo.",
+        "UIBackgroundModes": ["remote-notification", "fetch"]
+      },
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": []
+      }
     },
     "android": {
+      "package": "com.estoubem.app",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#F5F0EB",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "permissions": [
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.ACTIVITY_RECOGNITION"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      ["@bacons/apple-targets"]
+    ]
   }
 }

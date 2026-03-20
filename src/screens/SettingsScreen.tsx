@@ -8,6 +8,7 @@ import {
   Switch,
   Alert,
   TextInput,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +22,8 @@ import { checkInService } from "../services/CheckInService";
 import { autoCheckinService, CheckinMode } from "../services/AutoCheckinService";
 import { healthIntegrationService } from "../services/HealthIntegrationService";
 import { RootStackParamList } from "../types";
+
+const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -44,7 +47,7 @@ export function SettingsScreen() {
     if (mode === "auto_wearable" && !healthConnected) {
       const ok = await healthIntegrationService.initialize();
       if (!ok) {
-        Alert.alert("Não disponível", "Não foi possível conectar ao serviço de saúde.");
+        Alert.alert("Nao disponivel", "Nao foi possivel conectar ao servico de saude.");
         return;
       }
       setHealthConnected(true);
@@ -57,9 +60,9 @@ export function SettingsScreen() {
     const ok = await healthIntegrationService.initialize();
     if (ok) {
       setHealthConnected(true);
-      Alert.alert("Conectado!", `${healthIntegrationService.getPlatformName()} conectado.`);
+      Alert.alert("Conectado", `${healthIntegrationService.getPlatformName()} conectado.`);
     } else {
-      Alert.alert("Erro", "Não foi possível conectar. Verifique se o app de saúde está instalado.");
+      Alert.alert("Erro", "Nao foi possivel conectar. Verifique se o app de saude esta instalado.");
     }
   };
 
@@ -67,13 +70,13 @@ export function SettingsScreen() {
 
   const handleAddTime = async () => {
     if (!newTime.match(/^\d{2}:\d{2}$/)) {
-      Alert.alert("Formato inválido", "Use o formato HH:MM (ex: 14:30)");
+      Alert.alert("Formato invalido", "Use o formato HH:MM (ex: 14:30)");
       return;
     }
     if (checkinTimes.length >= maxCheckins) {
       Alert.alert(
         "Limite atingido",
-        `Seu plano permite até ${maxCheckins} check-in(s) por dia. Faça upgrade para adicionar mais.`,
+        `Seu plano permite ate ${maxCheckins} check-in(s) por dia. Faca upgrade para adicionar mais.`,
         [
           { text: "OK" },
           { text: "Ver planos", onPress: () => navigation.navigate("Paywall") },
@@ -110,7 +113,7 @@ export function SettingsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>⚙️ Configurações</Text>
+        <Text style={styles.title}>Configuracoes</Text>
 
         {/* Profile */}
         <Card style={styles.section}>
@@ -137,9 +140,9 @@ export function SettingsScreen() {
         {/* Check-in Schedule */}
         {isElder && (
           <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Horários de Check-in</Text>
+            <Text style={styles.sectionTitle}>Horarios de Check-in</Text>
             <Text style={styles.sectionSubtitle}>
-              Seu plano permite até {maxCheckins} check-in(s)/dia
+              Seu plano permite ate {maxCheckins} check-in(s)/dia
             </Text>
 
             {checkinTimes.map((time) => (
@@ -184,9 +187,9 @@ export function SettingsScreen() {
 
             {(["manual", "auto_movement", "auto_wearable"] as CheckinMode[]).map((mode) => {
               const labels: Record<CheckinMode, { title: string; desc: string; icon: string }> = {
-                manual: { title: "Manual", desc: "Você toca o botão para confirmar", icon: "hand-left" },
-                auto_movement: { title: "Automático (movimento)", desc: "Confirmado se o celular detectar movimento", icon: "phone-portrait" },
-                auto_wearable: { title: "Automático (relógio/pulseira)", desc: "Confirmado se o wearable detectar atividade", icon: "watch" },
+                manual: { title: "Manual", desc: "Voce toca o botao para confirmar", icon: "hand-left" },
+                auto_movement: { title: "Automatico (movimento)", desc: "Confirmado se o celular detectar movimento", icon: "phone-portrait" },
+                auto_wearable: { title: "Automatico (relogio/pulseira)", desc: "Confirmado se o wearable detectar atividade", icon: "watch" },
               };
               const l = labels[mode];
               return (
@@ -221,9 +224,9 @@ export function SettingsScreen() {
         {/* Health Integration */}
         {isElder && (
           <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Dados de Saúde</Text>
+            <Text style={styles.sectionTitle}>Dados de Saude</Text>
             <TouchableOpacity style={styles.menuRow} onPress={handleConnectHealth}>
-              <Ionicons name="heart" size={22} color={healthConnected ? COLORS.success : COLORS.textLight} />
+              <Ionicons name="heart" size={22} color={healthConnected ? COLORS.primary : COLORS.textLight} />
               <View style={{ flex: 1, marginLeft: SPACING.sm }}>
                 <Text style={styles.menuText}>{healthIntegrationService.getPlatformName()}</Text>
                 <Text style={styles.sectionSubtitle}>
@@ -233,7 +236,7 @@ export function SettingsScreen() {
               <Ionicons
                 name={healthConnected ? "checkmark-circle" : "chevron-forward"}
                 size={20}
-                color={healthConnected ? COLORS.success : COLORS.textLight}
+                color={healthConnected ? COLORS.primary : COLORS.textLight}
               />
             </TouchableOpacity>
           </Card>
@@ -249,7 +252,7 @@ export function SettingsScreen() {
                 {tier === "free"
                   ? "Gratuito"
                   : tier === "familia"
-                  ? "Família"
+                  ? "Familia"
                   : "Central"}
               </Text>
               {state.subscription.expiresAt && (
@@ -266,7 +269,7 @@ export function SettingsScreen() {
               onPress={() => navigation.navigate("Paywall")}
             >
               <Text style={styles.planBtnText}>
-                {tier === "free" ? "Upgrade" : "Gerenciar"}
+                {tier === "free" ? "UPGRADE" : "GERENCIAR"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -281,7 +284,7 @@ export function SettingsScreen() {
             onPress={() => navigation.navigate("EmergencyContacts")}
           >
             <Ionicons name="call" size={22} color={COLORS.primary} />
-            <Text style={styles.menuText}>Contatos de Emergência</Text>
+            <Text style={styles.menuText}>Contatos de Emergencia</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
           </TouchableOpacity>
 
@@ -290,7 +293,7 @@ export function SettingsScreen() {
             onPress={() => navigation.navigate("HealthLog")}
           >
             <Ionicons name="analytics" size={22} color={COLORS.primary} />
-            <Text style={styles.menuText}>Diário de Saúde</Text>
+            <Text style={styles.menuText}>Diario de Saude</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
           </TouchableOpacity>
         </Card>
@@ -313,9 +316,13 @@ export function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.lg },
-  title: { ...FONTS.title, marginBottom: SPACING.lg },
+  title: {
+    ...FONTS.title,
+    fontSize: 28,
+    marginBottom: SPACING.lg,
+  },
   section: { marginBottom: SPACING.md },
-  sectionTitle: { ...FONTS.subtitle, marginBottom: SPACING.sm },
+  sectionTitle: { ...FONTS.subtitle, fontWeight: "500", marginBottom: SPACING.sm },
   sectionSubtitle: { ...FONTS.caption, marginBottom: SPACING.sm },
   profileRow: { flexDirection: "row", alignItems: "center", gap: SPACING.md },
   avatar: {
@@ -326,7 +333,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarText: { color: COLORS.white, fontSize: 22, fontWeight: "700" },
+  avatarText: { color: COLORS.white, fontSize: 22, fontWeight: "300" },
   profileInfo: {},
   profileName: { ...FONTS.subtitle },
   profileRole: { ...FONTS.caption },
@@ -368,9 +375,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
+    borderRadius: RADIUS.md,
   },
-  planBtnText: { color: COLORS.white, fontWeight: "700" },
+  planBtnText: {
+    color: COLORS.white,
+    fontWeight: "600",
+    fontSize: 12,
+    letterSpacing: 1,
+  },
   menuRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -391,11 +403,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   modeOptionActive: {
-    backgroundColor: "#EBF4FF",
+    backgroundColor: COLORS.successLight,
     borderColor: COLORS.primary,
     borderWidth: 1,
   },
-  modeTitle: { ...FONTS.body, fontWeight: "600" },
+  modeTitle: { ...FONTS.body, fontWeight: "500" },
   modeDesc: { ...FONTS.small, marginTop: 2 },
   version: {
     ...FONTS.small,

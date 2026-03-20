@@ -1,48 +1,60 @@
-import { Dimensions } from "react-native";
+import { Dimensions, Platform } from "react-native";
 
 const { width, height } = Dimensions.get("window");
 
+const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
+
 export const COLORS = {
   // Primary
-  primary: "#4A90D9",
-  primaryDark: "#2E6DB4",
-  primaryLight: "#7CB3E8",
+  primary: "#2D4A3E",
+  primaryDark: "#1E3329",
+  primaryLight: "#3D6454",
+
+  // Accent
+  accent: "#C9A96E",
+  accentLight: "#D9C49A",
 
   // Status
-  success: "#4CAF50",
-  successLight: "#C8E6C9",
-  warning: "#FF9800",
-  warningLight: "#FFE0B2",
-  danger: "#F44336",
-  dangerLight: "#FFCDD2",
+  success: "#2D4A3E",
+  successLight: "#E8EEEB",
+  warning: "#C9A96E",
+  warningLight: "#F5EFE4",
+  danger: "#8B3A3A",
+  dangerLight: "#F0E0E0",
 
   // Neutral
   white: "#FFFFFF",
-  background: "#F5F7FA",
+  background: "#F5F0EB",
   card: "#FFFFFF",
-  border: "#E0E6ED",
-  textPrimary: "#1A1A2E",
-  textSecondary: "#6B7280",
-  textLight: "#9CA3AF",
-  disabled: "#D1D5DB",
+  border: "#E5DDD3",
+  textPrimary: "#1A1A1A",
+  textSecondary: "#5C5549",
+  textLight: "#9A9189",
+  disabled: "#C8C2BA",
 
   // Check-in specific
-  checkinGreen: "#4CAF50",
-  checkinGreenDark: "#388E3C",
-  checkinPending: "#FF9800",
-  checkinMissed: "#F44336",
+  checkinGreen: "#2D4A3E",
+  checkinGreenDark: "#1E3329",
+  checkinPending: "#C9A96E",
+  checkinMissed: "#8B3A3A",
+
+  // Tab bar
+  tabBar: "#1A1A1A",
+  tabBarActive: "#FFFFFF",
+  tabBarInactive: "#9A9189",
 
   // Subscription tiers
-  tierFree: "#9E9E9E",
-  tierFamilia: "#4A90D9",
-  tierCentral: "#9C27B0",
+  tierFree: "#9A9189",
+  tierFamilia: "#2D4A3E",
+  tierCentral: "#C9A96E",
 } as const;
 
 export const FONTS = {
-  // Elder-facing: large, high contrast
+  // Elder-facing: large, high contrast, serif headlines
   elderTitle: {
     fontSize: 32,
-    fontWeight: "700" as const,
+    fontWeight: "300" as const,
+    fontFamily: serifFont,
     color: COLORS.textPrimary,
   },
   elderBody: {
@@ -53,19 +65,21 @@ export const FONTS = {
   },
   elderButton: {
     fontSize: 24,
-    fontWeight: "700" as const,
+    fontWeight: "600" as const,
     color: COLORS.white,
+    letterSpacing: 1,
   },
 
   // Family-facing: standard sizes
   title: {
     fontSize: 24,
-    fontWeight: "700" as const,
+    fontWeight: "300" as const,
+    fontFamily: serifFont,
     color: COLORS.textPrimary,
   },
   subtitle: {
     fontSize: 18,
-    fontWeight: "600" as const,
+    fontWeight: "400" as const,
     color: COLORS.textPrimary,
   },
   body: {
@@ -96,34 +110,34 @@ export const SPACING = {
 } as const;
 
 export const RADIUS = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
+  sm: 4,
+  md: 4,
+  lg: 4,
+  xl: 4,
   full: 9999,
 } as const;
 
 export const SHADOWS = {
   small: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   medium: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   large: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
 } as const;
 

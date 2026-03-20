@@ -8,6 +8,7 @@ import {
   Alert,
   TextInput,
   Modal,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,12 +20,14 @@ import { Button } from "../components/Button";
 import { Medication, MedicationFrequency } from "../types";
 import { notificationService } from "../services/NotificationService";
 
+const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
+
 const FREQUENCY_LABELS: Record<MedicationFrequency, string> = {
   daily: "1x ao dia",
   twice_daily: "2x ao dia",
   three_times_daily: "3x ao dia",
   weekly: "Semanal",
-  as_needed: "Quando necessário",
+  as_needed: "Quando necessario",
 };
 
 export function MedicationsScreen() {
@@ -82,7 +85,7 @@ export function MedicationsScreen() {
 
   const handleTakeMedication = (med: Medication) => {
     if (med.stockQuantity <= 0) {
-      Alert.alert("Estoque vazio", `${med.name} está sem estoque!`);
+      Alert.alert("Estoque vazio", `${med.name} esta sem estoque.`);
       return;
     }
 
@@ -112,12 +115,12 @@ export function MedicationsScreen() {
         updatedMed.stockQuantity
       );
       Alert.alert(
-        "⚠️ Estoque baixo",
+        "Estoque baixo",
         `${med.name}: restam ${updatedMed.stockQuantity} ${med.stockUnit}`
       );
     }
 
-    Alert.alert("✅ Registrado", `${med.name} tomado com sucesso!`);
+    Alert.alert("Registrado", `${med.name} tomado com sucesso.`);
   };
 
   const handleDeleteMedication = (med: Medication) => {
@@ -138,7 +141,7 @@ export function MedicationsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>💊 Medicamentos</Text>
+        <Text style={styles.title}>Medicamentos</Text>
 
         {state.medications.length === 0 ? (
           <Card style={styles.emptyCard}>
@@ -158,7 +161,7 @@ export function MedicationsScreen() {
                   <Text style={styles.medName}>{med.name}</Text>
                   <Text style={styles.medDosage}>{med.dosage}</Text>
                   <Text style={styles.medFreq}>
-                    {FREQUENCY_LABELS[med.frequency]} — {med.times.join(", ")}
+                    {FREQUENCY_LABELS[med.frequency]} -- {med.times.join(", ")}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => handleDeleteMedication(med)}>
@@ -182,12 +185,12 @@ export function MedicationsScreen() {
                     styles.stockText,
                     med.stockQuantity <= med.lowStockThreshold && {
                       color: COLORS.danger,
-                      fontWeight: "600",
+                      fontWeight: "500",
                     },
                   ]}
                 >
                   Estoque: {med.stockQuantity} {med.stockUnit}
-                  {med.stockQuantity <= med.lowStockThreshold && " ⚠️ Baixo!"}
+                  {med.stockQuantity <= med.lowStockThreshold && " - Baixo"}
                 </Text>
               </View>
 
@@ -196,14 +199,14 @@ export function MedicationsScreen() {
                 onPress={() => handleTakeMedication(med)}
               >
                 <Ionicons name="checkmark-circle" size={24} color={COLORS.white} />
-                <Text style={styles.takeButtonText}>Tomei</Text>
+                <Text style={styles.takeButtonText}>TOMEI</Text>
               </TouchableOpacity>
             </Card>
           ))
         )}
 
         <Button
-          title="+ Adicionar Medicamento"
+          title="Adicionar Medicamento"
           onPress={() => setShowAddModal(true)}
           size="large"
           style={{ marginTop: SPACING.md, width: "100%" }}
@@ -239,7 +242,7 @@ export function MedicationsScreen() {
               placeholderTextColor={COLORS.textLight}
             />
 
-            <Text style={styles.inputLabel}>Frequência</Text>
+            <Text style={styles.inputLabel}>Frequencia</Text>
             <View style={styles.freqRow}>
               {(Object.keys(FREQUENCY_LABELS) as MedicationFrequency[]).map(
                 (freq) => (
@@ -264,7 +267,7 @@ export function MedicationsScreen() {
               )}
             </View>
 
-            <Text style={styles.inputLabel}>Horário</Text>
+            <Text style={styles.inputLabel}>Horario</Text>
             <TextInput
               style={styles.input}
               placeholder="08:00"
@@ -309,14 +312,18 @@ export function MedicationsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { padding: SPACING.lg },
-  title: { ...FONTS.elderTitle, marginBottom: SPACING.lg },
+  title: {
+    ...FONTS.title,
+    fontSize: 28,
+    marginBottom: SPACING.lg,
+  },
   emptyCard: { alignItems: "center", paddingVertical: SPACING.xxl },
   emptyText: { ...FONTS.subtitle, color: COLORS.textSecondary, marginTop: SPACING.md },
   emptySubtext: { ...FONTS.caption, marginTop: SPACING.xs, textAlign: "center" },
   medCard: { marginBottom: SPACING.md },
   medHeader: { flexDirection: "row", justifyContent: "space-between" },
   medInfo: { flex: 1 },
-  medName: { ...FONTS.subtitle },
+  medName: { ...FONTS.subtitle, fontWeight: "500" },
   medDosage: { ...FONTS.body, color: COLORS.textSecondary },
   medFreq: { ...FONTS.caption, marginTop: SPACING.xs },
   stockRow: {
@@ -333,13 +340,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.success,
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.sm,
     marginTop: SPACING.sm,
     gap: SPACING.xs,
   },
-  takeButtonText: { color: COLORS.white, fontSize: 18, fontWeight: "700" },
+  takeButtonText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
   modalContainer: { flex: 1, backgroundColor: COLORS.background },
   modalHeader: {
     flexDirection: "row",
@@ -351,7 +364,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: { ...FONTS.title },
   modalContent: { padding: SPACING.lg },
-  inputLabel: { ...FONTS.body, fontWeight: "600", marginTop: SPACING.md, marginBottom: SPACING.xs },
+  inputLabel: { ...FONTS.body, fontWeight: "500", marginTop: SPACING.md, marginBottom: SPACING.xs },
   input: {
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -365,7 +378,7 @@ const styles = StyleSheet.create({
   freqChip: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.white,
@@ -375,6 +388,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   freqChipText: { ...FONTS.caption },
-  freqChipTextActive: { color: COLORS.white, fontWeight: "600" },
+  freqChipTextActive: { color: COLORS.white, fontWeight: "500" },
   stockInputRow: { flexDirection: "row" },
 });

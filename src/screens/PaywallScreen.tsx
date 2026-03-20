@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,6 +20,8 @@ import { revenueCatService } from "../services/RevenueCatService";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { SubscriptionTier } from "../types";
+
+const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
 export function PaywallScreen() {
   const navigation = useNavigation();
@@ -61,7 +64,7 @@ export function PaywallScreen() {
       // Fallback: if RevenueCat isn't configured, show info
       Alert.alert(
         "Assinatura",
-        `Para assinar o plano ${plan.name} (${plan.price}), configure suas chaves RevenueCat no app.config.ts.\n\nEm produção, o pagamento será processado pela App Store / Google Play.`,
+        `Para assinar o plano ${plan.name} (${plan.price}), configure suas chaves RevenueCat no app.config.ts.\n\nEm producao, o pagamento sera processado pela App Store / Google Play.`,
         [
           { text: "OK" },
           {
@@ -89,13 +92,13 @@ export function PaywallScreen() {
       if (result) {
         dispatch({ type: "SET_SUBSCRIPTION", payload: result });
         Alert.alert(
-          "🎉 Assinatura ativada!",
-          `Seu plano ${plan.name} está ativo.`,
+          "Assinatura ativada",
+          `Seu plano ${plan.name} esta ativo.`,
           [{ text: "OK", onPress: () => navigation.goBack() }]
         );
       }
     } catch (error: any) {
-      Alert.alert("Erro", error.message || "Não foi possível completar a assinatura.");
+      Alert.alert("Erro", error.message || "Nao foi possivel completar a assinatura.");
     } finally {
       setPurchasing(false);
     }
@@ -107,12 +110,12 @@ export function PaywallScreen() {
       const result = await revenueCatService.restorePurchases();
       dispatch({ type: "SET_SUBSCRIPTION", payload: result });
       if (result.tier !== "free") {
-        Alert.alert("✅ Restaurado!", `Plano ${result.tier} restaurado.`);
+        Alert.alert("Restaurado", `Plano ${result.tier} restaurado.`);
       } else {
         Alert.alert("Info", "Nenhuma assinatura anterior encontrada.");
       }
     } catch {
-      Alert.alert("Erro", "Não foi possível restaurar compras.");
+      Alert.alert("Erro", "Nao foi possivel restaurar compras.");
     } finally {
       setLoading(false);
     }
@@ -131,7 +134,7 @@ export function PaywallScreen() {
           </TouchableOpacity>
           <Text style={styles.title}>Escolha seu plano</Text>
           <Text style={styles.subtitle}>
-            Proteja quem você ama com o plano ideal
+            Proteja quem voce ama com o plano ideal
           </Text>
         </View>
 
@@ -172,12 +175,12 @@ export function PaywallScreen() {
 
         {/* Legal */}
         <Text style={styles.legal}>
-          A assinatura será cobrada na sua conta do{" "}
-          {Platform.OS === "ios" ? "iTunes" : "Google Play"} na confirmação da
-          compra. A assinatura renova automaticamente a menos que a renovação
-          automática seja desativada pelo menos 24 horas antes do final do
-          período atual. O valor da renovação será cobrado nas 24 horas
-          anteriores ao final do período atual.
+          A assinatura sera cobrada na sua conta do{" "}
+          {Platform.OS === "ios" ? "iTunes" : "Google Play"} na confirmacao da
+          compra. A assinatura renova automaticamente a menos que a renovacao
+          automatica seja desativada pelo menos 24 horas antes do final do
+          periodo atual. O valor da renovacao sera cobrado nas 24 horas
+          anteriores ao final do periodo atual.
         </Text>
         <View style={styles.legalLinks}>
           <TouchableOpacity>
@@ -185,7 +188,7 @@ export function PaywallScreen() {
           </TouchableOpacity>
           <Text style={styles.legalSeparator}>|</Text>
           <TouchableOpacity>
-            <Text style={styles.legalLink}>Política de Privacidade</Text>
+            <Text style={styles.legalLink}>Politica de Privacidade</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -237,9 +240,9 @@ function PlanCard({
           {plan.features.map((feature, i) => (
             <View key={i} style={styles.featureRow}>
               <Ionicons
-                name={feature.included ? "checkmark-circle" : "close-circle"}
-                size={18}
-                color={feature.included ? COLORS.success : COLORS.disabled}
+                name={feature.included ? "checkmark" : "close"}
+                size={16}
+                color={feature.included ? COLORS.primary : COLORS.disabled}
               />
               <Text
                 style={[
@@ -257,14 +260,15 @@ function PlanCard({
   );
 }
 
-import { Platform } from "react-native";
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: SPACING.md },
+  content: { padding: SPACING.lg },
   header: { alignItems: "center", marginBottom: SPACING.lg },
   closeBtn: { alignSelf: "flex-end", padding: SPACING.xs },
-  title: { ...FONTS.elderTitle, textAlign: "center" },
+  title: {
+    ...FONTS.elderTitle,
+    textAlign: "center",
+  },
   subtitle: {
     ...FONTS.body,
     color: COLORS.textSecondary,
@@ -273,48 +277,67 @@ const styles = StyleSheet.create({
   },
   planCard: {
     marginBottom: SPACING.md,
-    borderWidth: 2,
-    borderColor: "transparent",
+    borderWidth: 1,
+    borderColor: COLORS.border,
     position: "relative",
     overflow: "visible",
   },
-  planCardSelected: { borderColor: COLORS.primary },
-  planCardHighlighted: { borderColor: COLORS.primary },
+  planCardSelected: { borderColor: COLORS.primary, borderWidth: 2 },
+  planCardHighlighted: { borderColor: COLORS.accent, borderWidth: 2 },
   popularBadge: {
     position: "absolute",
     top: -12,
     right: SPACING.md,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.accent,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.full,
+    borderRadius: RADIUS.md,
   },
-  popularText: { color: COLORS.white, fontSize: 11, fontWeight: "700" },
+  popularText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1,
+  },
   currentBadge: {
     position: "absolute",
     top: -12,
     left: SPACING.md,
-    backgroundColor: COLORS.success,
+    backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.full,
+    borderRadius: RADIUS.md,
   },
-  currentText: { color: COLORS.white, fontSize: 11, fontWeight: "700" },
+  currentText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1,
+  },
   planHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: SPACING.xs,
   },
-  planName: { ...FONTS.title },
-  planPrice: { ...FONTS.subtitle, color: COLORS.primary },
+  planName: {
+    ...FONTS.title,
+    fontSize: 20,
+  },
+  planPrice: { ...FONTS.subtitle, color: COLORS.accent, fontWeight: "500" },
   planDesc: { ...FONTS.caption, marginBottom: SPACING.md },
   featureList: { gap: SPACING.xs },
-  featureRow: { flexDirection: "row", alignItems: "center", gap: SPACING.xs },
+  featureRow: { flexDirection: "row", alignItems: "center", gap: SPACING.sm },
   featureText: { ...FONTS.caption, flex: 1 },
   featureDisabled: { color: COLORS.disabled },
   restoreBtn: { alignItems: "center", marginTop: SPACING.lg },
-  restoreText: { ...FONTS.caption, color: COLORS.primary },
+  restoreText: {
+    ...FONTS.caption,
+    color: COLORS.primary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    fontSize: 12,
+  },
   legal: {
     ...FONTS.small,
     textAlign: "center",

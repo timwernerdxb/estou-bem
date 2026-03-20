@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>pt-BR</string>
+    <key>CFBundleDisplayName</key>
+    <string>Estou Bem</string>
+    <key>CFBundleName</key>
+    <string>Estou Bem Watch</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>WKCompanionAppBundleIdentifier</key>
+    <string>com.estoubem.app</string>
+    <key>NSHealthShareUsageDescription</key>
+    <string>Estou Bem monitora seus batimentos cardiacos e passos para verificar seu bem-estar e alertar seus familiares em caso de emergencia.</string>
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>Estou Bem registra dados de saude para acompanhamento familiar.</string>
+    <key>NSMotionUsageDescription</key>
+    <string>Estou Bem detecta movimento para saber se voce esta ativo e adiar alertas desnecessarios.</string>
+    <key>WKApplication</key>
+    <true/>
+</dict>
+</plist>

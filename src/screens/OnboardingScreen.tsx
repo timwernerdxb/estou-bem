@@ -22,30 +22,32 @@ import { UserRole, ElderProfile, FamilyProfile, RootStackParamList } from "../ty
 import { notificationService } from "../services/NotificationService";
 import { checkInService } from "../services/CheckInService";
 
+const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
+
 const ONBOARDING_SLIDES = [
   {
     icon: "shield-checkmark",
     title: "Bem-vindo ao Estou Bem",
     description:
-      "O app que cuida de quem você ama. Check-ins diários para garantir que seu familiar idoso está seguro.",
+      "O app que cuida de quem voce ama. Check-ins diarios para garantir que seu familiar idoso esta seguro.",
   },
   {
     icon: "notifications",
     title: "Check-in Simples",
     description:
-      "O idoso recebe um alarme e toca um botão. Se não responder, você é avisado imediatamente.",
+      "O idoso recebe um alarme e toca um botao. Se nao responder, voce e avisado imediatamente.",
   },
   {
     icon: "medical",
-    title: "Medicamentos e Saúde",
+    title: "Medicamentos e Saude",
     description:
-      "Controle de medicamentos com estoque, lembretes e diário de saúde completo.",
+      "Controle de medicamentos com estoque, lembretes e diario de saude completo.",
   },
   {
     icon: "people",
-    title: "Proteção em Família",
+    title: "Protecao em Familia",
     description:
-      "Conecte toda a família. Todos acompanham, todos cuidam. Juntos.",
+      "Conecte toda a familia. Todos acompanham, todos cuidam. Juntos.",
   },
 ];
 
@@ -130,13 +132,13 @@ export function OnboardingScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.setupContainer}
         >
-          <Text style={styles.setupTitle}>Vamos começar!</Text>
+          <Text style={styles.setupTitle}>Vamos comecar</Text>
           <Text style={styles.setupSubtitle}>
             Configure seu perfil para usar o Estou Bem
           </Text>
 
           {/* Role Selection */}
-          <Text style={styles.label}>Quem é você?</Text>
+          <Text style={styles.label}>Quem e voce?</Text>
           <View style={styles.roleRow}>
             <TouchableOpacity
               style={[styles.roleCard, role === "elder" && styles.roleCardActive]}
@@ -222,7 +224,7 @@ export function OnboardingScreen() {
           />
 
           <Button
-            title="Começar a usar!"
+            title="Comecar"
             onPress={handleComplete}
             size="elder"
             style={{ marginTop: SPACING.xl, width: "100%" }}
@@ -252,7 +254,7 @@ export function OnboardingScreen() {
             <View style={styles.iconCircle}>
               <Ionicons
                 name={item.icon as any}
-                size={80}
+                size={64}
                 color={COLORS.primary}
               />
             </View>
@@ -278,11 +280,11 @@ export function OnboardingScreen() {
             <TouchableOpacity onPress={() => setShowSetup(true)}>
               <Text style={styles.skipText}>Pular</Text>
             </TouchableOpacity>
-            <Button title="Próximo" onPress={handleNext} size="large" />
+            <Button title="Proximo" onPress={handleNext} size="large" />
           </>
         ) : (
           <Button
-            title="Começar!"
+            title="Comecar"
             onPress={handleNext}
             size="elder"
             style={{ width: "100%" }}
@@ -294,7 +296,7 @@ export function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.white },
+  container: { flex: 1, backgroundColor: COLORS.background },
   slide: {
     width: SCREEN.width,
     alignItems: "center",
@@ -302,10 +304,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xl,
   },
   iconCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: COLORS.background,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: SPACING.xl,
@@ -316,9 +320,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   slideDesc: {
-    ...FONTS.elderBody,
+    ...FONTS.body,
+    fontSize: 18,
     textAlign: "center",
     color: COLORS.textSecondary,
+    lineHeight: 28,
   },
   dots: {
     flexDirection: "row",
@@ -327,9 +333,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: COLORS.border,
   },
   dotActive: { backgroundColor: COLORS.primary, width: 24 },
@@ -340,10 +346,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xl,
     paddingBottom: SPACING.xl,
   },
-  skipText: { ...FONTS.body, color: COLORS.textSecondary },
+  skipText: {
+    ...FONTS.body,
+    color: COLORS.textSecondary,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    fontSize: 14,
+  },
   // Setup
   setupContainer: { flex: 1, padding: SPACING.xl },
-  setupTitle: { ...FONTS.elderTitle, marginBottom: SPACING.xs },
+  setupTitle: {
+    ...FONTS.elderTitle,
+    marginBottom: SPACING.xs,
+  },
   setupSubtitle: {
     ...FONTS.body,
     color: COLORS.textSecondary,
@@ -353,14 +368,15 @@ const styles = StyleSheet.create({
     ...FONTS.subtitle,
     marginTop: SPACING.lg,
     marginBottom: SPACING.sm,
+    fontWeight: "500",
   },
   roleRow: { flexDirection: "row", gap: SPACING.sm },
   roleCard: {
     flex: 1,
     alignItems: "center",
     padding: SPACING.md,
-    borderRadius: RADIUS.lg,
-    borderWidth: 2,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.white,
   },
@@ -369,7 +385,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   roleText: { ...FONTS.caption, marginTop: SPACING.xs, textAlign: "center" },
-  roleTextActive: { color: COLORS.white, fontWeight: "600" },
+  roleTextActive: { color: COLORS.white, fontWeight: "500" },
   input: {
     borderWidth: 1,
     borderColor: COLORS.border,

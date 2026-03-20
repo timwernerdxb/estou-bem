@@ -7,7 +7,7 @@ import {
   TextStyle,
   ActivityIndicator,
 } from "react-native";
-import { COLORS, RADIUS, SPACING, SHADOWS } from "../constants/theme";
+import { COLORS, RADIUS, SPACING } from "../constants/theme";
 
 interface ButtonProps {
   title: string;
@@ -34,7 +34,7 @@ export function Button({
 }: ButtonProps) {
   const bgColor = {
     primary: COLORS.primary,
-    secondary: COLORS.success,
+    secondary: COLORS.accent,
     danger: COLORS.danger,
     outline: "transparent",
     ghost: "transparent",
@@ -49,10 +49,10 @@ export function Button({
   }[variant];
 
   const sizeStyles: Record<string, { paddingV: number; paddingH: number; fontSize: number }> = {
-    small: { paddingV: 8, paddingH: 16, fontSize: 14 },
-    medium: { paddingV: 12, paddingH: 24, fontSize: 16 },
-    large: { paddingV: 16, paddingH: 32, fontSize: 18 },
-    elder: { paddingV: 20, paddingH: 40, fontSize: 24 },
+    small: { paddingV: 8, paddingH: 16, fontSize: 12 },
+    medium: { paddingV: 12, paddingH: 24, fontSize: 14 },
+    large: { paddingV: 16, paddingH: 32, fontSize: 16 },
+    elder: { paddingV: 20, paddingH: 40, fontSize: 18 },
   };
 
   const s = sizeStyles[size];
@@ -68,10 +68,9 @@ export function Button({
           backgroundColor: disabled ? COLORS.disabled : bgColor,
           paddingVertical: s.paddingV,
           paddingHorizontal: s.paddingH,
-          borderWidth: variant === "outline" ? 2 : 0,
+          borderWidth: variant === "outline" ? 1 : 0,
           borderColor: COLORS.primary,
         },
-        variant !== "ghost" && SHADOWS.small,
         style,
       ]}
     >
@@ -85,7 +84,9 @@ export function Button({
               {
                 color: disabled ? COLORS.textLight : txtColor,
                 fontSize: s.fontSize,
-                fontWeight: "700",
+                fontWeight: "600",
+                letterSpacing: 1.5,
+                textTransform: "uppercase",
                 marginLeft: icon ? 8 : 0,
               },
               textStyle,
