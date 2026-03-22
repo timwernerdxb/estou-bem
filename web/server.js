@@ -470,6 +470,19 @@ async function initDB() {
       CREATE INDEX IF NOT EXISTS idx_commissions_affiliate ON commissions(affiliate_id);
       CREATE INDEX IF NOT EXISTS idx_consent_user ON consent_records(user_id);
 
+      -- Payout requests (PIX)
+      CREATE TABLE IF NOT EXISTS payout_requests (
+        id SERIAL PRIMARY KEY,
+        affiliate_id INTEGER REFERENCES affiliates(id) ON DELETE CASCADE,
+        amount REAL NOT NULL,
+        pix_key TEXT NOT NULL,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'rejected')),
+        admin_notes TEXT,
+        requested_at TIMESTAMPTZ DEFAULT NOW(),
+        processed_at TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_payout_requests_affiliate ON payout_requests(affiliate_id);
+
       CREATE TABLE IF NOT EXISTS escalation_alerts (
         id SERIAL PRIMARY KEY,
         elder_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -1238,6 +1251,78 @@ app.put('/api/affiliates/me', async (req, res) => {
 
   if (result.rows.length === 0) return res.status(404).json({ error: 'Affiliate not found' });
   res.json(result.rows[0]);
+});
+
+// Request payout (affiliate-authenticated)
+app.post('/api/affiliates/me/payout', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  const token = auth.slice(7);
+  const userId = tokens.get(token);
+  if (!userId || !String(userId).startsWith('af_')) return res.status(401).json({ error: 'Invalid token' });
+
+  const affiliateId = String(userId).replace('af_', '');
+  const MIN_PAYOUT = 100; // R$100 minimum
+
+  try {
+    // Check affiliate has enough pending/approved commissions
+    const balance = await pool.query(
+      `SELECT COALESCE(SUM(amount), 0) as total FROM commissions WHERE affiliate_id = $1 AND status IN ('pending', 'approved')`,
+      [affiliateId]
+    );
+    const available = parseFloat(balance.rows[0].total);
+
+    if (available < MIN_PAYOUT) {
+      return res.status(400).json({ error: `Minimum payout is R$${MIN_PAYOUT}. Your balance is R$${available.toFixed(2)}` });
+    }
+
+    // Check affiliate has PIX key
+    const affiliate = await pool.query('SELECT pix_key FROM affiliates WHERE id = $1', [affiliateId]);
+    if (!affiliate.rows[0]?.pix_key) {
+      return res.status(400).json({ error: 'Please set your PIX key first' });
+    }
+
+    // Check no pending payout request already exists
+    const existing = await pool.query(
+      'SELECT id FROM payout_requests WHERE affiliate_id = $1 AND status = $2',
+      [affiliateId, 'pending']
+    );
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'You already have a pending payout request' });
+    }
+
+    // Create payout request
+    const result = await pool.query(
+      'INSERT INTO payout_requests (affiliate_id, amount, pix_key) VALUES ($1, $2, $3) RETURNING *',
+      [affiliateId, available, affiliate.rows[0].pix_key]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Payout request error:', err);
+    res.status(500).json({ error: 'Failed to create payout request' });
+  }
+});
+
+// Get payout history (affiliate-authenticated)
+app.get('/api/affiliates/me/payouts', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  const token = auth.slice(7);
+  const userId = tokens.get(token);
+  if (!userId || !String(userId).startsWith('af_')) return res.status(401).json({ error: 'Invalid token' });
+
+  const affiliateId = String(userId).replace('af_', '');
+  try {
+    const result = await pool.query(
+      'SELECT * FROM payout_requests WHERE affiliate_id = $1 ORDER BY requested_at DESC',
+      [affiliateId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Payout history error:', err);
+    res.status(500).json({ error: 'Failed to fetch payout history' });
+  }
 });
 
 // Keep public dashboard for backward compat (admin use only)
@@ -2094,6 +2179,57 @@ app.put('/api/admin/escalations/:id/resolve', adminAuth, async (req, res) => {
   } catch (err) {
     console.error('Resolve escalation error:', err);
     res.status(500).json({ error: 'Failed to resolve escalation' });
+  }
+});
+
+// ── Admin Payout Endpoints ────────────────────────────────
+app.get('/api/admin/payouts', adminAuth, async (req, res) => {
+  try {
+    const { status } = req.query;
+    let query = `SELECT pr.*, a.name as affiliate_name, a.code as affiliate_code, a.email as affiliate_email, a.pix_key as current_pix_key
+      FROM payout_requests pr
+      JOIN affiliates a ON pr.affiliate_id = a.id`;
+    const params = [];
+    if (status) { params.push(status); query += ` WHERE pr.status = $1`; }
+    query += ' ORDER BY pr.requested_at DESC';
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin payouts error:', err);
+    res.status(500).json({ error: 'Failed to fetch payouts' });
+  }
+});
+
+app.put('/api/admin/payouts/:id', adminAuth, async (req, res) => {
+  try {
+    const { status, admin_notes } = req.body;
+    if (!['pending', 'processing', 'completed', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    let query = 'UPDATE payout_requests SET status = $1, admin_notes = COALESCE($2, admin_notes)';
+    if (status === 'completed') query += ', processed_at = NOW()';
+    if (status === 'rejected') query += ', processed_at = NOW()';
+    query += ' WHERE id = $3 RETURNING *';
+
+    const result = await pool.query(query, [status, admin_notes, req.params.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Payout request not found' });
+    }
+
+    // If completed, mark the commissions as paid
+    if (status === 'completed' && result.rows[0]) {
+      await pool.query(
+        `UPDATE commissions SET status = 'paid', paid_at = NOW() WHERE affiliate_id = $1 AND status IN ('pending', 'approved')`,
+        [result.rows[0].affiliate_id]
+      );
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Admin payout update error:', err);
+    res.status(500).json({ error: 'Failed to update payout' });
   }
 });
 

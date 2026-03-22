@@ -119,6 +119,22 @@ tr:hover td{background:rgba(45,74,62,.02);}
 /* Success message */
 .success-msg{background:var(--success-light);color:var(--success);padding:16px;border-radius:var(--radius);font-size:14px;line-height:1.5;margin-top:16px;text-align:center;}
 
+/* Payout Section */
+.payout-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:32px;}
+.payout-box h3{font-family:var(--serif);font-size:16px;font-weight:400;margin-bottom:12px;}
+.payout-balance{font-family:var(--serif);font-size:28px;color:var(--primary);margin-bottom:4px;}
+.payout-min{font-size:12px;color:var(--text3);margin-bottom:16px;}
+.payout-btn{display:inline-block;padding:12px 24px;background:var(--primary);color:#F5F0EB;border-radius:var(--radius);font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:500;transition:background .2s;}
+.payout-btn:hover{background:var(--primary-dark);}
+.payout-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.payout-btn:disabled:hover{background:var(--primary);}
+.payout-status{display:inline-block;padding:3px 10px;border-radius:2px;font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:600;}
+.payout-status.pending{background:var(--warning-light);color:var(--gold-dark);}
+.payout-status.processing{background:#E8F0FE;color:#3B82F6;}
+.payout-status.completed{background:var(--success-light);color:var(--success);}
+.payout-status.rejected{background:var(--danger-light);color:var(--danger);}
+.payout-alert{background:var(--warning-light);border:1px solid var(--gold);border-radius:var(--radius);padding:10px 14px;font-size:13px;color:var(--gold-dark);margin-bottom:12px;}
+
 /* Toast */
 .toast{position:fixed;bottom:24px;right:24px;background:var(--primary);color:#fff;padding:12px 20px;border-radius:var(--radius);font-size:14px;z-index:1000;transform:translateY(100px);opacity:0;transition:all .3s ease;}
 .toast.show{transform:translateY(0);opacity:1;}
@@ -550,6 +566,12 @@ function renderDashboard() {
         </div>
       </div>
 
+      <!-- Payout Request -->
+      <div id="payoutSection" class="payout-box">
+        <h3>Solicitar Pagamento</h3>
+        <div id="payoutContent"><p style="color:var(--text3);font-size:13px">Carregando...</p></div>
+      </div>
+
       <!-- Revenue Chart -->
       <div class="section">
         <div class="section-header">
@@ -636,6 +658,8 @@ function renderDashboard() {
       </div>
     </div>
   `;
+  // Load payout section after DOM is rendered
+  loadPayoutSection();
 }
 
 function renderCommissionRates(ratesOrChannel) {
@@ -722,6 +746,100 @@ async function savePixKey() {
     }
   } catch (err) {
     showToast(t('af_conn_error'));
+  }
+}
+
+// ── Payout ────────────────────────────────────────────
+let payoutData = [];
+let payoutAvailable = 0;
+
+async function loadPayoutSection() {
+  const el = document.getElementById('payoutContent');
+  if (!el) return;
+
+  const af = affiliateData.affiliate;
+  const commissions = affiliateData.commissions || [];
+
+  // Calculate available balance from pending/approved commissions
+  payoutAvailable = commissions.filter(c => c.status === 'pending' || c.status === 'approved')
+    .reduce((s, c) => s + parseFloat(c.amount || 0), 0);
+
+  const hasPix = !!af.pix_key;
+  const MIN_PAYOUT = 100;
+
+  // Load payout history
+  try {
+    const res = await fetch(`${API}/api/affiliates/me/payouts`, {
+      headers: { 'Authorization': `Bearer ${affiliateToken}` },
+    });
+    if (res.ok) payoutData = await res.json();
+  } catch (e) { payoutData = []; }
+
+  const hasPendingRequest = payoutData.some(p => p.status === 'pending' || p.status === 'processing');
+  const canRequest = payoutAvailable >= MIN_PAYOUT && hasPix && !hasPendingRequest;
+
+  let html = `
+    <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Saldo disponivel para saque (comissoes pendentes e aprovadas):</p>
+    <div class="payout-balance">${formatCurrency(payoutAvailable)}</div>
+    <div class="payout-min">Minimo para saque: R$ ${MIN_PAYOUT},00</div>
+  `;
+
+  if (!hasPix) {
+    html += `<div class="payout-alert">Configure sua chave PIX acima antes de solicitar um pagamento.</div>`;
+  }
+  if (hasPendingRequest) {
+    const pending = payoutData.find(p => p.status === 'pending' || p.status === 'processing');
+    html += `<div class="payout-alert">Voce ja possui uma solicitacao ${pending.status === 'processing' ? 'em processamento' : 'pendente'} de ${formatCurrency(pending.amount)}.</div>`;
+  }
+
+  html += `<button class="payout-btn" ${canRequest ? '' : 'disabled'} onclick="requestPayout()">Solicitar Pagamento</button>`;
+
+  // Payout history
+  if (payoutData.length > 0) {
+    html += `
+      <div style="margin-top:24px">
+        <h3 style="font-family:var(--serif);font-size:16px;font-weight:400;margin-bottom:12px">Historico de Pagamentos</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data</th><th>Valor</th><th>Chave PIX</th><th>Status</th></tr></thead>
+            <tbody>
+              ${payoutData.map(p => `
+                <tr>
+                  <td>${formatDate(p.requested_at)}</td>
+                  <td><strong>${formatCurrency(p.amount)}</strong></td>
+                  <td style="font-size:12px;max-width:120px;overflow:hidden;text-overflow:ellipsis">${p.pix_key || '-'}</td>
+                  <td><span class="payout-status ${p.status}">${payoutStatusLabel(p.status)}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  el.innerHTML = html;
+}
+
+function payoutStatusLabel(s) {
+  return { pending: 'Pendente', processing: 'Processando', completed: 'Pago', rejected: 'Rejeitado' }[s] || s;
+}
+
+async function requestPayout() {
+  try {
+    const res = await fetch(`${API}/api/affiliates/me/payout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${affiliateToken}` },
+    });
+    if (res.ok) {
+      showToast('Solicitacao de pagamento enviada com sucesso!');
+      await loadDashboard();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'Erro ao solicitar pagamento.');
+    }
+  } catch (e) {
+    showToast('Erro de conexao. Tente novamente.');
   }
 }
 

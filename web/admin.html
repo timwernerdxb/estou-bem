@@ -172,15 +172,74 @@ table tbody tr:last-child td { border-bottom: none; }
 /* ─── Affiliate pending row ───────────────────────────── */
 tr.aff-pending { background: #FFFBEB; }
 tr.aff-pending:hover { background: #FEF3C7; }
-tr.aff-inline-edit td { background: #F0F9FF; vertical-align: top; }
-tr.aff-inline-edit input, tr.aff-inline-edit select {
-  padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px;
-  font-size: 13px; width: 100%; min-width: 80px;
+
+/* ─── Affiliate inline edit form ─────────────────────── */
+.aff-edit-form {
+  background: #F7FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 8px 0;
 }
-tr.aff-inline-edit input:focus, tr.aff-inline-edit select:focus { border-color: var(--primary); outline: none; }
-.aff-comm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-.aff-comm-grid label { font-size: 10px; color: var(--text2); }
-.aff-comm-grid input { width: 100%; }
+.aff-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.aff-edit-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #718096;
+  margin-bottom: 4px;
+}
+.aff-edit-field input, .aff-edit-field select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .15s;
+}
+.aff-edit-field input:focus, .aff-edit-field select:focus {
+  border-color: var(--primary);
+}
+.aff-edit-field.full-width {
+  grid-column: 1 / -1;
+}
+.aff-comm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.aff-edit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+.aff-edit-toggle input[type="checkbox"] {
+  width: 18px; height: 18px; cursor: pointer;
+  accent-color: var(--success);
+}
+.aff-edit-toggle span {
+  font-size: 14px; font-weight: 600;
+}
+.aff-edit-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid #E2E8F0;
+  margin-top: 4px;
+}
+
+/* ─── Payout status badges ───────────────────────────── */
+.badge-processing { background: #BEE3F8; color: #2A4365; }
 
 /* ─── Buttons ──────────────────────────────────────────── */
 .btn {
@@ -348,6 +407,10 @@ tr.aff-inline-edit input:focus, tr.aff-inline-edit select:focus { border-color: 
       <div class="nav-item" data-section="commissions" onclick="navigateTo('commissions')">
         <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
         Comissões
+      </div>
+      <div class="nav-item" data-section="payouts" onclick="navigateTo('payouts')">
+        <svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+        Pagamentos
       </div>
 
       <div class="nav-section">Marketplace</div>
@@ -535,6 +598,37 @@ tr.aff-inline-edit input:focus, tr.aff-inline-edit select:focus { border-color: 
               </thead>
               <tbody id="commissionsTableBody">
                 <tr><td colspan="7" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ PAYOUTS ═══ -->
+      <div id="sec-payouts" class="section">
+        <div class="stats-grid" id="payoutStats"></div>
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Solicitacoes de Pagamento</h3>
+            <div class="toolbar">
+              <select id="payoutStatusFilter" onchange="loadPayouts()">
+                <option value="">Todos os status</option>
+                <option value="pending">Pendente</option>
+                <option value="processing">Processando</option>
+                <option value="completed">Concluido</option>
+                <option value="rejected">Rejeitado</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Afiliado</th><th>Codigo</th><th>Valor</th><th>Chave PIX</th><th>Status</th><th>Solicitado em</th><th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody id="payoutsTableBody">
+                <tr><td colspan="8" class="loading">Carregando...</td></tr>
               </tbody>
             </table>
           </div>
@@ -952,11 +1046,13 @@ function consentTypeName(t) {
 function statusBadge(s) {
   const map = {
     pending: 'badge-warning', confirmed: 'badge-info', approved: 'badge-info',
+    processing: 'badge-processing',
     completed: 'badge-success', paid: 'badge-success',
     cancelled: 'badge-gray', rejected: 'badge-danger',
   };
   const labels = {
     pending: 'Pendente', confirmed: 'Confirmado', approved: 'Aprovada',
+    processing: 'Processando',
     completed: 'Concluído', paid: 'Paga', cancelled: 'Cancelado', rejected: 'Rejeitada',
   };
   return `<span class="badge ${map[s] || 'badge-gray'}">${labels[s] || s}</span>`;
@@ -1001,7 +1097,8 @@ function toggleSidebar() {
 
 const sectionTitles = {
   dashboard: 'Visão Geral', users: 'Usuários', affiliates: 'Afiliados',
-  commissions: 'Comissões', marketplace: 'Provedores de Serviço',
+  commissions: 'Comissões', payouts: 'Pagamentos PIX',
+  marketplace: 'Provedores de Serviço',
   bookings: 'Agendamentos', institutions: 'Instituições B2B',
   conversions: 'Conversões / Analytics', consent: 'LGPD / Consentimento',
   gamification: 'Gamificação',
@@ -1032,6 +1129,7 @@ function loadSection(section) {
     users: loadUsers,
     affiliates: loadAffiliates,
     commissions: loadCommissions,
+    payouts: loadPayouts,
     marketplace: loadProviders,
     bookings: loadBookings,
     institutions: loadInstitutions,
@@ -1303,40 +1401,56 @@ function renderAffiliates() {
     if (isEditing) {
       const cr = a.commission_rate || {};
       return `
-      <tr class="aff-inline-edit" data-id="${a.id}">
-        <td><input type="checkbox" ${checked} onchange="toggleAffiliateSelect(${a.id}, this.checked)"></td>
-        <td><strong>${esc(a.code)}</strong></td>
-        <td>
-          <select id="affEditChannel_${a.id}">
-            <option value="influencer" ${a.channel==='influencer'?'selected':''}>Influenciador</option>
-            <option value="paid_media" ${a.channel==='paid_media'?'selected':''}>Midia Paga</option>
-            <option value="ad_network" ${a.channel==='ad_network'?'selected':''}>Rede Anuncios</option>
-            <option value="organic" ${a.channel==='organic'?'selected':''}>Organico</option>
-            <option value="referral" ${a.channel==='referral'?'selected':''}>Indicacao</option>
-            <option value="b2b_partner" ${a.channel==='b2b_partner'?'selected':''}>Parceiro B2B</option>
-          </select>
-        </td>
-        <td><input type="text" id="affEditName_${a.id}" value="${esc(a.name)}"></td>
-        <td><input type="email" id="affEditEmail_${a.id}" value="${esc(a.email || '')}"></td>
-        <td><input type="text" id="affEditPix_${a.id}" value="${esc(a.pix_key || '')}" placeholder="Chave PIX"></td>
-        <td colspan="2">
-          <div class="aff-comm-grid">
-            <div><label>Trial (R$)</label><input type="number" step="0.01" id="affEditCR_ts_${a.id}" value="${cr.trial_started || cr.register || 0}"></div>
-            <div><label>Familia (R$)</label><input type="number" step="0.01" id="affEditCR_sf_${a.id}" value="${cr.subscription_familia || cr.subscription || 0}"></div>
-            <div><label>Central (R$)</label><input type="number" step="0.01" id="affEditCR_sc_${a.id}" value="${cr.subscription_central || cr.purchase || 0}"></div>
-            <div><label>Rec. (%)</label><input type="number" step="0.01" id="affEditCR_rm_${a.id}" value="${cr.recurring_monthly || 0}"></div>
-          </div>
-        </td>
-        <td>
-          <select id="affEditActive_${a.id}">
-            <option value="true" ${a.is_active?'selected':''}>Ativo</option>
-            <option value="false" ${!a.is_active?'selected':''}>Inativo</option>
-          </select>
-        </td>
-        <td>
-          <div class="btn-group">
-            <button class="btn btn-sm btn-success" onclick="saveInlineAffiliate(${a.id})">Salvar</button>
-            <button class="btn btn-sm btn-outline" onclick="cancelInlineEdit()">Cancelar</button>
+      <tr data-id="${a.id}">
+        <td colspan="10">
+          <div class="aff-edit-form">
+            <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text)">Editando: <span style="color:var(--primary)">${esc(a.code)}</span></div>
+            <div class="aff-edit-grid">
+              <div class="aff-edit-field">
+                <label>Nome</label>
+                <input type="text" id="affEditName_${a.id}" value="${esc(a.name)}">
+              </div>
+              <div class="aff-edit-field">
+                <label>Email</label>
+                <input type="email" id="affEditEmail_${a.id}" value="${esc(a.email || '')}">
+              </div>
+              <div class="aff-edit-field">
+                <label>Canal</label>
+                <select id="affEditChannel_${a.id}">
+                  <option value="influencer" ${a.channel==='influencer'?'selected':''}>Influenciador</option>
+                  <option value="paid_media" ${a.channel==='paid_media'?'selected':''}>Midia Paga</option>
+                  <option value="ad_network" ${a.channel==='ad_network'?'selected':''}>Rede Anuncios</option>
+                  <option value="organic" ${a.channel==='organic'?'selected':''}>Organico</option>
+                  <option value="referral" ${a.channel==='referral'?'selected':''}>Indicacao</option>
+                  <option value="b2b_partner" ${a.channel==='b2b_partner'?'selected':''}>Parceiro B2B</option>
+                </select>
+              </div>
+              <div class="aff-edit-field">
+                <label>Status</label>
+                <div class="aff-edit-toggle">
+                  <input type="checkbox" id="affEditActive_${a.id}" ${a.is_active ? 'checked' : ''}>
+                  <span id="affEditActiveLabel_${a.id}">${a.is_active ? 'Ativo' : 'Inativo'}</span>
+                </div>
+                <script>document.getElementById('affEditActive_${a.id}').onchange=function(){document.getElementById('affEditActiveLabel_${a.id}').textContent=this.checked?'Ativo':'Inativo';}</script>
+              </div>
+              <div class="aff-edit-field full-width">
+                <label>Chave PIX</label>
+                <input type="text" id="affEditPix_${a.id}" value="${esc(a.pix_key || '')}" placeholder="CPF, email, telefone ou chave aleatoria">
+              </div>
+              <div class="aff-edit-field full-width">
+                <label>Taxas de Comissao</label>
+                <div class="aff-comm-grid">
+                  <div class="aff-edit-field"><label>Trial R$</label><input type="number" step="0.01" id="affEditCR_ts_${a.id}" value="${cr.trial_started || cr.register || 0}"></div>
+                  <div class="aff-edit-field"><label>Familia R$</label><input type="number" step="0.01" id="affEditCR_sf_${a.id}" value="${cr.subscription_familia || cr.subscription || 0}"></div>
+                  <div class="aff-edit-field"><label>Central R$</label><input type="number" step="0.01" id="affEditCR_sc_${a.id}" value="${cr.subscription_central || cr.purchase || 0}"></div>
+                  <div class="aff-edit-field"><label>Rec. %</label><input type="number" step="0.01" id="affEditCR_rm_${a.id}" value="${cr.recurring_monthly || 0}"></div>
+                </div>
+              </div>
+              <div class="aff-edit-actions">
+                <button class="btn btn-sm btn-outline" onclick="cancelInlineEdit()">Cancelar</button>
+                <button class="btn btn-sm btn-success" onclick="saveInlineAffiliate(${a.id})">Salvar</button>
+              </div>
+            </div>
           </div>
         </td>
       </tr>`;
@@ -1382,7 +1496,7 @@ async function saveInlineAffiliate(id) {
     name: document.getElementById('affEditName_' + id).value.trim(),
     email: document.getElementById('affEditEmail_' + id).value.trim(),
     channel: document.getElementById('affEditChannel_' + id).value,
-    is_active: document.getElementById('affEditActive_' + id).value === 'true',
+    is_active: document.getElementById('affEditActive_' + id).checked,
     pix_key: document.getElementById('affEditPix_' + id).value.trim() || null,
     commission_rate: {
       trial_started: parseFloat(document.getElementById('affEditCR_ts_' + id).value) || 0,
@@ -1595,6 +1709,91 @@ async function updateCommission(id, status) {
     await apiFetch(`/admin/commissions/${id}`, { method: 'PUT', body: { status } });
     toast('Comissão atualizada', 'success');
     loadCommissions();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PAYOUTS
+// ═══════════════════════════════════════════════════════════
+async function loadPayouts() {
+  const tbody = document.getElementById('payoutsTableBody');
+  const statsEl = document.getElementById('payoutStats');
+  tbody.innerHTML = '<tr><td colspan="8" class="loading">Carregando...</td></tr>';
+  const status = document.getElementById('payoutStatusFilter').value;
+  const query = status ? `?status=${status}` : '';
+  try {
+    const data = await apiFetch('/admin/payouts' + query);
+    // Stats
+    const pendingCount = data.filter(p => p.status === 'pending').length;
+    const pendingTotal = data.filter(p => p.status === 'pending').reduce((s, p) => s + (p.amount || 0), 0);
+    const completedTotal = data.filter(p => p.status === 'completed').reduce((s, p) => s + (p.amount || 0), 0);
+    statsEl.innerHTML = `
+      <div class="stat-card warning">
+        <div class="stat-label">Pendentes</div>
+        <div class="stat-value">${pendingCount}</div>
+        <div class="stat-sub">${formatMoney(pendingTotal)}</div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-label">Total Pago</div>
+        <div class="stat-value">${formatMoney(completedTotal)}</div>
+      </div>
+      <div class="stat-card primary">
+        <div class="stat-label">Total Solicitacoes</div>
+        <div class="stat-value">${data.length}</div>
+      </div>
+    `;
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Nenhuma solicitacao de pagamento.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(p => `
+      <tr style="${p.status === 'pending' ? 'background:#FFFBEB' : ''}">
+        <td>${p.id}</td>
+        <td>${esc(p.affiliate_name || '—')}</td>
+        <td><strong>${esc(p.affiliate_code || '—')}</strong></td>
+        <td><strong>${formatMoney(p.amount)}</strong></td>
+        <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${esc(p.pix_key || '')}">${esc(p.pix_key || '—')}</td>
+        <td>${statusBadge(p.status)}</td>
+        <td>${formatDate(p.requested_at)}</td>
+        <td>
+          <div class="btn-group">
+            ${p.status === 'pending' ? `
+              <button class="btn btn-sm btn-success" onclick="updatePayout(${p.id},'processing')">Aprovar</button>
+              <button class="btn btn-sm btn-danger" onclick="rejectPayout(${p.id})">Rejeitar</button>
+            ` : ''}
+            ${p.status === 'processing' ? `
+              <button class="btn btn-sm btn-success" onclick="updatePayout(${p.id},'completed')">Marcar Pago</button>
+            ` : ''}
+            ${p.status === 'completed' || p.status === 'rejected' ? `<span style="color:var(--text3);font-size:12px">${p.processed_at ? formatDate(p.processed_at) : '—'}</span>` : ''}
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    statsEl.innerHTML = '';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Nao foi possivel carregar pagamentos.</td></tr>';
+  }
+}
+
+async function updatePayout(id, status) {
+  try {
+    await apiFetch(`/admin/payouts/${id}`, { method: 'PUT', body: { status } });
+    const labels = { processing: 'Pagamento aprovado', completed: 'Pagamento marcado como concluido' };
+    toast(labels[status] || 'Atualizado', 'success');
+    loadPayouts();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+async function rejectPayout(id) {
+  const notes = prompt('Motivo da rejeicao (opcional):');
+  try {
+    await apiFetch(`/admin/payouts/${id}`, { method: 'PUT', body: { status: 'rejected', admin_notes: notes || null } });
+    toast('Pagamento rejeitado', 'success');
+    loadPayouts();
   } catch (e) {
     toast('Erro: ' + e.message, 'error');
   }
