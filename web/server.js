@@ -781,6 +781,56 @@ async function sendPushNotifications(tokens, title, body, data = {}, critical = 
 }
 
 // ── Twilio SMS & Voice ──────────────────────────────────
+// ── WhatsApp Business API (via Twilio) ────────────────────
+async function sendWhatsAppBusiness(to, body) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const waNumber = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+12627472376';
+
+  if (!accountSid || !authToken) {
+    console.log(`[WhatsApp] No Twilio credentials. Would send to ${to}: ${body}`);
+    return false;
+  }
+
+  // Normalize phone: ensure it starts with + and has country code
+  let cleanPhone = to.replace(/\D/g, '');
+  if (/^[1-9]{2}9\d{8}$/.test(cleanPhone)) cleanPhone = '55' + cleanPhone;
+  if (!cleanPhone.startsWith('+')) cleanPhone = '+' + cleanPhone;
+
+  try {
+    const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const params = new URLSearchParams({
+      To: `whatsapp:${cleanPhone}`,
+      From: waNumber,
+      Body: body,
+    });
+
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+    const result = await res.json();
+    console.log(`[WhatsApp] Sent to ${cleanPhone}: ${result.sid || result.message}`);
+    return res.ok;
+  } catch (err) {
+    console.error(`[WhatsApp] Error sending to ${to}:`, err.message);
+    return false;
+  }
+}
+
+// Send message via best available channel: WhatsApp first, SMS fallback
+async function sendAlert(to, body) {
+  // Try WhatsApp Business first (99% of Brazilians use it)
+  const waSent = await sendWhatsAppBusiness(to, body);
+  if (waSent) return true;
+  // Fallback to SMS
+  return await sendSMS(to, body);
+}
+
 async function sendSMS(to, body) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -1105,6 +1155,77 @@ app.post('/api/twilio/sms', express.urlencoded({ extended: false }), async (req,
   }
 });
 
+// Twilio WhatsApp incoming message webhook
+// Set this URL in Twilio Console → WhatsApp Senders → +12627472376 → Webhook URL:
+// https://estou-bem-web-production.up.railway.app/api/twilio/whatsapp
+app.post('/api/twilio/whatsapp', express.urlencoded({ extended: false }), async (req, res) => {
+  const body = (req.body.Body || '').trim().toUpperCase();
+  const from = (req.body.From || '').replace('whatsapp:', '');
+
+  console.log(`[WhatsApp Incoming] From ${from}: ${body}`);
+
+  if (body === 'SIM' || body === 'SI' || body === 'YES' || body === 'OK' || body === '1' || body === 'BEM' || body === 'ESTOU BEM') {
+    // Find elder by phone number (last 9 digits match)
+    const elder = await pool.query(
+      "SELECT id, name FROM users WHERE phone LIKE $1 AND role = 'elder'",
+      ['%' + from.replace('+', '').slice(-9)]
+    ).catch(() => ({ rows: [] }));
+
+    if (elder.rows[0]) {
+      const today = new Date().toISOString().slice(0, 10);
+      await pool.query(
+        "UPDATE checkins SET status = 'confirmed' WHERE user_id = $1 AND date = $2 AND status = 'pending'",
+        [elder.rows[0].id, today]
+      );
+      await pool.query(
+        "UPDATE escalation_alerts SET status = 'resolved' WHERE elder_id = $1 AND status = 'active'",
+        [elder.rows[0].id]
+      );
+      // Notify family that elder confirmed via WhatsApp
+      const family = await pool.query('SELECT * FROM users WHERE family_code = (SELECT family_code FROM users WHERE id = $1) AND role = $2', [elder.rows[0].id, 'family']);
+      const contacts = await pool.query('SELECT * FROM emergency_contacts WHERE user_id = $1', [elder.rows[0].id]);
+      const allPhones = [
+        ...family.rows.filter(f => f.phone).map(f => f.phone),
+        ...contacts.rows.filter(c => c.phone).map(c => c.phone),
+      ];
+      for (const phone of allPhones) {
+        await sendWhatsAppBusiness(phone, `✅ ESTOU BEM: ${elder.rows[0].name} confirmou o check-in via WhatsApp. Tudo OK!`);
+      }
+      console.log(`[WhatsApp] ${elder.rows[0].name} confirmed check-in via WhatsApp`);
+      res.type('text/xml').send('<Response><Message>✅ Check-in confirmado! Obrigado por responder. Sua família foi notificada. Cuide-se bem! 💚</Message></Response>');
+    } else {
+      res.type('text/xml').send('<Response><Message>Estou Bem: Número não encontrado. Entre em contato com seu familiar para cadastrar seu telefone no app.</Message></Response>');
+    }
+  } else if (body === 'SOS' || body === 'AJUDA' || body === 'HELP' || body === 'SOCORRO') {
+    // Elder sent SOS via WhatsApp
+    const elder = await pool.query(
+      "SELECT id, name, phone FROM users WHERE phone LIKE $1 AND role = 'elder'",
+      ['%' + from.replace('+', '').slice(-9)]
+    ).catch(() => ({ rows: [] }));
+
+    if (elder.rows[0]) {
+      const family = await pool.query('SELECT * FROM users WHERE family_code = (SELECT family_code FROM users WHERE id = $1) AND role = $2', [elder.rows[0].id, 'family']);
+      const contacts = await pool.query('SELECT * FROM emergency_contacts WHERE user_id = $1', [elder.rows[0].id]);
+      const medSMS = await getMedicalInfoForSMS(elder.rows[0].id);
+      const allPhones = [
+        ...family.rows.filter(f => f.phone).map(f => f.phone),
+        ...contacts.rows.filter(c => c.phone).map(c => c.phone),
+      ];
+      for (const phone of allPhones) {
+        await sendAlert(phone, `🆘 EMERGENCIA: ${elder.rows[0].name} pediu AJUDA via WhatsApp! Verifique IMEDIATAMENTE. SAMU: 192${medSMS}`);
+      }
+      // Also trigger voice call escalation
+      await callSAMUWithConference(elder.rows[0], allPhones);
+      console.log(`[WhatsApp] ${elder.rows[0].name} sent SOS via WhatsApp — SAMU activated`);
+      res.type('text/xml').send('<Response><Message>🚨 SOS ATIVADO! Sua família e o SAMU foram notificados. Ajuda está a caminho. Aguente firme! 🚑</Message></Response>');
+    } else {
+      res.type('text/xml').send('<Response><Message>Estou Bem: Número não encontrado. Ligue 192 (SAMU) para emergências.</Message></Response>');
+    }
+  } else {
+    res.type('text/xml').send('<Response><Message>Estou Bem: Responda *SIM* para confirmar seu check-in, ou *SOS* se precisar de ajuda urgente.</Message></Response>');
+  }
+});
+
 // ── User Routes ───────────────────────────────────────────
 app.get('/api/me', authMiddleware, async (req, res) => {
   const result = await pool.query(
@@ -1211,7 +1332,7 @@ app.post('/api/escalation/trigger', authMiddleware, async (req, res) => {
     let samuTriggered = false;
 
     if (action === 'test_sms') {
-      if (elder.phone) await sendSMS(elder.phone, `Estou Bem: Este é um teste do sistema de notificação. Tudo funcionando!`);
+      if (elder.phone) await sendAlert(elder.phone, `Estou Bem: Este é um teste do sistema de notificação. Tudo funcionando!`);
       return res.json({ success: true, message: 'Test SMS sent' });
     }
     if (action === 'resolved') {
@@ -1221,19 +1342,19 @@ app.post('/api/escalation/trigger', authMiddleware, async (req, res) => {
         ...contacts.rows.filter(c => c.phone).map(c => c.phone),
       ];
       for (const phone of allPhones) {
-        await sendSMS(phone, `✅ ESTOU BEM: ${elder.name} confirmou o check-in. Tudo OK!`);
+        await sendAlert(phone, `✅ ESTOU BEM: ${elder.name} confirmou o check-in. Tudo OK!`);
       }
       return res.json({ success: true });
     }
     if (action === 'sms_elder' && elder.phone) {
-      await sendSMS(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
+      await sendAlert(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
     }
     if (action === 'sms_family') {
       for (const fm of family.rows) {
-        if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in. Por favor verifique.`);
+        if (fm.phone) await sendAlert(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in. Por favor verifique.`);
       }
       for (const ct of contacts.rows) {
-        if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in. Por favor verifique.`);
+        if (ct.phone) await sendAlert(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in. Por favor verifique.`);
       }
     }
     if (action === 'call_elder' && elder.phone) {
@@ -1246,7 +1367,7 @@ app.post('/api/escalation/trigger', authMiddleware, async (req, res) => {
         ];
         const medSMS = await getMedicalInfoForSMS(elder.id);
         for (const phone of allPhones) {
-          await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA.${medSMS}`);
+          await sendAlert(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA.${medSMS}`);
         }
         await callSAMUWithConference(elder, allPhones);
         samuTriggered = true;
@@ -1259,7 +1380,7 @@ app.post('/api/escalation/trigger', authMiddleware, async (req, res) => {
       ];
       const medSMU = await getMedicalInfoForSMS(elder.id);
       for (const phone of allPhones) {
-        await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medSMU}`);
+        await sendAlert(phone, `🆘 EMERGENCIA: ${elder.name} nao responde. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medSMU}`);
       }
       await callSAMUWithConference(elder, allPhones);
       samuTriggered = true;
@@ -1475,15 +1596,15 @@ app.post('/api/activity-update', async (req, res) => {
 
           // SMS + Voice call to elder
           if (elder.rows[0].phone) {
-            await sendSMS(elder.rows[0].phone, `ALERTA Estou Bem: Seu nivel de oxigenio esta em ${spo2}%. Procure ajuda medica.`);
+            await sendAlert(elder.rows[0].phone, `ALERTA Estou Bem: Seu nivel de oxigenio esta em ${spo2}%. Procure ajuda medica.`);
             await makeVoiceCall(elder.rows[0].phone, `Alerta de saude. Seu nivel de oxigenio esta muito baixo, em ${spo2} por cento. Procure ajuda medica imediatamente.`);
           }
           // SMS to family
           for (const fm of family.rows) {
-            if (fm.phone) await sendSMS(fm.phone, `EMERGENCIA: ${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Procure ajuda medica IMEDIATAMENTE.`);
+            if (fm.phone) await sendAlert(fm.phone, `EMERGENCIA: ${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Procure ajuda medica IMEDIATAMENTE.`);
           }
           for (const ct of contacts.rows) {
-            if (ct.phone) await sendSMS(ct.phone, `EMERGENCIA: ${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Procure ajuda medica IMEDIATAMENTE.`);
+            if (ct.phone) await sendAlert(ct.phone, `EMERGENCIA: ${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Procure ajuda medica IMEDIATAMENTE.`);
           }
 
           // Email to family
@@ -1533,7 +1654,7 @@ app.post('/api/activity-update', async (req, res) => {
 
           // SMS to family
           for (const fm of family.rows) {
-            if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Monitore de perto.`);
+            if (fm.phone) await sendAlert(fm.phone, `ALERTA: ${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Monitore de perto.`);
           }
 
           // Email to family
@@ -1650,10 +1771,10 @@ app.post('/api/fall-detected', async (req, res) => {
 
     // 7. SMS to family contacts
     for (const fm of family.rows) {
-      if (fm.phone) await sendSMS(fm.phone, `ALERTA Estou Bem: ${elder.name} pode ter sofrido uma queda! Verifique imediatamente.`);
+      if (fm.phone) await sendAlert(fm.phone, `ALERTA Estou Bem: ${elder.name} pode ter sofrido uma queda! Verifique imediatamente.`);
     }
     for (const ct of contactsResult.rows) {
-      if (ct.phone) await sendSMS(ct.phone, `ALERTA Estou Bem: ${elder.name} pode ter sofrido uma queda! Verifique imediatamente.`);
+      if (ct.phone) await sendAlert(ct.phone, `ALERTA Estou Bem: ${elder.name} pode ter sofrido uma queda! Verifique imediatamente.`);
     }
 
     // 8. IMMEDIATELY escalate to Level 2: Voice call to elder
@@ -3363,7 +3484,7 @@ async function checkMissedCheckins() {
           // ── Twilio SMS & Voice escalation (scheduled mode) ──
           if (targetLevel >= 1 && elder.phone) {
             // Level 1+: SMS reminder to elder
-            await sendSMS(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
+            await sendAlert(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
           }
           if (targetLevel >= 2) {
             // Level 2: Voice call to elder — if no answer, IMMEDIATELY escalate to SAMU
@@ -3373,10 +3494,10 @@ async function checkMissedCheckins() {
             }
             // SMS to family contacts
             for (const fm of family.rows) {
-              if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
+              if (fm.phone) await sendAlert(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
             }
             for (const ct of contacts.rows) {
-              if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
+              if (ct.phone) await sendAlert(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
             }
             // If call failed or not answered → IMMEDIATE SAMU escalation
             if (!elderAnswered && targetLevel < 3) {
@@ -3392,7 +3513,7 @@ async function checkMissedCheckins() {
             ];
             const medEmergSMS = await getMedicalInfoForSMS(elder.id);
             for (const phone of allPhones) {
-              await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medEmergSMS}`);
+              await sendAlert(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medEmergSMS}`);
             }
             await callSAMUWithConference(elder, allPhones);
             console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);
@@ -3559,7 +3680,7 @@ async function checkMissedCheckins() {
             // ── Twilio SMS & Voice escalation (interval mode) ──
             if (targetLevel >= 1 && elder.phone) {
               // Level 1+: SMS reminder to elder
-              await sendSMS(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
+              await sendAlert(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
             }
             if (targetLevel >= 2) {
               // Level 2: Voice call — if no answer, IMMEDIATELY call SAMU
@@ -3568,10 +3689,10 @@ async function checkMissedCheckins() {
                 elderAnswered = await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem. Sua familia esta preocupada. Pressione 1 se esta bem.`);
               }
               for (const fm of family.rows) {
-                if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
+                if (fm.phone) await sendAlert(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
               }
               for (const ct of contacts.rows) {
-                if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
+                if (ct.phone) await sendAlert(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
               }
               if (!elderAnswered && targetLevel < 3) {
                 console.log(`[ESCALATION] ${elder.name} did NOT answer voice call — escalating to SAMU NOW`);
@@ -3585,7 +3706,7 @@ async function checkMissedCheckins() {
               ];
               const medIntSMS = await getMedicalInfoForSMS(elder.id);
               for (const phone of allPhones) {
-                await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medIntSMS}`);
+                await sendAlert(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medIntSMS}`);
               }
               await callSAMUWithConference(elder, allPhones);
               console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);
@@ -3656,7 +3777,7 @@ async function checkMissedCheckins() {
 
         // Step 2: SMS to elder
         if (inactive.phone) {
-          await sendSMS(inactive.phone, `Estou Bem: Voce esta bem? Nao detectamos movimento ha 3 horas. Responda SIM se esta tudo bem.`);
+          await sendAlert(inactive.phone, `Estou Bem: Voce esta bem? Nao detectamos movimento ha 3 horas. Responda SIM se esta tudo bem.`);
           console.log(`[Inactivity] Sent SMS to ${inactive.name}`);
         }
 
@@ -3697,10 +3818,10 @@ async function checkMissedCheckins() {
 
         // SMS to family
         for (const fm of inactFamily.rows) {
-          if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${inactive.name} nao apresenta movimento ha ${inactiveHours} horas. Verifique se esta tudo bem.`);
+          if (fm.phone) await sendAlert(fm.phone, `ALERTA: ${inactive.name} nao apresenta movimento ha ${inactiveHours} horas. Verifique se esta tudo bem.`);
         }
         for (const ct of inactContacts.rows) {
-          if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${inactive.name} nao apresenta movimento ha ${inactiveHours} horas. Verifique se esta tudo bem.`);
+          if (ct.phone) await sendAlert(ct.phone, `ALERTA: ${inactive.name} nao apresenta movimento ha ${inactiveHours} horas. Verifique se esta tudo bem.`);
         }
 
         // Email to family
