@@ -722,6 +722,79 @@ async function sendPushNotifications(tokens, title, body, data = {}, critical = 
   }
 }
 
+// ── Twilio SMS & Voice ──────────────────────────────────
+async function sendSMS(to, body) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+
+  if (!accountSid || !authToken || !fromNumber) {
+    console.log(`[SMS] No Twilio credentials. Would send to ${to}: ${body}`);
+    return false;
+  }
+
+  try {
+    const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const params = new URLSearchParams({
+      To: to,
+      From: fromNumber,
+      Body: body,
+    });
+
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+    const result = await res.json();
+    console.log(`[SMS] Sent to ${to}: ${result.sid || result.message}`);
+    return res.ok;
+  } catch (err) {
+    console.error(`[SMS] Error sending to ${to}:`, err.message);
+    return false;
+  }
+}
+
+async function makeVoiceCall(to, message) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+
+  if (!accountSid || !authToken || !fromNumber) {
+    console.log(`[Voice] No Twilio credentials. Would call ${to}: ${message}`);
+    return false;
+  }
+
+  try {
+    const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const twiml = `<Response><Say language="pt-BR" voice="Polly.Camila">${message}</Say><Pause length="2"/><Say language="pt-BR" voice="Polly.Camila">Pressione 1 se voce esta bem. Pressione 2 se precisa de ajuda.</Say><Gather numDigits="1" action="https://estou-bem-web-production.up.railway.app/api/twilio/gather" method="POST"><Say language="pt-BR" voice="Polly.Camila">Aguardando sua resposta.</Say></Gather></Response>`;
+
+    const params = new URLSearchParams({
+      To: to,
+      From: fromNumber,
+      Twiml: twiml,
+    });
+
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+    const result = await res.json();
+    console.log(`[Voice] Called ${to}: ${result.sid || result.message}`);
+    return res.ok;
+  } catch (err) {
+    console.error(`[Voice] Error calling ${to}:`, err.message);
+    return false;
+  }
+}
+
 // ── Push Token Routes ────────────────────────────────────
 // Authenticated version (web app users)
 app.post('/api/push-token', authMiddleware, async (req, res) => {
@@ -770,6 +843,74 @@ app.delete('/api/push-token', authMiddleware, async (req, res) => {
     await pool.query('DELETE FROM push_tokens WHERE user_id = $1 AND token = $2', [req.userId, token]);
   }
   res.json({ ok: true });
+});
+
+// ── Twilio Webhooks ──────────────────────────────────────
+
+// Twilio voice call gather callback
+app.post('/api/twilio/gather', express.urlencoded({ extended: false }), async (req, res) => {
+  const digit = req.body.Digits;
+  const callerPhone = req.body.To;
+
+  console.log(`[Twilio Gather] Phone ${callerPhone} pressed ${digit}`);
+
+  if (digit === '1') {
+    // Elder confirmed they're OK
+    const elder = await pool.query('SELECT id, name FROM users WHERE phone = $1 AND role = $2', [callerPhone, 'elder']).catch(() => ({ rows: [] }));
+    if (elder.rows[0]) {
+      await pool.query(
+        "UPDATE escalation_alerts SET status = 'resolved' WHERE elder_id = $1 AND status = 'active'",
+        [elder.rows[0].id]
+      );
+      const today = new Date().toISOString().slice(0, 10);
+      await pool.query(
+        "UPDATE checkins SET status = 'confirmed' WHERE user_id = $1 AND date = $2 AND status = 'pending'",
+        [elder.rows[0].id, today]
+      );
+      console.log(`[Twilio] ${elder.rows[0].name} confirmed OK via phone`);
+    }
+
+    res.type('text/xml').send('<Response><Say language="pt-BR" voice="Polly.Camila">Obrigado! Seu check-in foi confirmado. Cuide-se bem!</Say></Response>');
+  } else if (digit === '2') {
+    // Elder needs help - escalate immediately
+    res.type('text/xml').send('<Response><Say language="pt-BR" voice="Polly.Camila">Estamos avisando sua familia agora. Fique tranquilo, ajuda esta a caminho.</Say></Response>');
+  } else {
+    res.type('text/xml').send('<Response><Say language="pt-BR" voice="Polly.Camila">Nao entendi. Pressione 1 se esta bem, ou 2 se precisa de ajuda.</Say><Gather numDigits="1"><Say language="pt-BR">Aguardando.</Say></Gather></Response>');
+  }
+});
+
+// Twilio incoming SMS webhook (for elder replying "SIM" to SMS check-in)
+app.post('/api/twilio/sms', express.urlencoded({ extended: false }), async (req, res) => {
+  const body = (req.body.Body || '').trim().toUpperCase();
+  const from = req.body.From;
+
+  console.log(`[SMS Incoming] From ${from}: ${body}`);
+
+  if (body === 'SIM' || body === 'SI' || body === 'YES' || body === 'OK' || body === '1') {
+    // Find elder by phone number
+    const elder = await pool.query(
+      "SELECT id, name FROM users WHERE phone LIKE $1 AND role = 'elder'",
+      ['%' + from.replace('+', '').slice(-9)]
+    ).catch(() => ({ rows: [] }));
+
+    if (elder.rows[0]) {
+      const today = new Date().toISOString().slice(0, 10);
+      await pool.query(
+        "UPDATE checkins SET status = 'confirmed' WHERE user_id = $1 AND date = $2 AND status = 'pending'",
+        [elder.rows[0].id, today]
+      );
+      await pool.query(
+        "UPDATE escalation_alerts SET status = 'resolved' WHERE elder_id = $1 AND status = 'active'",
+        [elder.rows[0].id]
+      );
+      console.log(`[SMS] ${elder.rows[0].name} confirmed check-in via SMS`);
+      res.type('text/xml').send('<Response><Message>Check-in confirmado! Obrigado por responder. Cuide-se bem!</Message></Response>');
+    } else {
+      res.type('text/xml').send('<Response><Message>Estou Bem: Numero nao encontrado. Entre em contato com seu familiar.</Message></Response>');
+    }
+  } else {
+    res.type('text/xml').send('<Response><Message>Estou Bem: Responda SIM para confirmar seu check-in.</Message></Response>');
+  }
 });
 
 // ── User Routes ───────────────────────────────────────────
@@ -2444,6 +2585,38 @@ async function checkMissedCheckins() {
           // Send email notifications to family members
           await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel);
 
+          // ── Twilio SMS & Voice escalation (scheduled mode) ──
+          if (targetLevel >= 1 && elder.phone) {
+            // Level 1+: SMS reminder to elder
+            await sendSMS(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
+          }
+          if (targetLevel >= 2 && elder.phone) {
+            // Level 2+: Voice call to elder
+            await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem ha mais de uma hora. Sua familia esta preocupada.`);
+            // SMS to family contacts
+            for (const fm of family.rows) {
+              if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 1 hora. Por favor verifique.`);
+            }
+            for (const ct of contacts.rows) {
+              if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 1 hora. Por favor verifique.`);
+            }
+          }
+          if (targetLevel >= 3) {
+            // Level 3 EMERGENCY: Voice call to ALL contacts + emergency SMS
+            for (const fm of family.rows) {
+              if (fm.phone) {
+                await makeVoiceCall(fm.phone, `EMERGENCIA. ${elder.name} nao responde ao check-in do Estou Bem ha 2 horas. Por favor verifique imediatamente.`);
+                await sendSMS(fm.phone, `EMERGENCIA: ${elder.name} nao responde ha 2 horas. Verifique imediatamente. Se necessario, ligue SAMU 192.`);
+              }
+            }
+            for (const ct of contacts.rows) {
+              if (ct.phone) {
+                await makeVoiceCall(ct.phone, `EMERGENCIA. ${elder.name} nao responde ao check-in do Estou Bem ha 2 horas. Por favor verifique imediatamente.`);
+                await sendSMS(ct.phone, `EMERGENCIA: ${elder.name} nao responde ha 2 horas. Verifique imediatamente. Se necessario, ligue SAMU 192.`);
+              }
+            }
+          }
+
           // Send reminder to the elder themselves
           const elderTokens = await pool.query(
             `SELECT token FROM push_tokens WHERE user_id = $1`,
@@ -2601,6 +2774,38 @@ async function checkMissedCheckins() {
 
             // Send email notifications to family members
             await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel);
+
+            // ── Twilio SMS & Voice escalation (interval mode) ──
+            if (targetLevel >= 1 && elder.phone) {
+              // Level 1+: SMS reminder to elder
+              await sendSMS(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
+            }
+            if (targetLevel >= 2 && elder.phone) {
+              // Level 2+: Voice call to elder
+              await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem ha mais de uma hora. Sua familia esta preocupada.`);
+              // SMS to family contacts
+              for (const fm of family.rows) {
+                if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 1 hora. Por favor verifique.`);
+              }
+              for (const ct of contacts.rows) {
+                if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 1 hora. Por favor verifique.`);
+              }
+            }
+            if (targetLevel >= 3) {
+              // Level 3 EMERGENCY: Voice call to ALL contacts + emergency SMS
+              for (const fm of family.rows) {
+                if (fm.phone) {
+                  await makeVoiceCall(fm.phone, `EMERGENCIA. ${elder.name} nao responde ao check-in do Estou Bem ha 2 horas. Por favor verifique imediatamente.`);
+                  await sendSMS(fm.phone, `EMERGENCIA: ${elder.name} nao responde ha 2 horas. Verifique imediatamente. Se necessario, ligue SAMU 192.`);
+                }
+              }
+              for (const ct of contacts.rows) {
+                if (ct.phone) {
+                  await makeVoiceCall(ct.phone, `EMERGENCIA. ${elder.name} nao responde ao check-in do Estou Bem ha 2 horas. Por favor verifique imediatamente.`);
+                  await sendSMS(ct.phone, `EMERGENCIA: ${elder.name} nao responde ha 2 horas. Verifique imediatamente. Se necessario, ligue SAMU 192.`);
+                }
+              }
+            }
 
             // Send reminder to the elder themselves
             const elderTokens = await pool.query(
