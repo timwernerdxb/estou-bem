@@ -844,7 +844,7 @@ async function callSAMUWithConference(elder, familyPhones) {
     for (const phone of familyPhones) {
       const familyTwiml = `<Response>
         <Say language="pt-BR" voice="Polly.Camila">
-          EMERGENCIA do Estou Bem. ${elder.name} nao responde ha 2 horas.
+          EMERGENCIA do Estou Bem. ${elder.name} nao responde ha 30 minutos.
           Voce esta sendo conectado a uma ligacao com o SAMU 192.
         </Say>
         <Dial>
@@ -2582,20 +2582,20 @@ async function checkMissedCheckins() {
           let targetLevel;
           let pushTitle;
           let pushBody;
-          if (overdueMin >= 120) {
+          if (overdueMin >= 30) {
             targetLevel = 3;
             pushTitle = 'EMERGENCIA!';
-            pushBody = `EMERGENCIA: ${elder.name} nao responde ha 2 horas! Acao imediata necessaria.`;
-          } else if (overdueMin >= 60) {
+            pushBody = `EMERGENCIA: ${elder.name} nao responde ha 30 minutos! SAMU sendo acionado.`;
+          } else if (overdueMin >= 15) {
             targetLevel = 2;
             pushTitle = 'Check-in urgente perdido!';
-            pushBody = `${elder.name} nao respondeu ao check-in ha mais de 1 hora. Por favor verifique.`;
-          } else if (overdueMin >= 30) {
+            pushBody = `${elder.name} nao respondeu ao check-in ha 15 minutos. Verifique agora!`;
+          } else if (overdueMin >= 5) {
             targetLevel = 1;
             pushTitle = 'Check-in perdido!';
             pushBody = `${elder.name} nao respondeu ao check-in. Verifique se esta tudo bem.`;
           } else {
-            continue; // Not yet overdue (within 30 min grace)
+            continue; // Not yet overdue (within 5 min grace)
           }
 
           // Mark as missed
@@ -2689,10 +2689,10 @@ async function checkMissedCheckins() {
             await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem ha mais de uma hora. Sua familia esta preocupada.`);
             // SMS to family contacts
             for (const fm of family.rows) {
-              if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 1 hora. Por favor verifique.`);
+              if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
             }
             for (const ct of contacts.rows) {
-              if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 1 hora. Por favor verifique.`);
+              if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
             }
           }
           if (targetLevel >= 3) {
@@ -2703,7 +2703,7 @@ async function checkMissedCheckins() {
             ];
             // Send emergency SMS to everyone first
             for (const phone of allPhones) {
-              await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde ha 2 horas. O SAMU 192 esta sendo acionado automaticamente. Voce sera conectado a ligacao.`);
+              await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde ha 30 minutos. O SAMU 192 esta sendo acionado automaticamente. Voce sera conectado a ligacao.`);
             }
             // Call SAMU and conference-patch all contacts
             await callSAMUWithConference(elder, allPhones);
@@ -2774,18 +2774,18 @@ async function checkMissedCheckins() {
 
             // Determine escalation level based on how long overdue
             const overdueMs = lastTime ? (now - lastTime) : Infinity;
-            const overdueHours = overdueMs / (60 * 60 * 1000);
+            const overdueMin = overdueMs / (60 * 1000);
             let targetLevel;
             let pushTitle;
             let pushBody;
-            if (overdueHours >= 2 + intervalHours || !lastTime) {
+            if (overdueMin >= (intervalHours * 60) + 30 || !lastTime) {
               targetLevel = 3;
               pushTitle = 'EMERGENCIA!';
-              pushBody = `EMERGENCIA: ${elder.name} nao responde ha muito tempo! Acao imediata necessaria.`;
-            } else if (overdueHours >= 1 + intervalHours) {
+              pushBody = `EMERGENCIA: ${elder.name} nao responde ha 30 minutos alem do intervalo! SAMU sendo acionado.`;
+            } else if (overdueMin >= (intervalHours * 60) + 15) {
               targetLevel = 2;
               pushTitle = 'Check-in urgente perdido!';
-              pushBody = `${elder.name} nao respondeu ao check-in ha mais de 1 hora. Por favor verifique.`;
+              pushBody = `${elder.name} nao respondeu ao check-in ha 15 minutos. Verifique agora!`;
             } else {
               targetLevel = 1;
               pushTitle = 'Check-in perdido!';
@@ -2878,10 +2878,10 @@ async function checkMissedCheckins() {
               await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem ha mais de uma hora. Sua familia esta preocupada.`);
               // SMS to family contacts
               for (const fm of family.rows) {
-                if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 1 hora. Por favor verifique.`);
+                if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
               }
               for (const ct of contacts.rows) {
-                if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 1 hora. Por favor verifique.`);
+                if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
               }
             }
             if (targetLevel >= 3) {
@@ -2891,7 +2891,7 @@ async function checkMissedCheckins() {
                 ...contacts.rows.filter(c => c.phone).map(c => c.phone),
               ];
               for (const phone of allPhones) {
-                await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde ha 2 horas. O SAMU 192 esta sendo acionado automaticamente. Voce sera conectado a ligacao.`);
+                await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde ha 30 minutos. O SAMU 192 esta sendo acionado automaticamente. Voce sera conectado a ligacao.`);
               }
               await callSAMUWithConference(elder, allPhones);
               console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);
