@@ -2684,9 +2684,12 @@ async function checkMissedCheckins() {
             // Level 1+: SMS reminder to elder
             await sendSMS(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
           }
-          if (targetLevel >= 2 && elder.phone) {
-            // Level 2+: Voice call to elder
-            await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem ha mais de uma hora. Sua familia esta preocupada.`);
+          if (targetLevel >= 2) {
+            // Level 2: Voice call to elder — if no answer, IMMEDIATELY escalate to SAMU
+            let elderAnswered = false;
+            if (elder.phone) {
+              elderAnswered = await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem. Sua familia esta preocupada. Pressione 1 se esta bem.`);
+            }
             // SMS to family contacts
             for (const fm of family.rows) {
               if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
@@ -2694,18 +2697,21 @@ async function checkMissedCheckins() {
             for (const ct of contacts.rows) {
               if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
             }
+            // If call failed or not answered → IMMEDIATE SAMU escalation
+            if (!elderAnswered && targetLevel < 3) {
+              console.log(`[ESCALATION] ${elder.name} did NOT answer voice call — escalating to SAMU NOW`);
+              targetLevel = 3;
+            }
           }
           if (targetLevel >= 3) {
-            // Level 3 EMERGENCY: Call SAMU 192 + conference ALL contacts
+            // Level 3 EMERGENCY: Call SAMU 192 + conference ALL contacts — NO MORE WAITING
             const allPhones = [
               ...family.rows.filter(f => f.phone).map(f => f.phone),
               ...contacts.rows.filter(c => c.phone).map(c => c.phone),
             ];
-            // Send emergency SMS to everyone first
             for (const phone of allPhones) {
-              await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde ha 30 minutos. O SAMU 192 esta sendo acionado automaticamente. Voce sera conectado a ligacao.`);
+              await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.`);
             }
-            // Call SAMU and conference-patch all contacts
             await callSAMUWithConference(elder, allPhones);
             console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);
           }
@@ -2873,25 +2879,30 @@ async function checkMissedCheckins() {
               // Level 1+: SMS reminder to elder
               await sendSMS(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
             }
-            if (targetLevel >= 2 && elder.phone) {
-              // Level 2+: Voice call to elder
-              await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem ha mais de uma hora. Sua familia esta preocupada.`);
-              // SMS to family contacts
+            if (targetLevel >= 2) {
+              // Level 2: Voice call — if no answer, IMMEDIATELY call SAMU
+              let elderAnswered = false;
+              if (elder.phone) {
+                elderAnswered = await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem. Sua familia esta preocupada. Pressione 1 se esta bem.`);
+              }
               for (const fm of family.rows) {
                 if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
               }
               for (const ct of contacts.rows) {
                 if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
               }
+              if (!elderAnswered && targetLevel < 3) {
+                console.log(`[ESCALATION] ${elder.name} did NOT answer voice call — escalating to SAMU NOW`);
+                targetLevel = 3;
+              }
             }
             if (targetLevel >= 3) {
-              // Level 3 EMERGENCY: Call SAMU 192 + conference ALL contacts
               const allPhones = [
                 ...family.rows.filter(f => f.phone).map(f => f.phone),
                 ...contacts.rows.filter(c => c.phone).map(c => c.phone),
               ];
               for (const phone of allPhones) {
-                await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde ha 30 minutos. O SAMU 192 esta sendo acionado automaticamente. Voce sera conectado a ligacao.`);
+                await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.`);
               }
               await callSAMUWithConference(elder, allPhones);
               console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);
