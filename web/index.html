@@ -972,7 +972,15 @@ function renderOnboarding() {
 
 function renderLogin() {
   return `
-    <div class="screen active screen-padtop" style="padding-bottom:40px;justify-content:center">
+    <div class="screen active screen-padtop" style="padding-bottom:40px;justify-content:center;position:relative">
+      <div style="position:absolute;top:12px;right:16px">
+        <select onchange="setLanguage(this.value)" style="padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;background:var(--card);color:var(--text3);cursor:pointer;font-family:var(--sans);-webkit-appearance:none;appearance:none">
+          <option value="pt-BR" ${currentLang==='pt-BR'?'selected':''}>🇧🇷</option>
+          <option value="en" ${currentLang==='en'?'selected':''}>🇬🇧</option>
+          <option value="es" ${currentLang==='es'?'selected':''}>🇪🇸</option>
+          <option value="de" ${currentLang==='de'?'selected':''}>🇩🇪</option>
+        </select>
+      </div>
       <div style="text-align:center;margin-bottom:32px">
         <div class="onboarding-icon" style="margin:0 auto 24px">${icons.shield}</div>
         <h1>${t('login_welcome')}</h1>
@@ -989,14 +997,6 @@ function renderLogin() {
       <button class="btn btn-elder mt-lg" data-action="do-login">${t('login_enter')}</button>
       <button class="btn-outline btn mt-md" data-action="go-register" style="border-color:var(--border);color:var(--text2)">${t('login_create_account')}</button>
       <button class="btn-ghost btn mt-sm" style="font-size:13px;color:var(--text3);letter-spacing:.04em" data-action="skip-login">${t('login_skip')}</button>
-      <div style="margin-top:24px;text-align:center">
-        <select onchange="setLanguage(this.value)" style="padding:6px 12px;border:1px solid var(--border);border-radius:4px;font-size:13px;background:var(--card);color:var(--text2);cursor:pointer;font-family:var(--sans)">
-          <option value="pt-BR" ${currentLang==='pt-BR'?'selected':''}>🇧🇷 Português</option>
-          <option value="en" ${currentLang==='en'?'selected':''}>🇬🇧 English</option>
-          <option value="es" ${currentLang==='es'?'selected':''}>🇪🇸 Español</option>
-          <option value="de" ${currentLang==='de'?'selected':''}>🇩🇪 Deutsch</option>
-        </select>
-      </div>
     </div>`;
 }
 
