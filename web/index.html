@@ -1633,7 +1633,7 @@ function renderDashboard() {
           <div style="background:var(--bg);border-radius:12px;padding:12px;text-align:center">
             <div style="font-size:20px">🚶</div>
             <div style="font-size:14px;font-weight:700;color:${(() => { const h = (Date.now() - new Date(activityLog.last_movement_at).getTime()) / 3600000; return h > 3 ? 'var(--danger)' : h > 1 ? 'var(--warning)' : 'var(--success)'; })()}">${(() => { const d = new Date(activityLog.last_movement_at); const h = Math.round((Date.now() - d.getTime()) / 60000); return h < 60 ? h+'min' : Math.round(h/60)+'h'; })()}</div>
-            <div style="font-size:11px;color:var(--text2)">Ultimo mov.</div>
+            <div style="font-size:11px;color:var(--text2)">Último mov.</div>
             <div style="font-size:10px;color:var(--text3)">${new Date(activityLog.last_movement_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
           </div>` : ''}
         </div>
@@ -1802,9 +1802,9 @@ function renderSettings() {
       <div class="card">
         <h2>${t('settings_language')}</h2>
         <select onchange="setLanguage(this.value)" style="width:100%;padding:12px 0;border:none;border-bottom:1px solid var(--border);font-size:16px;background:transparent;color:var(--text);font-family:var(--sans);cursor:pointer">
-          <option value="pt-BR" ${currentLang==='pt-BR'?'selected':''}>Portugues (Brasil)</option>
+          <option value="pt-BR" ${currentLang==='pt-BR'?'selected':''}>Português (Brasil)</option>
           <option value="en" ${currentLang==='en'?'selected':''}>English</option>
-          <option value="es" ${currentLang==='es'?'selected':''}>Espanol</option>
+          <option value="es" ${currentLang==='es'?'selected':''}>Español</option>
           <option value="de" ${currentLang==='de'?'selected':''}>Deutsch</option>
         </select>
       </div>

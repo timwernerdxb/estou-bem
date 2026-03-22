@@ -270,6 +270,8 @@ async function initDB() {
         time TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending',
         date TEXT NOT NULL,
+        confirmed_at TIMESTAMPTZ,
+        escalation_level INTEGER DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
@@ -280,6 +282,28 @@ async function initDB() {
         phone TEXT NOT NULL,
         relationship TEXT,
         priority INTEGER DEFAULT 1
+      );
+
+      CREATE TABLE IF NOT EXISTS emergency_contacts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        phone TEXT,
+        email TEXT,
+        relationship TEXT,
+        priority INTEGER DEFAULT 1,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS family_contacts (
+        id SERIAL PRIMARY KEY,
+        elder_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        phone TEXT,
+        email TEXT,
+        relationship TEXT,
+        user_id INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS medications (
@@ -629,6 +653,7 @@ async function initDB() {
 
 // ── Middleware ─────────────────────────────────────────────
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Twilio webhooks send form-encoded data
 
 // CORS
 app.use('/api', (req, res, next) => {
@@ -1190,7 +1215,7 @@ app.post('/api/twilio/whatsapp', express.urlencoded({ extended: false }), async 
         [elder.rows[0].id]
       );
       // Notify family that elder confirmed via WhatsApp
-      const family = await pool.query('SELECT * FROM users WHERE family_code = (SELECT family_code FROM users WHERE id = $1) AND role = $2', [elder.rows[0].id, 'family']);
+      const family = await pool.query('SELECT * FROM family_contacts WHERE elder_id = $1', [elder.rows[0].id]);
       const contacts = await pool.query('SELECT * FROM emergency_contacts WHERE user_id = $1', [elder.rows[0].id]);
       const allPhones = [
         ...family.rows.filter(f => f.phone).map(f => f.phone),
@@ -1212,7 +1237,7 @@ app.post('/api/twilio/whatsapp', express.urlencoded({ extended: false }), async 
     ).catch(() => ({ rows: [] }));
 
     if (elder.rows[0]) {
-      const family = await pool.query('SELECT * FROM users WHERE family_code = (SELECT family_code FROM users WHERE id = $1) AND role = $2', [elder.rows[0].id, 'family']);
+      const family = await pool.query('SELECT * FROM family_contacts WHERE elder_id = $1', [elder.rows[0].id]);
       const contacts = await pool.query('SELECT * FROM emergency_contacts WHERE user_id = $1', [elder.rows[0].id]);
       const medSMS = await getMedicalInfoForSMS(elder.rows[0].id);
       const allPhones = [
@@ -1334,7 +1359,7 @@ app.post('/api/escalation/trigger', authMiddleware, async (req, res) => {
     const user = await pool.query('SELECT * FROM users WHERE id = $1', [uid]);
     if (!user.rows[0]) return res.status(404).json({ error: 'User not found' });
     const elder = user.rows[0];
-    const family = await pool.query('SELECT * FROM users WHERE family_code = $1 AND role = $2', [elder.family_code, 'family']);
+    const family = await pool.query('SELECT * FROM family_contacts WHERE elder_id = $1', [uid]);
     const contacts = await pool.query('SELECT * FROM emergency_contacts WHERE user_id = $1', [uid]);
 
     let samuTriggered = false;
@@ -3327,7 +3352,8 @@ async function start() {
     console.log('No DATABASE_URL — running without database (localStorage only)');
   }
   // ── Twilio WhatsApp Webhook (incoming messages) ──────────
-  app.post('/api/whatsapp/webhook', async (req, res) => {
+  // Support both URL paths
+  const whatsappWebhook = async (req, res) => {
     try {
       const { Body, From, To, MessageSid } = req.body;
       const phone = From ? From.replace('whatsapp:', '') : '';
@@ -3343,14 +3369,18 @@ async function start() {
       if (msg === 'SIM' || msg === 'ESTOU BEM' || msg === 'YES' || msg === 'OK' || msg === 'BEM') {
         // ── CHECK-IN CONFIRMED ──
         if (user) {
-          await pool.query(
-            `INSERT INTO checkins (user_id, status, confirmed_at) VALUES ($1, 'confirmed', NOW())`,
-            [user.id]
-          );
-          // Cancel any pending escalation
+          const now = new Date();
+          const timeStr = now.toTimeString().slice(0,5);
+          const dateStr = now.toISOString().slice(0,10);
+          // Cancel any pending escalation first
           await pool.query(
             `UPDATE checkins SET status = 'confirmed', confirmed_at = NOW() WHERE user_id = $1 AND status = 'pending'`,
             [user.id]
+          );
+          // Insert confirmed check-in
+          await pool.query(
+            `INSERT INTO checkins (user_id, status, time, date, confirmed_at) VALUES ($1, 'confirmed', $2, $3, NOW())`,
+            [user.id, timeStr, dateStr]
           );
           console.log(`[WhatsApp] Check-in confirmed for ${user.name} (${phone})`);
           replyBody = `✅ Check-in confirmado! Obrigado, ${user.name}. Ate o proximo check-in. 💚`;
@@ -3412,7 +3442,9 @@ async function start() {
       const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>Estou Bem: Ocorreu um erro. Ligue 192 para emergencias.</Message></Response>`;
       res.type('text/xml').send(twiml);
     }
-  });
+  };
+  app.post('/api/whatsapp/webhook', whatsappWebhook);
+  app.post('/api/twilio/whatsapp', whatsappWebhook);
 
   // Helper: send WhatsApp via Twilio
   async function sendWhatsApp(to, body) {
