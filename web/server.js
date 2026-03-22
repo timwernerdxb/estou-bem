@@ -853,6 +853,23 @@ async function makeVoiceCall(to, message) {
   }
 }
 
+// Build medical info string for emergency SMS
+async function getMedicalInfoForSMS(elderId) {
+  try {
+    const result = await pool.query('SELECT * FROM medical_profiles WHERE user_id = $1', [elderId]);
+    if (result.rows.length === 0) return '';
+    const mp = result.rows[0];
+    const parts = [];
+    if (mp.blood_type) parts.push(`Sangue: ${mp.blood_type}`);
+    if (mp.allergies) parts.push(`Alergias: ${mp.allergies}`);
+    if (mp.chronic_conditions) parts.push(`Condicoes: ${mp.chronic_conditions}`);
+    if (mp.address) parts.push(`Endereco: ${mp.address}`);
+    return parts.length > 0 ? ' ' + parts.join('. ') + '.' : '';
+  } catch (err) {
+    return '';
+  }
+}
+
 // ── Emergency SAMU Call with Conference ──────────────────
 async function callSAMUWithConference(elder, familyPhones) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -1227,8 +1244,9 @@ app.post('/api/escalation/trigger', authMiddleware, async (req, res) => {
           ...family.rows.filter(f => f.phone).map(f => f.phone),
           ...contacts.rows.filter(c => c.phone).map(c => c.phone),
         ];
+        const medSMS = await getMedicalInfoForSMS(elder.id);
         for (const phone of allPhones) {
-          await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA.`);
+          await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA.${medSMS}`);
         }
         await callSAMUWithConference(elder, allPhones);
         samuTriggered = true;
@@ -1239,8 +1257,9 @@ app.post('/api/escalation/trigger', authMiddleware, async (req, res) => {
         ...family.rows.filter(f => f.phone).map(f => f.phone),
         ...contacts.rows.filter(c => c.phone).map(c => c.phone),
       ];
+      const medSMU = await getMedicalInfoForSMS(elder.id);
       for (const phone of allPhones) {
-        await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde. SAMU 192 sendo acionado AGORA. Voce sera conectado.`);
+        await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medSMU}`);
       }
       await callSAMUWithConference(elder, allPhones);
       samuTriggered = true;
@@ -3126,8 +3145,12 @@ app.put('/api/admin/payouts/:id', adminAuth, async (req, res) => {
   }
 });
 
-// ── Static Files ──────────────────────────────────────────
-app.use(express.static(__dirname));
+// ── Static Files (no-cache for development) ──────────────
+app.use(express.static(__dirname, {
+  maxAge: 0,
+  etag: false,
+  setHeaders: (res) => res.set('Cache-Control', 'no-cache, no-store, must-revalidate'),
+}));
 
 // Admin dashboard
 app.get('/admin', (req, res) => {
@@ -3367,8 +3390,9 @@ async function checkMissedCheckins() {
               ...family.rows.filter(f => f.phone).map(f => f.phone),
               ...contacts.rows.filter(c => c.phone).map(c => c.phone),
             ];
+            const medEmergSMS = await getMedicalInfoForSMS(elder.id);
             for (const phone of allPhones) {
-              await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.`);
+              await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medEmergSMS}`);
             }
             await callSAMUWithConference(elder, allPhones);
             console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);
@@ -3559,8 +3583,9 @@ async function checkMissedCheckins() {
                 ...family.rows.filter(f => f.phone).map(f => f.phone),
                 ...contacts.rows.filter(c => c.phone).map(c => c.phone),
               ];
+              const medIntSMS = await getMedicalInfoForSMS(elder.id);
               for (const phone of allPhones) {
-                await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.`);
+                await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medIntSMS}`);
               }
               await callSAMUWithConference(elder, allPhones);
               console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);

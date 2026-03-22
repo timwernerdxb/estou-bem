@@ -131,6 +131,23 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:none}
 .quick-call:active{background:var(--bg)}
 .quick-call svg{width:20px;height:20px;fill:var(--danger)}
 
+/* ─── Medical Profile ──────────────────────────────────── */
+.medical-card{border:1px solid var(--border);border-radius:4px;background:var(--card)}
+.medical-card h2{font-size:15px;margin-bottom:8px}
+.form-group{margin-bottom:14px}
+.form-label{display:block;font-size:12px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.form-input{width:100%;padding:10px 0;border:none;border-bottom:1px solid var(--border);font-size:15px;background:transparent;color:var(--text);font-family:var(--sans);outline:none;transition:border-color .2s;box-sizing:border-box}
+.form-input:focus{border-bottom-color:var(--gold)}
+textarea.form-input{resize:vertical;min-height:40px;line-height:1.5}
+select.form-input{cursor:pointer;-webkit-appearance:none;appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239A9189' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right center;padding-right:20px}
+.emergency-card-preview{border-top:1px solid var(--border);padding-top:12px}
+.ecard-row{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.04);gap:12px}
+.ecard-row:last-child{border-bottom:none}
+.ecard-label{font-size:12px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;min-width:90px}
+.ecard-value{font-size:14px;color:var(--text);text-align:right;word-break:break-word}
+.ecard-highlight{font-weight:700;color:var(--primary);font-size:16px}
+.ecard-alert{color:var(--danger);font-weight:600}
+
 /* ─── Medications ──────────────────────────────────────── */
 .med-card{position:relative}
 .med-name{font-family:var(--serif);font-size:18px;font-weight:400}
@@ -414,6 +431,7 @@ const translations = {
     medical_age: 'anos', medical_not_filled: 'Não preenchido',
     medical_personal_info: 'Informações Pessoais', medical_health_info: 'Informações de Saúde',
     medical_plan_info: 'Plano de Saúde', medical_doctor_info: 'Médico Responsável',
+    medical_save_btn: 'Salvar Ficha Médica',
   },
   'en': {
     greeting_morning: 'Good morning', greeting_afternoon: 'Good afternoon', greeting_evening: 'Good evening',
@@ -520,6 +538,7 @@ const translations = {
     medical_age: 'years old', medical_not_filled: 'Not filled',
     medical_personal_info: 'Personal Information', medical_health_info: 'Health Information',
     medical_plan_info: 'Health Plan', medical_doctor_info: 'Primary Doctor',
+    medical_save_btn: 'Save Medical Profile',
   },
   'es': {
     greeting_morning: 'Buenos días', greeting_afternoon: 'Buenas tardes', greeting_evening: 'Buenas noches',
@@ -626,6 +645,7 @@ const translations = {
     medical_age: 'años', medical_not_filled: 'No completado',
     medical_personal_info: 'Información Personal', medical_health_info: 'Información de Salud',
     medical_plan_info: 'Plan de Salud', medical_doctor_info: 'Médico Responsable',
+    medical_save_btn: 'Guardar Ficha Médica',
   },
   'de': {
     greeting_morning: 'Guten Morgen', greeting_afternoon: 'Guten Tag', greeting_evening: 'Guten Abend',
@@ -732,6 +752,7 @@ const translations = {
     medical_age: 'Jahre alt', medical_not_filled: 'Nicht ausgefüllt',
     medical_personal_info: 'Persönliche Daten', medical_health_info: 'Gesundheitsdaten',
     medical_plan_info: 'Krankenversicherung', medical_doctor_info: 'Hausarzt',
+    medical_save_btn: 'Medizinisches Profil speichern',
   },
 };
 
@@ -1081,17 +1102,17 @@ function renderOnboarding() {
 function renderLogin() {
   return `
     <div class="screen active screen-padtop" style="padding-bottom:40px;justify-content:center;position:relative">
-      <div style="position:absolute;top:16px;right:16px;display:flex;gap:6px">
-        <button onclick="setLanguage('pt-BR')" style="padding:4px 8px;border:${currentLang==='pt-BR'?'2px solid var(--gold)':'1px solid var(--border)'};border-radius:6px;background:var(--card);cursor:pointer;font-size:16px;line-height:1;opacity:${currentLang==='pt-BR'?'1':'0.5'}">🇧🇷</button>
-        <button onclick="setLanguage('en')" style="padding:4px 8px;border:${currentLang==='en'?'2px solid var(--gold)':'1px solid var(--border)'};border-radius:6px;background:var(--card);cursor:pointer;font-size:16px;line-height:1;opacity:${currentLang==='en'?'1':'0.5'}">🇬🇧</button>
-        <button onclick="setLanguage('es')" style="padding:4px 8px;border:${currentLang==='es'?'2px solid var(--gold)':'1px solid var(--border)'};border-radius:6px;background:var(--card);cursor:pointer;font-size:16px;line-height:1;opacity:${currentLang==='es'?'1':'0.5'}">🇪🇸</button>
-        <button onclick="setLanguage('de')" style="padding:4px 8px;border:${currentLang==='de'?'2px solid var(--gold)':'1px solid var(--border)'};border-radius:6px;background:var(--card);cursor:pointer;font-size:16px;line-height:1;opacity:${currentLang==='de'?'1':'0.5'}">🇩🇪</button>
-      </div>
       <div style="text-align:center;margin-bottom:32px">
         <div class="onboarding-icon" style="margin:0 auto 24px">${icons.shield}</div>
         <h1>${t('login_welcome')}</h1>
         <div class="gold-divider"></div>
         <p class="subtitle" style="margin-top:8px">${t('login_subtitle')}</p>
+        <div style="display:flex;justify-content:center;gap:8px;margin-top:16px">
+          <button onclick="setLanguage('pt-BR')" style="padding:6px 10px;border:${currentLang==='pt-BR'?'2px solid var(--gold)':'1px solid var(--border)'};border-radius:8px;background:var(--card);cursor:pointer;font-size:18px;line-height:1;opacity:${currentLang==='pt-BR'?'1':'0.4'};transition:all .2s">🇧🇷</button>
+          <button onclick="setLanguage('en')" style="padding:6px 10px;border:${currentLang==='en'?'2px solid var(--gold)':'1px solid var(--border)'};border-radius:8px;background:var(--card);cursor:pointer;font-size:18px;line-height:1;opacity:${currentLang==='en'?'1':'0.4'};transition:all .2s">🇬🇧</button>
+          <button onclick="setLanguage('es')" style="padding:6px 10px;border:${currentLang==='es'?'2px solid var(--gold)':'1px solid var(--border)'};border-radius:8px;background:var(--card);cursor:pointer;font-size:18px;line-height:1;opacity:${currentLang==='es'?'1':'0.4'};transition:all .2s">🇪🇸</button>
+          <button onclick="setLanguage('de')" style="padding:6px 10px;border:${currentLang==='de'?'2px solid var(--gold)':'1px solid var(--border)'};border-radius:8px;background:var(--card);cursor:pointer;font-size:18px;line-height:1;opacity:${currentLang==='de'?'1':'0.4'};transition:all .2s">🇩🇪</button>
+        </div>
       </div>
 
       <div class="input-label">${t('login_email')}</div>
@@ -2014,6 +2035,150 @@ function renderMarketplace() {
     </div>`;
 }
 
+// ─── Medical Profile ──────────────────────────────────────
+function renderMedicalProfile() {
+  const mp = state.medicalProfile || {};
+  const bloodTypes = ['A+','A-','B+','B-','AB+','AB-','O+','O-'];
+  const dob = mp.date_of_birth ? mp.date_of_birth.slice(0,10) : '';
+  const age = dob ? Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
+
+  return `
+    <div class="screen active screen-padtop">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <button data-action="go-back" style="padding:8px;background:none;border:none">${icons.chevron.replace('width','style="width:24px;height:24px;fill:var(--text);transform:rotate(180deg)" width')}</button>
+        <h1 style="margin:0">🏥 ${t('medical_profile')}</h1>
+      </div>
+      <p class="caption" style="margin-bottom:16px">${t('medical_profile_desc')}</p>
+
+      <div class="card medical-card">
+        <h2 style="font-family:var(--serif);color:var(--gold-dark);font-weight:400;margin-bottom:12px">${t('medical_personal_info')}</h2>
+        <div class="form-group">
+          <label class="form-label">${t('medical_full_name')}</label>
+          <input type="text" id="med-full-name" class="form-input" value="${mp.full_name || state.user?.name || ''}" placeholder="${t('medical_full_name')}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('medical_dob')}</label>
+          <input type="date" id="med-dob" class="form-input" value="${dob}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('medical_blood_type')}</label>
+          <select id="med-blood-type" class="form-input">
+            <option value="">--</option>
+            ${bloodTypes.map(bt => `<option value="${bt}" ${mp.blood_type === bt ? 'selected' : ''}>${bt}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('medical_cpf')}</label>
+          <input type="text" id="med-cpf" class="form-input" value="${mp.cpf || ''}" placeholder="000.000.000-00" maxlength="14">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('medical_address')}</label>
+          <textarea id="med-address" class="form-input" rows="2" placeholder="${t('medical_address_placeholder')}">${mp.address || ''}</textarea>
+        </div>
+      </div>
+
+      <div class="card medical-card">
+        <h2 style="font-family:var(--serif);color:var(--gold-dark);font-weight:400;margin-bottom:12px">${t('medical_health_info')}</h2>
+        <div class="form-group">
+          <label class="form-label">${t('medical_allergies')}</label>
+          <textarea id="med-allergies" class="form-input" rows="2" placeholder="${t('medical_allergies_placeholder')}">${mp.allergies || ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('medical_conditions')}</label>
+          <textarea id="med-conditions" class="form-input" rows="2" placeholder="${t('medical_conditions_placeholder')}">${mp.chronic_conditions || ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('medical_medications')}</label>
+          <textarea id="med-medications" class="form-input" rows="2" placeholder="${t('medical_medications_placeholder')}">${mp.current_medications || ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('medical_emergency_notes')}</label>
+          <textarea id="med-emergency-notes" class="form-input" rows="2" placeholder="${t('medical_emergency_notes_placeholder')}">${mp.emergency_notes || ''}</textarea>
+        </div>
+      </div>
+
+      <div class="card medical-card">
+        <h2 style="font-family:var(--serif);color:var(--gold-dark);font-weight:400;margin-bottom:12px">${t('medical_plan_info')}</h2>
+        <div class="form-group">
+          <label class="form-label">${t('medical_health_plan')}</label>
+          <input type="text" id="med-health-plan" class="form-input" value="${mp.health_plan || ''}" placeholder="${t('medical_health_plan')}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('medical_health_plan_number')}</label>
+          <input type="text" id="med-health-plan-number" class="form-input" value="${mp.health_plan_number || ''}" placeholder="${t('medical_health_plan_number')}">
+        </div>
+      </div>
+
+      <div class="card medical-card">
+        <h2 style="font-family:var(--serif);color:var(--gold-dark);font-weight:400;margin-bottom:12px">${t('medical_doctor_info')}</h2>
+        <div class="form-group">
+          <label class="form-label">${t('medical_doctor')}</label>
+          <input type="text" id="med-doctor" class="form-input" value="${mp.primary_doctor || ''}" placeholder="${t('medical_doctor')}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('medical_doctor_phone')}</label>
+          <input type="tel" id="med-doctor-phone" class="form-input" value="${mp.doctor_phone || ''}" placeholder="${t('medical_doctor_phone')}">
+        </div>
+      </div>
+
+      <button class="btn mt-md" data-action="save-medical-profile" style="width:100%">
+        ${icons.checkmark.replace('width','style="width:18px;height:18px;fill:#FFF" width')} ${t('medical_save_btn')}
+      </button>
+
+      <!-- Emergency Card Preview -->
+      <div class="card mt-lg" style="border:2px solid var(--gold);background:linear-gradient(135deg,#FFFDF7 0%,#F5F0EB 100%)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-size:24px">🆘</span>
+          <div>
+            <h2 style="font-family:var(--serif);color:var(--gold-dark);font-weight:400;margin:0">${t('medical_emergency_card')}</h2>
+            <div class="caption">${t('medical_emergency_card_desc')}</div>
+          </div>
+        </div>
+        <div class="emergency-card-preview">
+          <div class="ecard-row"><span class="ecard-label">${t('medical_full_name')}</span><span class="ecard-value">${mp.full_name || state.user?.name || t('medical_not_filled')}</span></div>
+          ${age ? `<div class="ecard-row"><span class="ecard-label">${t('medical_dob')}</span><span class="ecard-value">${age} ${t('medical_age')}</span></div>` : ''}
+          <div class="ecard-row"><span class="ecard-label">${t('medical_blood_type')}</span><span class="ecard-value ${mp.blood_type ? 'ecard-highlight' : ''}">${mp.blood_type || t('medical_not_filled')}</span></div>
+          <div class="ecard-row"><span class="ecard-label">${t('medical_allergies')}</span><span class="ecard-value ${mp.allergies ? 'ecard-alert' : ''}">${mp.allergies || t('medical_not_filled')}</span></div>
+          <div class="ecard-row"><span class="ecard-label">${t('medical_conditions')}</span><span class="ecard-value">${mp.chronic_conditions || t('medical_not_filled')}</span></div>
+          <div class="ecard-row"><span class="ecard-label">${t('medical_medications')}</span><span class="ecard-value">${mp.current_medications || t('medical_not_filled')}</span></div>
+          ${mp.address ? `<div class="ecard-row"><span class="ecard-label">${t('medical_address')}</span><span class="ecard-value">${mp.address}</span></div>` : ''}
+          ${mp.health_plan ? `<div class="ecard-row"><span class="ecard-label">${t('medical_health_plan')}</span><span class="ecard-value">${mp.health_plan} ${mp.health_plan_number ? '('+mp.health_plan_number+')' : ''}</span></div>` : ''}
+          ${mp.primary_doctor ? `<div class="ecard-row"><span class="ecard-label">${t('medical_doctor')}</span><span class="ecard-value">${mp.primary_doctor} ${mp.doctor_phone ? '('+mp.doctor_phone+')' : ''}</span></div>` : ''}
+          ${mp.emergency_notes ? `<div class="ecard-row"><span class="ecard-label">${t('medical_emergency_notes')}</span><span class="ecard-value ecard-alert">${mp.emergency_notes}</span></div>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+// Save medical profile handler
+async function saveMedicalProfile() {
+  if (!state._userId) return;
+  const data = {
+    full_name: $('#med-full-name')?.value?.trim() || null,
+    date_of_birth: $('#med-dob')?.value || null,
+    blood_type: $('#med-blood-type')?.value || null,
+    allergies: $('#med-allergies')?.value?.trim() || null,
+    chronic_conditions: $('#med-conditions')?.value?.trim() || null,
+    current_medications: $('#med-medications')?.value?.trim() || null,
+    emergency_notes: $('#med-emergency-notes')?.value?.trim() || null,
+    cpf: $('#med-cpf')?.value?.trim() || null,
+    health_plan: $('#med-health-plan')?.value?.trim() || null,
+    health_plan_number: $('#med-health-plan-number')?.value?.trim() || null,
+    primary_doctor: $('#med-doctor')?.value?.trim() || null,
+    doctor_phone: $('#med-doctor-phone')?.value?.trim() || null,
+    address: $('#med-address')?.value?.trim() || null,
+  };
+  const res = await api('PUT', `/api/medical-profile/${state._userId}`, data);
+  if (res.ok) {
+    state.medicalProfile = res.data;
+    save();
+    toast(t('medical_saved'));
+    render();
+  } else {
+    toast('Error saving medical profile');
+  }
+}
+
 // ─── Calendar ────────────────────────────────────────────
 function renderCalendar() {
   const sub = getEffectiveSub();
@@ -2271,6 +2436,21 @@ function bindEvents() {
     sosBtn.addEventListener('touchcancel', cancelSOS);
     sosBtn.addEventListener('mouseup', cancelSOS);
     sosBtn.addEventListener('mouseleave', cancelSOS);
+  }
+
+  // Medical profile auto-save on blur
+  if (state.currentTab === 'medical-profile') {
+    let medAutoSaveTimer = null;
+    const medInputs = ['med-full-name','med-dob','med-blood-type','med-allergies','med-conditions','med-medications','med-emergency-notes','med-cpf','med-health-plan','med-health-plan-number','med-doctor','med-doctor-phone','med-address'];
+    for (const id of medInputs) {
+      const el = $(`#${id}`);
+      if (el) {
+        el.addEventListener('change', () => {
+          clearTimeout(medAutoSaveTimer);
+          medAutoSaveTimer = setTimeout(() => saveMedicalProfile(), 800);
+        });
+      }
+    }
   }
 }
 
@@ -2674,6 +2854,9 @@ function handleAction(action, el) {
       state.currentTab = 'escalation';
       render();
       break;
+    case 'save-medical-profile':
+      saveMedicalProfile();
+      break;
     case 'test-escalation': {
       // Create a missed check-in and start escalation for demo
       const missedId = genId();
@@ -2717,11 +2900,24 @@ function startSOS(e) {
       }
       toast('🚨 SOS ATIVADO! Enviando WhatsApp e ligando...');
 
-      // Send WhatsApp SOS to all contacts
+      // Build medical info for SOS message
       const elderName = state.user?.name || 'Idoso';
+      const mp = state.medicalProfile || {};
+      let medicalSOS = '';
+      if (mp.blood_type || mp.allergies || mp.chronic_conditions || mp.current_medications) {
+        const parts = [];
+        if (mp.blood_type) parts.push(`Tipo sanguíneo: ${mp.blood_type}`);
+        if (mp.allergies) parts.push(`Alergias: ${mp.allergies}`);
+        if (mp.chronic_conditions) parts.push(`Condições: ${mp.chronic_conditions}`);
+        if (mp.current_medications) parts.push(`Medicamentos: ${mp.current_medications}`);
+        medicalSOS = '\n\n📋 *FICHA MÉDICA*\n' + parts.join('\n');
+      }
+      const addressSOS = mp.address ? `\n📍 Endereço: ${mp.address}` : '';
+
+      // Send WhatsApp SOS to all contacts
       for (const contact of state.contacts) {
         sendWhatsApp(contact.phone,
-          `🚨🚨 *SOS — EMERGÊNCIA*\n\n${elderName} acionou o botão de emergência no app Estou Bem!\n\n⚠️ AÇÃO IMEDIATA NECESSÁRIA\nPor favor ligue ou vá pessoalmente verificar.\nSAMU: 192\n\n— Estou Bem App`
+          `🚨🚨 *SOS — EMERGÊNCIA*\n\n${elderName} acionou o botão de emergência no app Estou Bem!\n\n⚠️ AÇÃO IMEDIATA NECESSÁRIA\nPor favor ligue ou vá pessoalmente verificar.\nSAMU: 192${medicalSOS}${addressSOS}\n\n— Estou Bem App`
         );
       }
 
