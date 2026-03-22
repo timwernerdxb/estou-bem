@@ -18,7 +18,10 @@
         "NSHealthShareUsageDescription": "Estou Bem usa dados de saúde para monitorar o bem-estar do idoso e alertar familiares.",
         "NSHealthUpdateUsageDescription": "Estou Bem registra check-ins de saúde para acompanhamento familiar.",
         "NSMotionUsageDescription": "Estou Bem detecta movimento para verificar automaticamente se o idoso está ativo.",
-        "UIBackgroundModes": ["remote-notification", "fetch"]
+        "UIBackgroundModes": [
+          "remote-notification",
+          "fetch"
+        ]
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,
@@ -49,7 +52,9 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      ["@bacons/apple-targets"]
+      [
+        "@bacons/apple-targets"
+      ]
     ]
   }
 }

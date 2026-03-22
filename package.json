@@ -4,12 +4,13 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
     "@bacons/apple-targets": "^4.0.6",
+    "@expo/prebuild-config": "^55.0.10",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "^3.0.1",
     "@react-navigation/bottom-tabs": "^7.15.6",
@@ -20,7 +21,6 @@
     "expo-constants": "^55.0.9",
     "expo-device": "^55.0.10",
     "expo-haptics": "^55.0.9",
-    "expo-health-connect": "^0.1.1",
     "expo-linking": "^55.0.8",
     "expo-local-authentication": "^55.0.9",
     "expo-location": "^55.1.4",
@@ -33,10 +33,10 @@
     "react-native-appsflyer": "^6.17.8",
     "react-native-gesture-handler": "^2.30.0",
     "react-native-purchases": "^9.14.0",
+    "react-native-purchases-ui": "^9.14.0",
     "react-native-reanimated": "^4.2.2",
     "react-native-safe-area-context": "^5.7.0",
-    "react-native-screens": "^4.24.0",
-    "react-native-watch-connectivity": "^2.0.0"
+    "react-native-screens": "^4.24.0"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",

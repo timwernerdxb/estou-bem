@@ -21,6 +21,7 @@ import { FamilyDashboardScreen } from "../screens/FamilyDashboardScreen";
 import { EmergencyContactsScreen } from "../screens/EmergencyContactsScreen";
 import { HealthLogScreen } from "../screens/HealthLogScreen";
 import { PaywallScreen } from "../screens/PaywallScreen";
+import { CustomerCenterScreen } from "../screens/CustomerCenterScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { CheckInHistoryScreen } from "../screens/CheckInHistoryScreen";
 
@@ -208,6 +209,11 @@ export function AppNavigator() {
               component={PaywallScreen}
               options={{ presentation: "modal" }}
             />
+            <Stack.Screen
+              name="CustomerCenter"
+              component={CustomerCenterScreen}
+              options={{ presentation: "modal" }}
+            />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen
               name="EmergencyContacts"
@@ -225,6 +231,11 @@ export function AppNavigator() {
             <Stack.Screen
               name="Paywall"
               component={PaywallScreen}
+              options={{ presentation: "modal" }}
+            />
+            <Stack.Screen
+              name="CustomerCenter"
+              component={CustomerCenterScreen}
               options={{ presentation: "modal" }}
             />
             <Stack.Screen name="Settings" component={SettingsScreen} />

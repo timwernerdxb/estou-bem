@@ -1,0 +1,1941 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estou Bem — Cuidado e tranquilidade para quem voce ama</title>
+<meta name="description" content="Check-ins diarios, alertas inteligentes e monitoramento de saude para idosos. Tranquilidade para toda a familia.">
+<meta name="theme-color" content="#2D4A3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Base ──────────────────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #F5F0EB;
+  color: #1A1A1A;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ── Typography ────────────────────────────────────────── */
+h1, h2, h3, h4 { font-family: 'Playfair Display', Georgia, serif; font-weight: 600; line-height: 1.2; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -0.01em; }
+h3 { font-size: clamp(1.2rem, 2.5vw, 1.5rem); }
+p { color: #4A4A4A; font-size: 1.05rem; }
+
+/* ── Utilities ─────────────────────────────────────────── */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 100px 0; }
+.section-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #C9A96E;
+  margin-bottom: 16px;
+}
+.section-title { margin-bottom: 20px; color: #1A1A1A; }
+.section-subtitle { max-width: 600px; font-size: 1.1rem; color: #5A5A5A; line-height: 1.7; }
+.text-center { text-align: center; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+
+/* ── Scroll Animations ─────────────────────────────────── */
+.fade-in {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.fade-in-delay-1 { transition-delay: 0.1s; }
+.fade-in-delay-2 { transition-delay: 0.2s; }
+.fade-in-delay-3 { transition-delay: 0.3s; }
+.fade-in-delay-4 { transition-delay: 0.4s; }
+
+/* ── Buttons ───────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 32px;
+  border-radius: 60px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.btn-primary {
+  background: #2D4A3E;
+  color: #F5F0EB;
+}
+.btn-primary:hover {
+  background: #1e332b;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(45, 74, 62, 0.3);
+}
+.btn-outline {
+  background: transparent;
+  color: #2D4A3E;
+  border: 1.5px solid #2D4A3E;
+}
+.btn-outline:hover {
+  background: #2D4A3E;
+  color: #F5F0EB;
+  transform: translateY(-2px);
+}
+.btn-gold {
+  background: #C9A96E;
+  color: #1A1A1A;
+}
+.btn-gold:hover {
+  background: #b8953d;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(201, 169, 110, 0.35);
+}
+.btn-sm { padding: 12px 24px; font-size: 0.875rem; }
+
+/* ── Header ────────────────────────────────────────────── */
+.header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1000;
+  padding: 16px 0;
+  transition: all 0.35s ease;
+  background: transparent;
+}
+.header.scrolled {
+  background: rgba(245, 240, 235, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 1px 0 rgba(26, 26, 26, 0.06);
+  padding: 12px 0;
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2D4A3E;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-dot {
+  width: 10px; height: 10px;
+  background: #C9A96E;
+  border-radius: 50%;
+  display: inline-block;
+}
+.nav { display: flex; align-items: center; gap: 36px; }
+.nav a {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #1A1A1A;
+  text-decoration: none;
+  transition: color 0.2s;
+  letter-spacing: 0.01em;
+}
+.nav a:hover { color: #2D4A3E; }
+.header-cta { margin-left: 12px; }
+
+/* Burger */
+.burger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  z-index: 1001;
+}
+.burger span {
+  display: block;
+  width: 24px; height: 2px;
+  background: #1A1A1A;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+.burger.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+.burger.open span:nth-child(2) { opacity: 0; }
+.burger.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+.mobile-menu {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(245, 240, 235, 0.98);
+  backdrop-filter: blur(20px);
+  z-index: 999;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+}
+.mobile-menu.open { display: flex; }
+.mobile-menu a {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  color: #1A1A1A;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.mobile-menu a:hover { color: #2D4A3E; }
+
+@media (max-width: 768px) {
+  .nav { display: none; }
+  .header-cta { display: none; }
+  .burger { display: flex; }
+}
+
+/* ── Hero ──────────────────────────────────────────────── */
+.hero {
+  padding: 160px 0 100px;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 700px; height: 700px;
+  background: radial-gradient(circle, rgba(201, 169, 110, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+}
+.hero-content { max-width: 560px; }
+.hero h1 {
+  color: #1A1A1A;
+  margin-bottom: 24px;
+}
+.hero h1 span { color: #2D4A3E; }
+.hero-subtitle {
+  font-size: 1.15rem;
+  color: #5A5A5A;
+  line-height: 1.8;
+  margin-bottom: 40px;
+  max-width: 480px;
+}
+.hero-buttons { display: flex; gap: 16px; flex-wrap: wrap; }
+.hero-trust {
+  margin-top: 48px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  color: #888;
+  font-size: 0.85rem;
+}
+.hero-trust-avatars {
+  display: flex;
+}
+.hero-trust-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: #2D4A3E;
+  border: 2.5px solid #F5F0EB;
+  margin-right: -10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: #F5F0EB;
+  font-weight: 600;
+}
+.hero-trust-avatar:nth-child(2) { background: #C9A96E; color: #1A1A1A; }
+.hero-trust-avatar:nth-child(3) { background: #8B7355; }
+
+/* Phone Mockup */
+.phone-mockup {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.phone-frame {
+  width: 280px;
+  height: 560px;
+  background: #1A1A1A;
+  border-radius: 44px;
+  padding: 12px;
+  box-shadow: 0 40px 80px rgba(26, 26, 26, 0.15), 0 0 0 1px rgba(255,255,255,0.1) inset;
+  position: relative;
+}
+.phone-notch {
+  width: 120px;
+  height: 28px;
+  background: #1A1A1A;
+  border-radius: 0 0 18px 18px;
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+.phone-screen {
+  width: 100%;
+  height: 100%;
+  background: #F5F0EB;
+  border-radius: 34px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.phone-status-bar {
+  padding: 16px 20px 8px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #888;
+}
+.phone-app-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
+.phone-greeting {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.3rem;
+  color: #1A1A1A;
+  margin-bottom: 6px;
+}
+.phone-date {
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 40px;
+}
+.phone-check-btn {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2D4A3E 0%, #3a6153 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 40px rgba(45, 74, 62, 0.35);
+  position: relative;
+  animation: pulse-ring 2.5s infinite;
+}
+.phone-check-btn::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 2px solid rgba(45, 74, 62, 0.15);
+  animation: pulse-ring-outer 2.5s infinite;
+}
+.phone-check-text {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem;
+  color: #F5F0EB;
+  font-weight: 600;
+}
+.phone-check-sub {
+  font-size: 0.65rem;
+  color: rgba(245, 240, 235, 0.7);
+  margin-top: 4px;
+}
+.phone-streak {
+  margin-top: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #C9A96E;
+  font-weight: 600;
+}
+
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 12px 40px rgba(45, 74, 62, 0.35); }
+  50% { box-shadow: 0 12px 60px rgba(45, 74, 62, 0.5); }
+}
+@keyframes pulse-ring-outer {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.08); opacity: 0.2; }
+}
+
+@media (max-width: 768px) {
+  .hero { padding: 120px 0 60px; min-height: auto; }
+  .hero-grid { grid-template-columns: 1fr; gap: 48px; }
+  .phone-mockup { order: -1; }
+  .phone-frame { width: 240px; height: 480px; border-radius: 38px; }
+  .phone-screen { border-radius: 28px; }
+  .hero-content { text-align: center; }
+  .hero-subtitle { margin-left: auto; margin-right: auto; }
+  .hero-buttons { justify-content: center; }
+  .hero-trust { justify-content: center; }
+}
+
+/* ── How It Works ──────────────────────────────────────── */
+.how-it-works { background: #fff; }
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  margin-top: 60px;
+}
+.step-card {
+  text-align: center;
+  padding: 48px 32px;
+  border-radius: 24px;
+  background: #F5F0EB;
+  position: relative;
+  transition: transform 0.3s ease;
+}
+.step-card:hover { transform: translateY(-4px); }
+.step-number {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px; height: 32px;
+  background: #C9A96E;
+  color: #1A1A1A;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+}
+.step-icon {
+  width: 64px; height: 64px;
+  margin: 0 auto 24px;
+  background: #2D4A3E;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.step-icon svg { width: 28px; height: 28px; stroke: #F5F0EB; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.step-card h3 { margin-bottom: 12px; color: #1A1A1A; }
+.step-card p { font-size: 0.95rem; color: #666; line-height: 1.6; }
+.step-connector {
+  display: none;
+}
+@media (min-width: 769px) {
+  .step-connector {
+    display: block;
+    position: absolute;
+    top: 50%;
+    right: -24px;
+    width: 8px; height: 8px;
+    border-top: 2px solid #C9A96E;
+    border-right: 2px solid #C9A96E;
+    transform: rotate(45deg);
+  }
+  .step-card:last-child .step-connector { display: none; }
+}
+@media (max-width: 768px) {
+  .steps-grid { grid-template-columns: 1fr; max-width: 400px; margin-left: auto; margin-right: auto; }
+}
+
+/* ── Features ──────────────────────────────────────────── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin-top: 60px;
+}
+.feature-card {
+  padding: 40px 36px;
+  background: #fff;
+  border-radius: 24px;
+  border: 1px solid rgba(26, 26, 26, 0.06);
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  overflow: hidden;
+}
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 3px;
+  background: linear-gradient(90deg, #2D4A3E, #C9A96E);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(26, 26, 26, 0.06);
+}
+.feature-card:hover::before { opacity: 1; }
+.feature-icon {
+  width: 56px; height: 56px;
+  background: rgba(45, 74, 62, 0.08);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.feature-icon svg { width: 26px; height: 26px; stroke: #2D4A3E; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.feature-card h3 { margin-bottom: 12px; color: #1A1A1A; font-size: 1.3rem; }
+.feature-card p { color: #666; line-height: 1.7; font-size: 0.95rem; }
+.feature-badge {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 4px 12px;
+  background: rgba(201, 169, 110, 0.12);
+  color: #9A7D4A;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+}
+@media (max-width: 768px) {
+  .features-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Family Dashboard ──────────────────────────────────── */
+.family-section { background: #2D4A3E; color: #F5F0EB; }
+.family-section .section-label { color: #C9A96E; }
+.family-section .section-title { color: #F5F0EB; }
+.family-section .section-subtitle { color: rgba(245, 240, 235, 0.7); }
+.family-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+  margin-top: 60px;
+}
+.family-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.stat-card {
+  background: rgba(245, 240, 235, 0.08);
+  border: 1px solid rgba(245, 240, 235, 0.1);
+  border-radius: 20px;
+  padding: 28px 24px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+.stat-card:hover {
+  background: rgba(245, 240, 235, 0.12);
+  transform: translateY(-2px);
+}
+.stat-value {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #F5F0EB;
+  line-height: 1;
+}
+.stat-value.gold { color: #C9A96E; }
+.stat-label {
+  font-size: 0.8rem;
+  color: rgba(245, 240, 235, 0.6);
+  margin-top: 8px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.stat-unit {
+  font-size: 0.85rem;
+  font-weight: 400;
+  opacity: 0.6;
+}
+.family-text h3 {
+  font-size: 1.2rem;
+  color: #F5F0EB;
+  margin-bottom: 16px;
+}
+.family-features-list {
+  list-style: none;
+  margin-top: 24px;
+}
+.family-features-list li {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(245, 240, 235, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.95rem;
+  color: rgba(245, 240, 235, 0.85);
+}
+.family-features-list li:last-child { border: none; }
+.check-icon {
+  width: 20px; height: 20px;
+  background: rgba(201, 169, 110, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.check-icon svg { width: 12px; height: 12px; stroke: #C9A96E; fill: none; stroke-width: 2.5; }
+@media (max-width: 768px) {
+  .family-grid { grid-template-columns: 1fr; gap: 40px; }
+  .family-stats { order: -1; }
+}
+
+/* ── Pricing ───────────────────────────────────────────── */
+.pricing-section { background: #fff; }
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 28px;
+  max-width: 800px;
+  margin: 60px auto 0;
+}
+.pricing-card {
+  background: #F5F0EB;
+  border-radius: 24px;
+  padding: 44px 36px;
+  position: relative;
+  border: 1.5px solid transparent;
+  transition: all 0.35s ease;
+}
+.pricing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(26, 26, 26, 0.08);
+}
+.pricing-card.featured {
+  background: #2D4A3E;
+  color: #F5F0EB;
+  border-color: #C9A96E;
+}
+.pricing-badge {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 20px;
+  background: #C9A96E;
+  color: #1A1A1A;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.pricing-plan {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #C9A96E;
+  margin-bottom: 12px;
+}
+.pricing-card h3 {
+  font-size: 1.4rem;
+  margin-bottom: 8px;
+}
+.pricing-card.featured h3 { color: #F5F0EB; }
+.pricing-amount {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.8rem;
+  font-weight: 700;
+  line-height: 1;
+  margin: 20px 0 4px;
+}
+.pricing-amount .currency { font-size: 1.2rem; vertical-align: super; }
+.pricing-amount .period {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 400;
+  opacity: 0.6;
+}
+.pricing-desc {
+  font-size: 0.9rem;
+  color: #888;
+  margin-bottom: 28px;
+}
+.pricing-card.featured .pricing-desc { color: rgba(245, 240, 235, 0.6); }
+.pricing-features {
+  list-style: none;
+  margin-bottom: 32px;
+}
+.pricing-features li {
+  padding: 8px 0;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #4A4A4A;
+}
+.pricing-card.featured .pricing-features li { color: rgba(245, 240, 235, 0.85); }
+.pricing-features li svg { width: 16px; height: 16px; stroke: #2D4A3E; fill: none; stroke-width: 2.5; flex-shrink: 0; }
+.pricing-card.featured .pricing-features li svg { stroke: #C9A96E; }
+.pricing-card .btn { width: 100%; text-align: center; }
+.pricing-card.featured .btn-primary { background: #C9A96E; color: #1A1A1A; }
+.pricing-card.featured .btn-primary:hover { background: #b8953d; }
+@media (max-width: 768px) {
+  .pricing-grid { grid-template-columns: 1fr; max-width: 400px; }
+}
+
+/* ── Testimonials ──────────────────────────────────────── */
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 60px;
+}
+.testimonial-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 36px 32px;
+  border: 1px solid rgba(26, 26, 26, 0.06);
+  transition: transform 0.3s ease;
+}
+.testimonial-card:hover { transform: translateY(-4px); }
+.testimonial-stars {
+  color: #C9A96E;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+}
+.testimonial-text {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: #4A4A4A;
+  margin-bottom: 24px;
+  font-style: italic;
+}
+.testimonial-author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.testimonial-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: #2D4A3E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #F5F0EB;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.testimonial-avatar.alt { background: #C9A96E; color: #1A1A1A; }
+.testimonial-avatar.alt2 { background: #8B7355; }
+.testimonial-name { font-weight: 600; font-size: 0.9rem; color: #1A1A1A; }
+.testimonial-role { font-size: 0.8rem; color: #888; }
+@media (max-width: 768px) {
+  .testimonials-grid { grid-template-columns: 1fr; max-width: 500px; margin-left: auto; margin-right: auto; }
+}
+
+/* ── FAQ ───────────────────────────────────────────────── */
+.faq-section { background: #fff; }
+.faq-list {
+  max-width: 720px;
+  margin: 60px auto 0;
+}
+.faq-item {
+  border-bottom: 1px solid rgba(26, 26, 26, 0.08);
+}
+.faq-question {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1A1A1A;
+  text-align: left;
+  transition: color 0.2s;
+}
+.faq-question:hover { color: #2D4A3E; }
+.faq-icon {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(45, 74, 62, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+.faq-item.open .faq-icon {
+  background: #2D4A3E;
+  transform: rotate(45deg);
+}
+.faq-icon svg { width: 14px; height: 14px; stroke: #2D4A3E; fill: none; stroke-width: 2.5; }
+.faq-item.open .faq-icon svg { stroke: #F5F0EB; }
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1), padding 0.4s ease;
+}
+.faq-answer-inner {
+  padding: 0 0 24px;
+  font-size: 0.95rem;
+  color: #666;
+  line-height: 1.7;
+}
+.faq-item.open .faq-answer {
+  max-height: 300px;
+}
+
+/* ── Footer CTA ────────────────────────────────────────── */
+.footer-cta {
+  background: linear-gradient(135deg, #2D4A3E 0%, #1e332b 100%);
+  color: #F5F0EB;
+  text-align: center;
+  padding: 100px 0;
+  position: relative;
+  overflow: hidden;
+}
+.footer-cta::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  left: -10%;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(201, 169, 110, 0.1) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.footer-cta h2 { color: #F5F0EB; margin-bottom: 16px; }
+.footer-cta p { color: rgba(245, 240, 235, 0.7); margin-bottom: 40px; font-size: 1.1rem; }
+.footer-cta .section-label { color: #C9A96E; }
+.store-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+.store-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 28px;
+  background: rgba(245, 240, 235, 0.1);
+  border: 1px solid rgba(245, 240, 235, 0.2);
+  border-radius: 14px;
+  color: #F5F0EB;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+.store-btn:hover {
+  background: rgba(245, 240, 235, 0.15);
+  transform: translateY(-2px);
+}
+.store-btn svg { width: 28px; height: 28px; fill: #F5F0EB; }
+.store-btn-text { text-align: left; }
+.store-btn-label { font-size: 0.65rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.05em; }
+.store-btn-name { font-size: 1rem; font-weight: 600; }
+.free-trial-note {
+  margin-top: 24px;
+  font-size: 0.85rem;
+  color: rgba(245, 240, 235, 0.5);
+}
+
+/* ── Footer ────────────────────────────────────────────── */
+.footer {
+  background: #1A1A1A;
+  color: rgba(245, 240, 235, 0.6);
+  padding: 60px 0 40px;
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 48px;
+}
+.footer-brand .logo { color: #F5F0EB; margin-bottom: 16px; }
+.footer-brand p { font-size: 0.9rem; line-height: 1.7; max-width: 300px; }
+.footer-col h4 {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #C9A96E;
+  margin-bottom: 20px;
+}
+.footer-col a {
+  display: block;
+  color: rgba(245, 240, 235, 0.6);
+  text-decoration: none;
+  font-size: 0.9rem;
+  padding: 6px 0;
+  transition: color 0.2s;
+}
+.footer-col a:hover { color: #F5F0EB; }
+.footer-bottom {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(245, 240, 235, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+}
+.footer-social {
+  display: flex;
+  gap: 16px;
+}
+.footer-social a {
+  width: 36px; height: 36px;
+  background: rgba(245, 240, 235, 0.06);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+.footer-social a:hover { background: rgba(245, 240, 235, 0.12); }
+.footer-social svg { width: 16px; height: 16px; fill: rgba(245, 240, 235, 0.6); }
+@media (max-width: 768px) {
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+  .footer-brand { grid-column: 1 / -1; }
+  .footer-bottom { flex-direction: column; gap: 16px; text-align: center; }
+}
+
+/* ── Divider ───────────────────────────────────────────── */
+.divider {
+  width: 48px; height: 2px;
+  background: #C9A96E;
+  margin: 16px 0 0;
+  border-radius: 2px;
+}
+.text-center .divider { margin-left: auto; margin-right: auto; }
+
+/* ── Language Selector ────────────────────────────────── */
+.lang-select {
+  border: 1px solid rgba(26, 26, 26, 0.15);
+  border-radius: 60px;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  background: transparent;
+  color: #1A1A1A;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%231A1A1A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+  transition: border-color 0.2s;
+  margin-left: 8px;
+}
+.lang-select:hover { border-color: #2D4A3E; }
+.lang-select:focus { outline: none; border-color: #2D4A3E; }
+.mobile-menu .lang-select-mobile {
+  border: 1px solid rgba(26, 26, 26, 0.15);
+  border-radius: 60px;
+  padding: 10px 18px;
+  font-size: 1rem;
+  font-family: 'Inter', sans-serif;
+  background: transparent;
+  color: #1A1A1A;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%231A1A1A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────── -->
+<header class="header" id="header">
+  <div class="container header-inner">
+    <a href="#" class="logo">
+      <span class="logo-dot"></span>Estou Bem
+    </a>
+    <nav class="nav">
+      <a href="#como-funciona" data-i18n="nav_how">Como funciona</a>
+      <a href="#recursos" data-i18n="nav_features">Recursos</a>
+      <a href="#precos" data-i18n="nav_pricing">Precos</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a href="#baixar" class="btn btn-primary btn-sm header-cta" data-i18n="nav_download">Baixar App</a>
+    <select class="lang-select" id="langSelect" onchange="setLanguage(this.value)">
+      <option value="pt-BR">PT-BR</option>
+      <option value="en">EN</option>
+      <option value="es">ES</option>
+      <option value="de">DE</option>
+    </select>
+    <button class="burger" id="burger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<!-- Mobile Menu -->
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#como-funciona" onclick="closeMenu()" data-i18n="nav_how">Como funciona</a>
+  <a href="#recursos" onclick="closeMenu()" data-i18n="nav_features">Recursos</a>
+  <a href="#precos" onclick="closeMenu()" data-i18n="nav_pricing">Precos</a>
+  <a href="#faq" onclick="closeMenu()">FAQ</a>
+  <a href="#baixar" class="btn btn-primary" onclick="closeMenu()" data-i18n="nav_download">Baixar App</a>
+  <select class="lang-select-mobile" onchange="setLanguage(this.value)" id="langSelectMobile">
+    <option value="pt-BR">PT-BR</option>
+    <option value="en">EN</option>
+    <option value="es">ES</option>
+    <option value="de">DE</option>
+  </select>
+</div>
+
+<!-- ── Hero ─────────────────────────────────────────────── -->
+<section class="hero" id="hero">
+  <div class="container">
+    <div class="hero-grid">
+      <div class="hero-content fade-in">
+        <p class="section-label" data-i18n="hero_label">Cuidado Inteligente</p>
+        <h1 data-i18n-html="hero_headline">Cuide de quem voce ama, <span>mesmo de longe</span></h1>
+        <p class="hero-subtitle" data-i18n="hero_subtitle">Check-ins diarios, alertas inteligentes e monitoramento de saude para idosos. Tranquilidade para toda a familia.</p>
+        <div class="hero-buttons">
+          <a href="#baixar" class="btn btn-primary" data-i18n="nav_download">
+            Baixar App
+          </a>
+          <a href="#como-funciona" class="btn btn-outline" data-i18n="hero_cta_learn">Conhecer mais</a>
+        </div>
+        <div class="hero-trust">
+          <div class="hero-trust-avatars">
+            <div class="hero-trust-avatar">MR</div>
+            <div class="hero-trust-avatar">CL</div>
+            <div class="hero-trust-avatar">AS</div>
+          </div>
+          <span data-i18n="hero_trust">Mais de 2.000 familias confiam em nos</span>
+        </div>
+      </div>
+      <div class="phone-mockup fade-in fade-in-delay-2">
+        <div class="phone-frame">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="phone-status-bar">
+              <span>9:41</span>
+              <span>100%</span>
+            </div>
+            <div class="phone-app-content">
+              <div class="phone-greeting" data-i18n="phone_greeting">Bom dia, Maria</div>
+              <div class="phone-date" data-i18n="phone_date">Sexta, 21 de marco</div>
+              <div class="phone-check-btn">
+                <div style="text-align:center">
+                  <div class="phone-check-text">Estou<br>Bem</div>
+                </div>
+              </div>
+              <div class="phone-streak">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#C9A96E" stroke="none"><path d="M12 2c.5 3.5 4 6 4 10a6 6 0 01-12 0c0-4 3.5-6.5 4-10 .5 2 2 3.5 4 3.5S11.5 4 12 2z"/></svg>
+                <span data-i18n="phone_streak">12 dias seguidos</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How It Works ─────────────────────────────────────── -->
+<section class="section how-it-works" id="como-funciona">
+  <div class="container text-center">
+    <div class="fade-in">
+      <p class="section-label" data-i18n="how_label">Simples e Seguro</p>
+      <h2 class="section-title" data-i18n="how_title">Como funciona</h2>
+      <p class="section-subtitle mx-auto" data-i18n="how_subtitle">Tres passos simples para a tranquilidade da sua familia.</p>
+      <div class="divider"></div>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card fade-in fade-in-delay-1">
+        <div class="step-number">1</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        </div>
+        <h3 data-i18n="step1_title">O idoso recebe um lembrete</h3>
+        <p data-i18n="step1_desc">Todo dia, no horario escolhido, um alarme gentil lembra de fazer o check-in.</p>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-card fade-in fade-in-delay-2">
+        <div class="step-number">2</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h3 data-i18n="step2_title">Ele toca um botao: Estou Bem</h3>
+        <p data-i18n="step2_desc">Um unico toque confirma que esta tudo bem. Simples, rapido e acessivel.</p>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-card fade-in fade-in-delay-3">
+        <div class="step-number">3</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h3 data-i18n="step3_title">Se nao responder, voce e alertado</h3>
+        <p data-i18n="step3_desc">A familia recebe uma notificacao imediata se o check-in nao for concluido.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Features ─────────────────────────────────────────── -->
+<section class="section" id="recursos">
+  <div class="container">
+    <div class="text-center fade-in">
+      <p class="section-label" data-i18n="feat_label">Recursos</p>
+      <h2 class="section-title" data-i18n="feat_title">Tudo que sua familia precisa</h2>
+      <p class="section-subtitle mx-auto" data-i18n="feat_subtitle">Tecnologia pensada com carinho para quem mais importa.</p>
+      <div class="divider"></div>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card fade-in fade-in-delay-1">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h3 data-i18n="feat1_title">Check-in Simples</h3>
+        <p data-i18n="feat1_desc">Um unico toque por dia. Alarme configuravel, interface com letras grandes e alto contraste para facilitar o uso.</p>
+      </div>
+      <div class="feature-card fade-in fade-in-delay-2">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="7"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="6" x2="12" y2="6.01"/></svg>
+        </div>
+        <h3>Apple Watch</h3>
+        <p data-i18n="feat2_desc">Check-in direto do pulso. Deteccao de movimento e lembretes hapticos para maior comodidade.</p>
+        <span class="feature-badge" data-i18n="feat_badge_new">Novo</span>
+      </div>
+      <div class="feature-card fade-in fade-in-delay-3">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h3 data-i18n="feat3_title">Emergencia SOS</h3>
+        <p data-i18n="feat3_desc">Pressione e segure para ativar o botao de panico. Localizacao GPS enviada automaticamente para a familia.</p>
+      </div>
+      <div class="feature-card fade-in fade-in-delay-4">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+        </div>
+        <h3 data-i18n="feat4_title">Monitoramento de Saude</h3>
+        <p data-i18n="feat4_desc">Acompanhe frequencia cardiaca, medicamentos e diario de saude. Tudo em um so lugar.</p>
+        <span class="feature-badge">Premium</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Family Dashboard ────────────────────────────────── -->
+<section class="section family-section" id="familia">
+  <div class="container">
+    <div class="family-grid">
+      <div class="fade-in">
+        <p class="section-label" data-i18n="family_label">Para Familias</p>
+        <h2 class="section-title" data-i18n="family_title">Painel Familiar</h2>
+        <p class="section-subtitle" data-i18n="family_subtitle">Acompanhe a saude e o bem-estar de quem voce ama em tempo real, de qualquer lugar.</p>
+        <ul class="family-features-list" style="margin-top: 32px;">
+          <li>
+            <span class="check-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span data-i18n="family_feat1">Historico completo de check-ins</span>
+          </li>
+          <li>
+            <span class="check-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span data-i18n="family_feat2">Notificacoes em tempo real</span>
+          </li>
+          <li>
+            <span class="check-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span data-i18n="family_feat3">Dados de saude e atividade</span>
+          </li>
+          <li>
+            <span class="check-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span data-i18n="family_feat4">Multiplos cuidadores por idoso</span>
+          </li>
+          <li>
+            <span class="check-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span data-i18n="family_feat5">Relatorios semanais automaticos</span>
+          </li>
+        </ul>
+      </div>
+      <div class="family-stats fade-in fade-in-delay-2">
+        <div class="stat-card">
+          <div class="stat-value gold">98%</div>
+          <div class="stat-label" data-i18n="stat_adherence">Aderencia</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">72 <span class="stat-unit">bpm</span></div>
+          <div class="stat-label">BPM</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">3.241</div>
+          <div class="stat-label" data-i18n="stat_steps">Passos</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value gold">12</div>
+          <div class="stat-label" data-i18n="stat_streak">Sequencia</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Pricing ──────────────────────────────────────────── -->
+<section class="section pricing-section" id="precos">
+  <div class="container text-center">
+    <div class="fade-in">
+      <p class="section-label" data-i18n="pricing_label">Planos</p>
+      <h2 class="section-title" data-i18n="pricing_title">Escolha o plano ideal</h2>
+      <p class="section-subtitle mx-auto" data-i18n="pricing_subtitle">Comece com 7 dias gratis. Cancele quando quiser.</p>
+      <div class="divider"></div>
+    </div>
+    <div class="pricing-grid">
+      <div class="pricing-card fade-in fade-in-delay-1">
+        <div class="pricing-plan" data-i18n="plan1_name">Familia</div>
+        <h3 data-i18n="plan1_title">Para comecar</h3>
+        <div class="pricing-amount" data-i18n-html="plan1_price"><span class="currency">R$</span>49,90<span class="period">/mes</span></div>
+        <p class="pricing-desc" data-i18n="plan1_desc">Ideal para cuidar de 1 idoso</p>
+        <ul class="pricing-features">
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan1_f1">1 idoso monitorado</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan1_f2">Check-ins diarios com alarme</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan1_f3">Alertas para a familia</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Apple Watch</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="feat3_title">Emergencia SOS</span></li>
+        </ul>
+        <a href="#baixar" class="btn btn-outline" data-i18n="pricing_cta">Comecar gratis</a>
+      </div>
+      <div class="pricing-card featured fade-in fade-in-delay-2">
+        <div class="pricing-badge" data-i18n="plan2_badge">Mais Popular</div>
+        <div class="pricing-plan">Central</div>
+        <h3 data-i18n="plan2_title">Para toda a familia</h3>
+        <div class="pricing-amount" data-i18n-html="plan2_price"><span class="currency">R$</span>89,90<span class="period">/mes</span></div>
+        <p class="pricing-desc" data-i18n="plan2_desc">Ate 5 idosos monitorados</p>
+        <ul class="pricing-features">
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan2_f1">Ate 5 idosos monitorados</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan2_f2">Tudo do plano Familia</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan2_f3">Monitoramento de saude</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan2_f4">Relatorios semanais</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan2_f5">Suporte prioritario</span></li>
+        </ul>
+        <a href="#baixar" class="btn btn-primary" data-i18n="pricing_cta">Comecar gratis</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Testimonials ─────────────────────────────────────── -->
+<section class="section" id="depoimentos">
+  <div class="container">
+    <div class="text-center fade-in">
+      <p class="section-label" data-i18n="test_label">Depoimentos</p>
+      <h2 class="section-title" data-i18n="test_title">Quem usa, recomenda</h2>
+      <p class="section-subtitle mx-auto" data-i18n="test_subtitle">Historias reais de familias que encontraram tranquilidade.</p>
+      <div class="divider"></div>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card fade-in fade-in-delay-1">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <p class="testimonial-text" data-i18n="test1_quote">"Uso todo dia e meus filhos ficam tranquilos. O botao e grande e facil de apertar. Adoro a sequencia de dias!"</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">MR</div>
+          <div>
+            <div class="testimonial-name" data-i18n="test1_name">Maria, 78 anos</div>
+            <div class="testimonial-role" data-i18n="test1_role">Sao Paulo</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card fade-in fade-in-delay-2">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <p class="testimonial-text" data-i18n="test2_quote">"Minha mae mora sozinha e agora eu tenho paz de espirito. Quando ela nao responde, eu sei em minutos."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar alt">CL</div>
+          <div>
+            <div class="testimonial-name" data-i18n="test2_name">Carlos, filho de Dona Ana</div>
+            <div class="testimonial-role" data-i18n="test2_role">Rio de Janeiro</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card fade-in fade-in-delay-3">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <p class="testimonial-text" data-i18n="test3_quote">"Recomendo para todos os meus pacientes. A funcao de monitoramento de saude e excelente para acompanhamento remoto."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar alt2">DS</div>
+          <div>
+            <div class="testimonial-name" data-i18n="test3_name">Dr. Silva, geriatra</div>
+            <div class="testimonial-role" data-i18n="test3_role">Belo Horizonte</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FAQ ──────────────────────────────────────────────── -->
+<section class="section faq-section" id="faq">
+  <div class="container">
+    <div class="text-center fade-in">
+      <p class="section-label" data-i18n="faq_label">Duvidas</p>
+      <h2 class="section-title" data-i18n="faq_title">Perguntas frequentes</h2>
+      <div class="divider"></div>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item fade-in">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          <span data-i18n="faq1_q">Como funciona o check-in?</span>
+          <span class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-inner" data-i18n="faq1_a">Todo dia, no horario configurado, o idoso recebe um alarme no celular ou Apple Watch. Basta tocar no botao "Estou Bem" para confirmar que esta tudo certo. Se nao responder dentro do prazo, os familiares cadastrados recebem uma notificacao imediata.</div>
+        </div>
+      </div>
+      <div class="faq-item fade-in fade-in-delay-1">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          <span data-i18n="faq2_q">Preciso de internet?</span>
+          <span class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-inner" data-i18n="faq2_a">Sim, e necessaria uma conexao com internet (Wi-Fi ou dados moveis) para enviar o check-in e receber alertas. O alarme local toca mesmo sem internet, e o check-in sera enviado assim que a conexao for restabelecida.</div>
+        </div>
+      </div>
+      <div class="faq-item fade-in fade-in-delay-2">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          <span data-i18n="faq3_q">Funciona com Apple Watch?</span>
+          <span class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-inner" data-i18n="faq3_a">Sim! O Estou Bem tem um app completo para Apple Watch. O idoso pode fazer o check-in direto do pulso, receber lembretes hapticos e ate usar a deteccao de movimento para seguranca extra.</div>
+        </div>
+      </div>
+      <div class="faq-item fade-in fade-in-delay-3">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          <span data-i18n="faq4_q">E se o idoso nao responder?</span>
+          <span class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-inner" data-i18n="faq4_a">Se o check-in nao for concluido dentro do tempo configurado, todos os familiares cadastrados recebem uma notificacao push e por e-mail. Voce pode ligar diretamente pelo app ou verificar a ultima localizacao conhecida.</div>
+        </div>
+      </div>
+      <div class="faq-item fade-in fade-in-delay-4">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          <span data-i18n="faq5_q">Como cancelar?</span>
+          <span class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-inner" data-i18n="faq5_a">Voce pode cancelar a qualquer momento diretamente pelo app, sem burocracia. Basta acessar Configuracoes > Assinatura > Cancelar. O acesso continua ate o fim do periodo ja pago.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer CTA ──────────────────────────────────────── -->
+<section class="footer-cta" id="baixar">
+  <div class="container">
+    <div class="fade-in">
+      <p class="section-label" data-i18n="cta_label">Comece Agora</p>
+      <h2 data-i18n="cta_title">Comece gratis hoje</h2>
+      <p data-i18n="cta_subtitle">7 dias gratis, sem compromisso. Cuide de quem voce ama.</p>
+      <a href="#" class="btn btn-gold" data-i18n="cta_download">
+        Baixar Agora
+      </a>
+      <div class="store-buttons">
+        <a href="#" class="store-btn">
+          <svg viewBox="0 0 24 24"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+          <div class="store-btn-text">
+            <div class="store-btn-label" data-i18n="store_apple_label">Baixar na</div>
+            <div class="store-btn-name">App Store</div>
+          </div>
+        </a>
+        <a href="#" class="store-btn">
+          <svg viewBox="0 0 24 24"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.921V2.735a1 1 0 01.609-.921zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.199l2.302 2.302a1 1 0 010 1.38l-2.302 2.302L15.396 13l2.302-2.302v-.19zM5.864 1.658L16.8 7.99l-2.302 2.302L5.864 1.658z"/></svg>
+          <div class="store-btn-text">
+            <div class="store-btn-label" data-i18n="store_google_label">Disponivel no</div>
+            <div class="store-btn-name">Google Play</div>
+          </div>
+        </a>
+      </div>
+      <p class="free-trial-note" data-i18n="cta_note">Sem cartao de credito. Cancele quando quiser.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ──────────────────────────────────────────── -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#" class="logo">
+          <span class="logo-dot"></span>Estou Bem
+        </a>
+        <p data-i18n="footer_desc">Tecnologia e carinho para o cuidado de quem voce ama. Feito no Brasil com amor.</p>
+      </div>
+      <div class="footer-col">
+        <h4 data-i18n="footer_product">Produto</h4>
+        <a href="#como-funciona" data-i18n="nav_how">Como funciona</a>
+        <a href="#recursos" data-i18n="nav_features">Recursos</a>
+        <a href="#precos" data-i18n="nav_pricing">Precos</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <a href="/termos" data-i18n="footer_terms">Termos de Uso</a>
+        <a href="/privacidade" data-i18n="footer_privacy">Privacidade</a>
+        <a href="/contato" data-i18n="footer_contact_link">Contato</a>
+        <a href="/affiliate" data-i18n="footer_affiliates">Afiliados</a>
+      </div>
+      <div class="footer-col">
+        <h4 data-i18n="footer_contact">Contato</h4>
+        <a href="mailto:contato@estoubem.app">contato@estoubem.app</a>
+        <a href="#" data-i18n="footer_support">Suporte</a>
+        <a href="#">Blog</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span data-i18n="footer_copy">&copy; 2026 Estou Bem. Todos os direitos reservados.</span>
+      <div class="footer-social">
+        <a href="#" aria-label="Instagram">
+          <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+        </a>
+        <a href="#" aria-label="Facebook">
+          <svg viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
+        </a>
+        <a href="#" aria-label="LinkedIn">
+          <svg viewBox="0 0 24 24"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- ── Scripts ──────────────────────────────────────────── -->
+<script>
+// ─── i18n ─────────────────────────────────────────────
+const translations = {
+  'pt-BR': {
+    nav_how: 'Como funciona',
+    nav_features: 'Recursos',
+    nav_pricing: 'Precos',
+    nav_download: 'Baixar App',
+    hero_label: 'Cuidado Inteligente',
+    hero_headline: 'Cuide de quem voce ama, <span>mesmo de longe</span>',
+    hero_subtitle: 'Check-ins diarios, alertas inteligentes e monitoramento de saude para idosos. Tranquilidade para toda a familia.',
+    hero_cta_learn: 'Conhecer mais',
+    hero_trust: 'Mais de 2.000 familias confiam em nos',
+    phone_greeting: 'Bom dia, Maria',
+    phone_date: 'Sexta, 21 de marco',
+    phone_streak: '12 dias seguidos',
+    how_label: 'Simples e Seguro',
+    how_title: 'Como funciona',
+    how_subtitle: 'Tres passos simples para a tranquilidade da sua familia.',
+    step1_title: 'O idoso recebe um lembrete',
+    step1_desc: 'Todo dia, no horario escolhido, um alarme gentil lembra de fazer o check-in.',
+    step2_title: 'Ele toca um botao: Estou Bem',
+    step2_desc: 'Um unico toque confirma que esta tudo bem. Simples, rapido e acessivel.',
+    step3_title: 'Se nao responder, voce e alertado',
+    step3_desc: 'A familia recebe uma notificacao imediata se o check-in nao for concluido.',
+    feat_label: 'Recursos',
+    feat_title: 'Tudo que sua familia precisa',
+    feat_subtitle: 'Tecnologia pensada com carinho para quem mais importa.',
+    feat1_title: 'Check-in Simples',
+    feat1_desc: 'Um unico toque por dia. Alarme configuravel, interface com letras grandes e alto contraste para facilitar o uso.',
+    feat2_desc: 'Check-in direto do pulso. Deteccao de movimento e lembretes hapticos para maior comodidade.',
+    feat_badge_new: 'Novo',
+    feat3_title: 'Emergencia SOS',
+    feat3_desc: 'Pressione e segure para ativar o botao de panico. Localizacao GPS enviada automaticamente para a familia.',
+    feat4_title: 'Monitoramento de Saude',
+    feat4_desc: 'Acompanhe frequencia cardiaca, medicamentos e diario de saude. Tudo em um so lugar.',
+    family_label: 'Para Familias',
+    family_title: 'Painel Familiar',
+    family_subtitle: 'Acompanhe a saude e o bem-estar de quem voce ama em tempo real, de qualquer lugar.',
+    family_feat1: 'Historico completo de check-ins',
+    family_feat2: 'Notificacoes em tempo real',
+    family_feat3: 'Dados de saude e atividade',
+    family_feat4: 'Multiplos cuidadores por idoso',
+    family_feat5: 'Relatorios semanais automaticos',
+    stat_adherence: 'Aderencia',
+    stat_steps: 'Passos',
+    stat_streak: 'Sequencia',
+    pricing_label: 'Planos',
+    pricing_title: 'Escolha o plano ideal',
+    pricing_subtitle: 'Comece com 7 dias gratis. Cancele quando quiser.',
+    plan1_name: 'Familia',
+    plan1_title: 'Para comecar',
+    plan1_price: '<span class="currency">R$</span>49,90<span class="period">/mes</span>',
+    plan1_desc: 'Ideal para cuidar de 1 idoso',
+    plan1_f1: '1 idoso monitorado',
+    plan1_f2: 'Check-ins diarios com alarme',
+    plan1_f3: 'Alertas para a familia',
+    plan2_badge: 'Mais Popular',
+    plan2_title: 'Para toda a familia',
+    plan2_price: '<span class="currency">R$</span>89,90<span class="period">/mes</span>',
+    plan2_desc: 'Ate 5 idosos monitorados',
+    plan2_f1: 'Ate 5 idosos monitorados',
+    plan2_f2: 'Tudo do plano Familia',
+    plan2_f3: 'Monitoramento de saude',
+    plan2_f4: 'Relatorios semanais',
+    plan2_f5: 'Suporte prioritario',
+    pricing_cta: 'Comecar gratis',
+    test_label: 'Depoimentos',
+    test_title: 'Quem usa, recomenda',
+    test_subtitle: 'Historias reais de familias que encontraram tranquilidade.',
+    test1_quote: '"Uso todo dia e meus filhos ficam tranquilos. O botao e grande e facil de apertar. Adoro a sequencia de dias!"',
+    test1_name: 'Maria, 78 anos',
+    test1_role: 'Sao Paulo',
+    test2_quote: '"Minha mae mora sozinha e agora eu tenho paz de espirito. Quando ela nao responde, eu sei em minutos."',
+    test2_name: 'Carlos, filho de Dona Ana',
+    test2_role: 'Rio de Janeiro',
+    test3_quote: '"Recomendo para todos os meus pacientes. A funcao de monitoramento de saude e excelente para acompanhamento remoto."',
+    test3_name: 'Dr. Silva, geriatra',
+    test3_role: 'Belo Horizonte',
+    faq_label: 'Duvidas',
+    faq_title: 'Perguntas frequentes',
+    faq1_q: 'Como funciona o check-in?',
+    faq1_a: 'Todo dia, no horario configurado, o idoso recebe um alarme no celular ou Apple Watch. Basta tocar no botao "Estou Bem" para confirmar que esta tudo certo. Se nao responder dentro do prazo, os familiares cadastrados recebem uma notificacao imediata.',
+    faq2_q: 'Preciso de internet?',
+    faq2_a: 'Sim, e necessaria uma conexao com internet (Wi-Fi ou dados moveis) para enviar o check-in e receber alertas. O alarme local toca mesmo sem internet, e o check-in sera enviado assim que a conexao for restabelecida.',
+    faq3_q: 'Funciona com Apple Watch?',
+    faq3_a: 'Sim! O Estou Bem tem um app completo para Apple Watch. O idoso pode fazer o check-in direto do pulso, receber lembretes hapticos e ate usar a deteccao de movimento para seguranca extra.',
+    faq4_q: 'E se o idoso nao responder?',
+    faq4_a: 'Se o check-in nao for concluido dentro do tempo configurado, todos os familiares cadastrados recebem uma notificacao push e por e-mail. Voce pode ligar diretamente pelo app ou verificar a ultima localizacao conhecida.',
+    faq5_q: 'Como cancelar?',
+    faq5_a: 'Voce pode cancelar a qualquer momento diretamente pelo app, sem burocracia. Basta acessar Configuracoes > Assinatura > Cancelar. O acesso continua ate o fim do periodo ja pago.',
+    cta_label: 'Comece Agora',
+    cta_title: 'Comece gratis hoje',
+    cta_subtitle: '7 dias gratis, sem compromisso. Cuide de quem voce ama.',
+    cta_download: 'Baixar Agora',
+    store_apple_label: 'Baixar na',
+    store_google_label: 'Disponivel no',
+    cta_note: 'Sem cartao de credito. Cancele quando quiser.',
+    footer_desc: 'Tecnologia e carinho para o cuidado de quem voce ama. Feito no Brasil com amor.',
+    footer_product: 'Produto',
+    footer_terms: 'Termos de Uso',
+    footer_privacy: 'Privacidade',
+    footer_contact_link: 'Contato',
+    footer_affiliates: 'Afiliados',
+    footer_contact: 'Contato',
+    footer_support: 'Suporte',
+    footer_copy: '\u00a9 2026 Estou Bem. Todos os direitos reservados.',
+  },
+  'en': {
+    nav_how: 'How it works',
+    nav_features: 'Features',
+    nav_pricing: 'Pricing',
+    nav_download: 'Download App',
+    hero_label: 'Smart Care',
+    hero_headline: 'Care for your loved ones, <span>even from afar</span>',
+    hero_subtitle: 'Daily check-ins, smart alerts and health monitoring for seniors. Peace of mind for the whole family.',
+    hero_cta_learn: 'Learn more',
+    hero_trust: 'Over 2,000 families trust us',
+    phone_greeting: 'Good morning, Maria',
+    phone_date: 'Friday, March 21',
+    phone_streak: '12 days in a row',
+    how_label: 'Simple & Safe',
+    how_title: 'How it works',
+    how_subtitle: 'Three simple steps for your family\'s peace of mind.',
+    step1_title: 'The senior gets a reminder',
+    step1_desc: 'Every day, at the chosen time, a gentle alarm reminds them to check in.',
+    step2_title: 'They tap a button: I\'m Fine',
+    step2_desc: 'A single tap confirms everything is okay. Simple, fast and accessible.',
+    step3_title: 'If no response, you get alerted',
+    step3_desc: 'The family receives an immediate notification if the check-in is not completed.',
+    feat_label: 'Features',
+    feat_title: 'Everything your family needs',
+    feat_subtitle: 'Technology designed with care for those who matter most.',
+    feat1_title: 'Simple Check-in',
+    feat1_desc: 'One tap per day. Configurable alarm, large-text interface with high contrast for easy use.',
+    feat2_desc: 'Check in from your wrist. Motion detection and haptic reminders for greater convenience.',
+    feat_badge_new: 'New',
+    feat3_title: 'Emergency SOS',
+    feat3_desc: 'Press and hold to trigger the panic button. GPS location sent automatically to the family.',
+    feat4_title: 'Health Monitoring',
+    feat4_desc: 'Track heart rate, medications and health journal. All in one place.',
+    family_label: 'For Families',
+    family_title: 'Family Dashboard',
+    family_subtitle: 'Monitor the health and well-being of your loved ones in real time, from anywhere.',
+    family_feat1: 'Complete check-in history',
+    family_feat2: 'Real-time notifications',
+    family_feat3: 'Health and activity data',
+    family_feat4: 'Multiple caregivers per senior',
+    family_feat5: 'Automatic weekly reports',
+    stat_adherence: 'Adherence',
+    stat_steps: 'Steps',
+    stat_streak: 'Streak',
+    pricing_label: 'Plans',
+    pricing_title: 'Choose the ideal plan',
+    pricing_subtitle: 'Start with 7 free days. Cancel anytime.',
+    plan1_name: 'Family',
+    plan1_title: 'To get started',
+    plan1_price: '<span class="currency">$</span>9.90<span class="period">/mo</span>',
+    plan1_desc: 'Ideal for caring for 1 senior',
+    plan1_f1: '1 monitored senior',
+    plan1_f2: 'Daily check-ins with alarm',
+    plan1_f3: 'Family alerts',
+    plan2_badge: 'Most Popular',
+    plan2_title: 'For the whole family',
+    plan2_price: '<span class="currency">$</span>17.90<span class="period">/mo</span>',
+    plan2_desc: 'Up to 5 monitored seniors',
+    plan2_f1: 'Up to 5 monitored seniors',
+    plan2_f2: 'Everything in the Family plan',
+    plan2_f3: 'Health monitoring',
+    plan2_f4: 'Weekly reports',
+    plan2_f5: 'Priority support',
+    pricing_cta: 'Start free',
+    test_label: 'Testimonials',
+    test_title: 'Loved by users',
+    test_subtitle: 'Real stories from families who found peace of mind.',
+    test1_quote: '"I use it every day and my children feel at ease. The button is big and easy to press. I love the streak!"',
+    test1_name: 'Maria, 78 years old',
+    test1_role: 'Sao Paulo',
+    test2_quote: '"My mother lives alone and now I have peace of mind. When she doesn\'t respond, I know within minutes."',
+    test2_name: 'Carlos, son of Dona Ana',
+    test2_role: 'Rio de Janeiro',
+    test3_quote: '"I recommend it to all my patients. The health monitoring feature is excellent for remote follow-up."',
+    test3_name: 'Dr. Silva, geriatrician',
+    test3_role: 'Belo Horizonte',
+    faq_label: 'Questions',
+    faq_title: 'Frequently asked questions',
+    faq1_q: 'How does the check-in work?',
+    faq1_a: 'Every day, at the configured time, the senior receives an alarm on their phone or Apple Watch. They simply tap the "I\'m Fine" button to confirm everything is okay. If they don\'t respond within the deadline, registered family members receive an immediate notification.',
+    faq2_q: 'Do I need internet?',
+    faq2_a: 'Yes, an internet connection (Wi-Fi or mobile data) is required to send the check-in and receive alerts. The local alarm still rings without internet, and the check-in will be sent once the connection is restored.',
+    faq3_q: 'Does it work with Apple Watch?',
+    faq3_a: 'Yes! Estou Bem has a full Apple Watch app. Seniors can check in from their wrist, receive haptic reminders and even use motion detection for extra safety.',
+    faq4_q: 'What if the senior doesn\'t respond?',
+    faq4_a: 'If the check-in is not completed within the configured time, all registered family members receive a push notification and email. You can call directly through the app or check the last known location.',
+    faq5_q: 'How do I cancel?',
+    faq5_a: 'You can cancel at any time directly through the app, hassle-free. Just go to Settings > Subscription > Cancel. Access continues until the end of the already paid period.',
+    cta_label: 'Get Started',
+    cta_title: 'Start free today',
+    cta_subtitle: '7 free days, no commitment. Care for your loved ones.',
+    cta_download: 'Download Now',
+    store_apple_label: 'Download on the',
+    store_google_label: 'Available on',
+    cta_note: 'No credit card required. Cancel anytime.',
+    footer_desc: 'Technology and care for looking after your loved ones. Made in Brazil with love.',
+    footer_product: 'Product',
+    footer_terms: 'Terms of Use',
+    footer_privacy: 'Privacy',
+    footer_contact_link: 'Contact',
+    footer_affiliates: 'Affiliates',
+    footer_contact: 'Contact',
+    footer_support: 'Support',
+    footer_copy: '\u00a9 2026 Estou Bem. All rights reserved.',
+  },
+  'es': {
+    nav_how: 'Como funciona',
+    nav_features: 'Recursos',
+    nav_pricing: 'Precios',
+    nav_download: 'Descargar App',
+    hero_label: 'Cuidado Inteligente',
+    hero_headline: 'Cuida de quienes amas, <span>incluso a distancia</span>',
+    hero_subtitle: 'Check-ins diarios, alertas inteligentes y monitoreo de salud para adultos mayores. Tranquilidad para toda la familia.',
+    hero_cta_learn: 'Conocer mas',
+    hero_trust: 'Mas de 2.000 familias confian en nosotros',
+    phone_greeting: 'Buenos dias, Maria',
+    phone_date: 'Viernes, 21 de marzo',
+    phone_streak: '12 dias seguidos',
+    how_label: 'Simple y Seguro',
+    how_title: 'Como funciona',
+    how_subtitle: 'Tres pasos simples para la tranquilidad de tu familia.',
+    step1_title: 'El adulto mayor recibe un recordatorio',
+    step1_desc: 'Cada dia, a la hora elegida, una alarma gentil recuerda hacer el check-in.',
+    step2_title: 'Toca un boton: Estoy Bien',
+    step2_desc: 'Un solo toque confirma que todo esta bien. Simple, rapido y accesible.',
+    step3_title: 'Si no responde, te alertamos',
+    step3_desc: 'La familia recibe una notificacion inmediata si el check-in no se completa.',
+    feat_label: 'Recursos',
+    feat_title: 'Todo lo que tu familia necesita',
+    feat_subtitle: 'Tecnologia pensada con carino para quienes mas importan.',
+    feat1_title: 'Check-in Simple',
+    feat1_desc: 'Un solo toque por dia. Alarma configurable, interfaz con letras grandes y alto contraste para facilitar el uso.',
+    feat2_desc: 'Check-in desde la muneca. Deteccion de movimiento y recordatorios hapticos para mayor comodidad.',
+    feat_badge_new: 'Nuevo',
+    feat3_title: 'Emergencia SOS',
+    feat3_desc: 'Mantene presionado para activar el boton de panico. Ubicacion GPS enviada automaticamente a la familia.',
+    feat4_title: 'Monitoreo de Salud',
+    feat4_desc: 'Seguimiento de frecuencia cardiaca, medicamentos y diario de salud. Todo en un solo lugar.',
+    family_label: 'Para Familias',
+    family_title: 'Panel Familiar',
+    family_subtitle: 'Acompana la salud y el bienestar de quienes amas en tiempo real, desde cualquier lugar.',
+    family_feat1: 'Historial completo de check-ins',
+    family_feat2: 'Notificaciones en tiempo real',
+    family_feat3: 'Datos de salud y actividad',
+    family_feat4: 'Multiples cuidadores por adulto mayor',
+    family_feat5: 'Reportes semanales automaticos',
+    stat_adherence: 'Adherencia',
+    stat_steps: 'Pasos',
+    stat_streak: 'Racha',
+    pricing_label: 'Planes',
+    pricing_title: 'Elige el plan ideal',
+    pricing_subtitle: 'Comienza con 7 dias gratis. Cancela cuando quieras.',
+    plan1_name: 'Familia',
+    plan1_title: 'Para empezar',
+    plan1_price: '<span class="currency">US$</span>9,90<span class="period">/mes</span>',
+    plan1_desc: 'Ideal para cuidar de 1 adulto mayor',
+    plan1_f1: '1 adulto mayor monitoreado',
+    plan1_f2: 'Check-ins diarios con alarma',
+    plan1_f3: 'Alertas para la familia',
+    plan2_badge: 'Mas Popular',
+    plan2_title: 'Para toda la familia',
+    plan2_price: '<span class="currency">US$</span>17,90<span class="period">/mes</span>',
+    plan2_desc: 'Hasta 5 adultos mayores monitoreados',
+    plan2_f1: 'Hasta 5 adultos mayores monitoreados',
+    plan2_f2: 'Todo del plan Familia',
+    plan2_f3: 'Monitoreo de salud',
+    plan2_f4: 'Reportes semanales',
+    plan2_f5: 'Soporte prioritario',
+    pricing_cta: 'Empezar gratis',
+    test_label: 'Testimonios',
+    test_title: 'Quienes lo usan, lo recomiendan',
+    test_subtitle: 'Historias reales de familias que encontraron tranquilidad.',
+    test1_quote: '"Lo uso todos los dias y mis hijos estan tranquilos. El boton es grande y facil de presionar. Me encanta la racha de dias!"',
+    test1_name: 'Maria, 78 anos',
+    test1_role: 'Sao Paulo',
+    test2_quote: '"Mi madre vive sola y ahora tengo paz mental. Cuando ella no responde, lo se en minutos."',
+    test2_name: 'Carlos, hijo de Dona Ana',
+    test2_role: 'Rio de Janeiro',
+    test3_quote: '"Lo recomiendo a todos mis pacientes. La funcion de monitoreo de salud es excelente para el seguimiento remoto."',
+    test3_name: 'Dr. Silva, geriatra',
+    test3_role: 'Belo Horizonte',
+    faq_label: 'Dudas',
+    faq_title: 'Preguntas frecuentes',
+    faq1_q: 'Como funciona el check-in?',
+    faq1_a: 'Cada dia, a la hora configurada, el adulto mayor recibe una alarma en su celular o Apple Watch. Solo debe tocar el boton "Estoy Bien" para confirmar que todo esta bien. Si no responde a tiempo, los familiares registrados reciben una notificacion inmediata.',
+    faq2_q: 'Necesito internet?',
+    faq2_a: 'Si, se necesita conexion a internet (Wi-Fi o datos moviles) para enviar el check-in y recibir alertas. La alarma local suena incluso sin internet, y el check-in se enviara cuando se restablezca la conexion.',
+    faq3_q: 'Funciona con Apple Watch?',
+    faq3_a: 'Si! Estou Bem tiene una app completa para Apple Watch. El adulto mayor puede hacer el check-in desde su muneca, recibir recordatorios hapticos y usar la deteccion de movimiento para mayor seguridad.',
+    faq4_q: 'Que pasa si el adulto mayor no responde?',
+    faq4_a: 'Si el check-in no se completa en el tiempo configurado, todos los familiares registrados reciben una notificacion push y por correo electronico. Puedes llamar directamente desde la app o verificar la ultima ubicacion conocida.',
+    faq5_q: 'Como cancelo?',
+    faq5_a: 'Puedes cancelar en cualquier momento directamente desde la app, sin complicaciones. Solo ve a Configuracion > Suscripcion > Cancelar. El acceso continua hasta el final del periodo ya pagado.',
+    cta_label: 'Empieza Ahora',
+    cta_title: 'Empieza gratis hoy',
+    cta_subtitle: '7 dias gratis, sin compromiso. Cuida de quienes amas.',
+    cta_download: 'Descargar Ahora',
+    store_apple_label: 'Descargar en',
+    store_google_label: 'Disponible en',
+    cta_note: 'Sin tarjeta de credito. Cancela cuando quieras.',
+    footer_desc: 'Tecnologia y carino para el cuidado de quienes amas. Hecho en Brasil con amor.',
+    footer_product: 'Producto',
+    footer_terms: 'Terminos de Uso',
+    footer_privacy: 'Privacidad',
+    footer_contact_link: 'Contacto',
+    footer_affiliates: 'Afiliados',
+    footer_contact: 'Contacto',
+    footer_support: 'Soporte',
+    footer_copy: '\u00a9 2026 Estou Bem. Todos los derechos reservados.',
+  },
+  'de': {
+    nav_how: 'So funktioniert es',
+    nav_features: 'Funktionen',
+    nav_pricing: 'Preise',
+    nav_download: 'App herunterladen',
+    hero_label: 'Intelligente Pflege',
+    hero_headline: 'Sorge fuer deine Liebsten, <span>auch aus der Ferne</span>',
+    hero_subtitle: 'Taegliche Check-ins, intelligente Benachrichtigungen und Gesundheitsmonitoring fuer Senioren. Seelenfrieden fuer die ganze Familie.',
+    hero_cta_learn: 'Mehr erfahren',
+    hero_trust: 'Ueber 2.000 Familien vertrauen uns',
+    phone_greeting: 'Guten Morgen, Maria',
+    phone_date: 'Freitag, 21. Maerz',
+    phone_streak: '12 Tage in Folge',
+    how_label: 'Einfach & Sicher',
+    how_title: 'So funktioniert es',
+    how_subtitle: 'Drei einfache Schritte fuer die Sicherheit Ihrer Familie.',
+    step1_title: 'Der Senior erhaelt eine Erinnerung',
+    step1_desc: 'Jeden Tag, zur gewaehlten Zeit, erinnert ein sanfter Alarm an den Check-in.',
+    step2_title: 'Ein Knopfdruck: Mir geht es gut',
+    step2_desc: 'Ein einziger Tipp bestaetigt, dass alles in Ordnung ist. Einfach, schnell und zugaenglich.',
+    step3_title: 'Keine Antwort? Sie werden benachrichtigt',
+    step3_desc: 'Die Familie erhaelt eine sofortige Benachrichtigung, wenn der Check-in nicht abgeschlossen wird.',
+    feat_label: 'Funktionen',
+    feat_title: 'Alles was Ihre Familie braucht',
+    feat_subtitle: 'Technologie mit Sorgfalt fuer die Menschen entwickelt, die am wichtigsten sind.',
+    feat1_title: 'Einfacher Check-in',
+    feat1_desc: 'Ein Tipp pro Tag. Konfigurierbarer Alarm, grosse Schrift und hoher Kontrast fuer einfache Bedienung.',
+    feat2_desc: 'Check-in vom Handgelenk. Bewegungserkennung und haptische Erinnerungen fuer mehr Komfort.',
+    feat_badge_new: 'Neu',
+    feat3_title: 'Notfall SOS',
+    feat3_desc: 'Gedrueckt halten um den Panikknopf auszuloesen. GPS-Standort wird automatisch an die Familie gesendet.',
+    feat4_title: 'Gesundheitsmonitoring',
+    feat4_desc: 'Herzfrequenz, Medikamente und Gesundheitstagebuch verfolgen. Alles an einem Ort.',
+    family_label: 'Fuer Familien',
+    family_title: 'Familien-Dashboard',
+    family_subtitle: 'Ueberwachen Sie Gesundheit und Wohlbefinden Ihrer Liebsten in Echtzeit, von ueberall.',
+    family_feat1: 'Vollstaendiger Check-in-Verlauf',
+    family_feat2: 'Echtzeit-Benachrichtigungen',
+    family_feat3: 'Gesundheits- und Aktivitaetsdaten',
+    family_feat4: 'Mehrere Betreuer pro Senior',
+    family_feat5: 'Automatische Wochenberichte',
+    stat_adherence: 'Einhaltung',
+    stat_steps: 'Schritte',
+    stat_streak: 'Serie',
+    pricing_label: 'Plaene',
+    pricing_title: 'Waehlen Sie den idealen Plan',
+    pricing_subtitle: 'Starten Sie mit 7 kostenlosen Tagen. Jederzeit kuendbar.',
+    plan1_name: 'Familie',
+    plan1_title: 'Zum Starten',
+    plan1_price: '<span class="currency">\u20ac</span>9,90<span class="period">/Mon.</span>',
+    plan1_desc: 'Ideal fuer die Betreuung von 1 Senior',
+    plan1_f1: '1 ueberwachter Senior',
+    plan1_f2: 'Taegliche Check-ins mit Alarm',
+    plan1_f3: 'Familien-Benachrichtigungen',
+    plan2_badge: 'Beliebteste',
+    plan2_title: 'Fuer die ganze Familie',
+    plan2_price: '<span class="currency">\u20ac</span>17,90<span class="period">/Mon.</span>',
+    plan2_desc: 'Bis zu 5 ueberwachte Senioren',
+    plan2_f1: 'Bis zu 5 ueberwachte Senioren',
+    plan2_f2: 'Alles aus dem Familienplan',
+    plan2_f3: 'Gesundheitsmonitoring',
+    plan2_f4: 'Wochenberichte',
+    plan2_f5: 'Prioritaets-Support',
+    pricing_cta: 'Kostenlos starten',
+    test_label: 'Erfahrungen',
+    test_title: 'Empfohlen von Nutzern',
+    test_subtitle: 'Echte Geschichten von Familien, die Seelenfrieden gefunden haben.',
+    test1_quote: '"Ich nutze es jeden Tag und meine Kinder sind beruhigt. Der Knopf ist gross und leicht zu druecken. Ich liebe die Tages-Serie!"',
+    test1_name: 'Maria, 78 Jahre alt',
+    test1_role: 'Sao Paulo',
+    test2_quote: '"Meine Mutter lebt allein und jetzt habe ich innere Ruhe. Wenn sie nicht antwortet, weiss ich es in Minuten."',
+    test2_name: 'Carlos, Sohn von Dona Ana',
+    test2_role: 'Rio de Janeiro',
+    test3_quote: '"Ich empfehle es allen meinen Patienten. Die Gesundheitsmonitoring-Funktion ist hervorragend fuer die Fernueberwachung."',
+    test3_name: 'Dr. Silva, Geriater',
+    test3_role: 'Belo Horizonte',
+    faq_label: 'Fragen',
+    faq_title: 'Haeufig gestellte Fragen',
+    faq1_q: 'Wie funktioniert der Check-in?',
+    faq1_a: 'Jeden Tag, zur konfigurierten Zeit, erhaelt der Senior einen Alarm auf seinem Handy oder seiner Apple Watch. Er tippt einfach auf "Mir geht es gut", um zu bestaetigen, dass alles in Ordnung ist. Wenn er nicht rechtzeitig antwortet, erhalten die registrierten Familienmitglieder eine sofortige Benachrichtigung.',
+    faq2_q: 'Brauche ich Internet?',
+    faq2_a: 'Ja, eine Internetverbindung (WLAN oder mobile Daten) ist erforderlich, um den Check-in zu senden und Benachrichtigungen zu erhalten. Der lokale Alarm klingelt auch ohne Internet, und der Check-in wird gesendet, sobald die Verbindung wiederhergestellt ist.',
+    faq3_q: 'Funktioniert es mit der Apple Watch?',
+    faq3_a: 'Ja! Estou Bem hat eine vollstaendige Apple Watch App. Senioren koennen den Check-in vom Handgelenk aus machen, haptische Erinnerungen erhalten und sogar die Bewegungserkennung fuer zusaetzliche Sicherheit nutzen.',
+    faq4_q: 'Was passiert, wenn der Senior nicht antwortet?',
+    faq4_a: 'Wenn der Check-in nicht innerhalb der konfigurierten Zeit abgeschlossen wird, erhalten alle registrierten Familienmitglieder eine Push-Benachrichtigung und E-Mail. Sie koennen direkt ueber die App anrufen oder den letzten bekannten Standort ueberpruefen.',
+    faq5_q: 'Wie kuendige ich?',
+    faq5_a: 'Sie koennen jederzeit direkt ueber die App kuendigen, ohne Aufwand. Gehen Sie einfach zu Einstellungen > Abonnement > Kuendigen. Der Zugang besteht bis zum Ende des bereits bezahlten Zeitraums.',
+    cta_label: 'Jetzt starten',
+    cta_title: 'Heute kostenlos starten',
+    cta_subtitle: '7 kostenlose Tage, unverbindlich. Sorgen Sie fuer Ihre Liebsten.',
+    cta_download: 'Jetzt herunterladen',
+    store_apple_label: 'Laden im',
+    store_google_label: 'Verfuegbar bei',
+    cta_note: 'Keine Kreditkarte erforderlich. Jederzeit kuendbar.',
+    footer_desc: 'Technologie und Sorgfalt fuer die Betreuung Ihrer Liebsten. Hergestellt in Brasilien mit Liebe.',
+    footer_product: 'Produkt',
+    footer_terms: 'Nutzungsbedingungen',
+    footer_privacy: 'Datenschutz',
+    footer_contact_link: 'Kontakt',
+    footer_affiliates: 'Partner',
+    footer_contact: 'Kontakt',
+    footer_support: 'Support',
+    footer_copy: '\u00a9 2026 Estou Bem. Alle Rechte vorbehalten.',
+  }
+};
+
+let currentLang = localStorage.getItem('estoubem_lang') || 'pt-BR';
+
+function t(key) {
+  return translations[currentLang]?.[key] || translations['pt-BR'][key] || key;
+}
+
+function applyTranslations() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    el.innerHTML = t(el.dataset.i18nHtml);
+  });
+  // Update html lang attribute
+  const langMap = { 'pt-BR': 'pt-BR', 'en': 'en', 'es': 'es', 'de': 'de' };
+  document.documentElement.lang = langMap[currentLang] || 'pt-BR';
+}
+
+function setLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('estoubem_lang', lang);
+  applyTranslations();
+  // Sync both selects
+  document.getElementById('langSelect').value = lang;
+  const mobileSel = document.getElementById('langSelectMobile');
+  if (mobileSel) mobileSel.value = lang;
+}
+
+// Set initial language on load
+(function initLang() {
+  const sel = document.getElementById('langSelect');
+  const mobileSel = document.getElementById('langSelectMobile');
+  if (sel) sel.value = currentLang;
+  if (mobileSel) mobileSel.value = currentLang;
+  if (currentLang !== 'pt-BR') {
+    applyTranslations();
+  }
+})();
+
+// ─── Sticky header ─────────────────────────────────────
+const header = document.getElementById('header');
+window.addEventListener('scroll', () => {
+  header.classList.toggle('scrolled', window.scrollY > 40);
+}, { passive: true });
+
+// ─── Mobile menu ───────────────────────────────────────
+const burger = document.getElementById('burger');
+const mobileMenu = document.getElementById('mobileMenu');
+burger.addEventListener('click', () => {
+  burger.classList.toggle('open');
+  mobileMenu.classList.toggle('open');
+  document.body.style.overflow = mobileMenu.classList.contains('open') ? 'hidden' : '';
+});
+function closeMenu() {
+  burger.classList.remove('open');
+  mobileMenu.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// ─── Scroll animations with IntersectionObserver ───────
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+// ─── FAQ accordion ─────────────────────────────────────
+function toggleFaq(btn) {
+  const item = btn.parentElement;
+  const wasOpen = item.classList.contains('open');
+  // Close all
+  document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+  // Toggle current
+  if (!wasOpen) item.classList.add('open');
+}
+</script>
+
+</body>
+</html>

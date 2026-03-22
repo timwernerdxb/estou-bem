@@ -42,7 +42,17 @@ class HealthIntegrationService {
   // ─── Android: Health Connect ────────────────────────────────
   private async initAndroidHealthConnect(): Promise<boolean> {
     try {
-      const HC = require("expo-health-connect");
+      // react-native-health-connect is the runtime package.
+      // expo-health-connect is a config plugin only (build-time).
+      let HC: any;
+      try {
+        HC = require("react-native-health-connect");
+      } catch {
+        console.log("[HealthConnect] react-native-health-connect not installed, skipping");
+        this.initialized = true;
+        return true;
+      }
+
       const available = await HC.getSdkStatus();
       if (available !== HC.SdkAvailabilityStatus.SDK_AVAILABLE) {
         console.warn("[HealthConnect] SDK not available, status:", available);

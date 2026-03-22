@@ -143,8 +143,7 @@ class AnalyticsService {
 
     const priceMap: Record<SubscriptionTier, number> = {
       free: 0,
-      familia: 49.9,
-      central: 89.9,
+      pro: 49.9,
     };
 
     this.trackEvent(eventMap[action], {

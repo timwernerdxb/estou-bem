@@ -9,6 +9,7 @@ import {
   Alert,
   TextInput,
   Platform,
+  Share,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,12 +17,14 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { COLORS, FONTS, SPACING, RADIUS, CHECKIN_CONFIG } from "../constants/theme";
 import { useApp, useSubscription } from "../store/AppContext";
+import { useI18n, SUPPORTED_LANGUAGES, SupportedLang } from "../i18n";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { checkInService } from "../services/CheckInService";
 import { autoCheckinService, CheckinMode } from "../services/AutoCheckinService";
 import { healthIntegrationService } from "../services/HealthIntegrationService";
 import { RootStackParamList } from "../types";
+import { affiliateService } from "../services/AffiliateService";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -30,18 +33,26 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export function SettingsScreen() {
   const navigation = useNavigation<Nav>();
   const { state, dispatch } = useApp();
-  const { tier, isFamilia, isCentral } = useSubscription();
+  const { tier, isPro } = useSubscription();
+  const { t, lang, setLang } = useI18n();
   const isElder = state.currentUser?.role === "elder";
 
   const [checkinTimes, setCheckinTimes] = useState(state.checkinTimes);
   const [newTime, setNewTime] = useState("");
   const [autoCheckinMode, setAutoCheckinMode] = useState<CheckinMode>("manual");
   const [healthConnected, setHealthConnected] = useState(false);
+  const [myReferralCode, setMyReferralCode] = useState("");
 
   React.useEffect(() => {
     setAutoCheckinMode(autoCheckinService.getMode());
     setHealthConnected(healthIntegrationService.isInitialized());
   }, []);
+
+  React.useEffect(() => {
+    if (state.currentUser?.id) {
+      setMyReferralCode(affiliateService.generateReferralCode(state.currentUser.id));
+    }
+  }, [state.currentUser?.id]);
 
   const handleAutoCheckinChange = async (mode: CheckinMode) => {
     if (mode === "auto_wearable" && !healthConnected) {
@@ -100,10 +111,10 @@ export function SettingsScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert("Sair", "Deseja sair e apagar seus dados locais?", [
-      { text: "Cancelar", style: "cancel" },
+    Alert.alert(t("confirm_logout"), t("confirm_logout_msg"), [
+      { text: t("cancel"), style: "cancel" },
       {
-        text: "Sair",
+        text: t("confirm_logout"),
         style: "destructive",
         onPress: () => dispatch({ type: "LOGOUT" }),
       },
@@ -113,11 +124,11 @@ export function SettingsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Configuracoes</Text>
+        <Text style={styles.title}>{t("settings_title")}</Text>
 
         {/* Profile */}
         <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Perfil</Text>
+          <Text style={styles.sectionTitle}>{t("settings_profile")}</Text>
           <View style={styles.profileRow}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
@@ -128,19 +139,46 @@ export function SettingsScreen() {
               <Text style={styles.profileName}>{state.currentUser?.name}</Text>
               <Text style={styles.profileRole}>
                 {state.currentUser?.role === "elder"
-                  ? "Idoso"
+                  ? t("role_elder")
                   : state.currentUser?.role === "family"
-                  ? "Familiar"
-                  : "Cuidador"}
+                  ? t("role_family")
+                  : t("role_caregiver")}
               </Text>
             </View>
           </View>
         </Card>
 
+        {/* Language Selector */}
+        <Card style={styles.section}>
+          <Text style={styles.sectionTitle}>{t("settings_language")}</Text>
+          {SUPPORTED_LANGUAGES.map((l) => (
+            <TouchableOpacity
+              key={l.code}
+              style={[
+                styles.langOption,
+                lang === l.code && styles.langOptionActive,
+              ]}
+              onPress={() => setLang(l.code)}
+            >
+              <Text
+                style={[
+                  styles.langLabel,
+                  lang === l.code && { color: COLORS.primary, fontWeight: "600" },
+                ]}
+              >
+                {l.label}
+              </Text>
+              {lang === l.code && (
+                <Ionicons name="checkmark-circle" size={20} color={COLORS.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </Card>
+
         {/* Check-in Schedule */}
         {isElder && (
           <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Horarios de Check-in</Text>
+            <Text style={styles.sectionTitle}>{t("checkin_schedule")}</Text>
             <Text style={styles.sectionSubtitle}>
               Seu plano permite ate {maxCheckins} check-in(s)/dia
             </Text>
@@ -224,13 +262,13 @@ export function SettingsScreen() {
         {/* Health Integration */}
         {isElder && (
           <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Dados de Saude</Text>
+            <Text style={styles.sectionTitle}>{t("settings_health_data")}</Text>
             <TouchableOpacity style={styles.menuRow} onPress={handleConnectHealth}>
               <Ionicons name="heart" size={22} color={healthConnected ? COLORS.primary : COLORS.textLight} />
               <View style={{ flex: 1, marginLeft: SPACING.sm }}>
                 <Text style={styles.menuText}>{healthIntegrationService.getPlatformName()}</Text>
                 <Text style={styles.sectionSubtitle}>
-                  {healthConnected ? "Conectado" : "Toque para conectar"}
+                  {healthConnected ? t("settings_health_connected") : t("settings_health_tap")}
                 </Text>
               </View>
               <Ionicons
@@ -244,16 +282,11 @@ export function SettingsScreen() {
 
         {/* Subscription */}
         <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Assinatura</Text>
+          <Text style={styles.sectionTitle}>{t("settings_subscription")}</Text>
           <View style={styles.subRow}>
             <View>
               <Text style={styles.subTier}>
-                Plano{" "}
-                {tier === "free"
-                  ? "Gratuito"
-                  : tier === "familia"
-                  ? "Familia"
-                  : "Central"}
+                {isPro ? "Estou Bem Pro" : t("settings_plan_free")}
               </Text>
               {state.subscription.expiresAt && (
                 <Text style={styles.subExpiry}>
@@ -266,25 +299,51 @@ export function SettingsScreen() {
             </View>
             <TouchableOpacity
               style={styles.planBtn}
-              onPress={() => navigation.navigate("Paywall")}
+              onPress={() =>
+                navigation.navigate(isPro ? "CustomerCenter" : "Paywall")
+              }
             >
               <Text style={styles.planBtnText}>
-                {tier === "free" ? "UPGRADE" : "GERENCIAR"}
+                {isPro ? t("settings_manage") : t("settings_upgrade")}
               </Text>
+            </TouchableOpacity>
+          </View>
+        </Card>
+
+        {/* Referral */}
+        <Card style={styles.section}>
+          <Text style={styles.sectionTitle}>{t("settings_referral")}</Text>
+          <Text style={styles.sectionSubtitle}>
+            Compartilhe seu codigo e ganhe descontos quando seus amigos assinarem
+          </Text>
+          <View style={styles.referralRow}>
+            <View style={styles.referralCodeBox}>
+              <Text style={styles.referralCode}>{myReferralCode}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.shareBtn}
+              onPress={() => {
+                Share.share({
+                  message: `Cuide de quem voce ama com o Estou Bem! Use meu codigo ${myReferralCode} e ganhe 7 dias gratis: https://estoubem.com/invite?ref=${myReferralCode}`,
+                });
+              }}
+            >
+              <Ionicons name="share-social" size={20} color={COLORS.white} />
+              <Text style={styles.shareBtnText}>COMPARTILHAR</Text>
             </TouchableOpacity>
           </View>
         </Card>
 
         {/* Navigation shortcuts */}
         <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Mais</Text>
+          <Text style={styles.sectionTitle}>{t("settings_more")}</Text>
 
           <TouchableOpacity
             style={styles.menuRow}
             onPress={() => navigation.navigate("EmergencyContacts")}
           >
             <Ionicons name="call" size={22} color={COLORS.primary} />
-            <Text style={styles.menuText}>Contatos de Emergencia</Text>
+            <Text style={styles.menuText}>{t("settings_emergency_contacts")}</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
           </TouchableOpacity>
 
@@ -293,14 +352,14 @@ export function SettingsScreen() {
             onPress={() => navigation.navigate("HealthLog")}
           >
             <Ionicons name="analytics" size={22} color={COLORS.primary} />
-            <Text style={styles.menuText}>Diario de Saude</Text>
+            <Text style={styles.menuText}>{t("health_data_title")}</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
           </TouchableOpacity>
         </Card>
 
         {/* Danger Zone */}
         <Button
-          title="Sair da conta"
+          title={t("settings_logout")}
           onPress={handleLogout}
           variant="danger"
           size="large"
@@ -409,6 +468,63 @@ const styles = StyleSheet.create({
   },
   modeTitle: { ...FONTS.body, fontWeight: "500" },
   modeDesc: { ...FONTS.small, marginTop: 2 },
+  referralRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  referralCodeBox: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: "#C9A96E",
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    alignItems: "center",
+  },
+  referralCode: {
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    fontSize: 20,
+    fontWeight: "600",
+    color: COLORS.primary,
+    letterSpacing: 3,
+  },
+  shareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+  },
+  shareBtnText: {
+    color: COLORS.white,
+    fontWeight: "600",
+    fontSize: 11,
+    letterSpacing: 1,
+  },
+  langOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  langOptionActive: {
+    backgroundColor: COLORS.successLight,
+    borderRadius: RADIUS.md,
+    borderBottomWidth: 0,
+    marginBottom: 1,
+    paddingHorizontal: SPACING.sm,
+  },
+  langLabel: {
+    ...FONTS.body,
+    color: COLORS.textPrimary,
+  },
   version: {
     ...FONTS.small,
     textAlign: "center",

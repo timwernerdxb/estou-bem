@@ -169,6 +169,19 @@ table tbody tr:last-child td { border-bottom: none; }
 .badge-gray { background: #EDF2F7; color: #4A5568; }
 .badge-primary { background: #BEE3F8; color: #2B6CB0; }
 
+/* ─── Affiliate pending row ───────────────────────────── */
+tr.aff-pending { background: #FFFBEB; }
+tr.aff-pending:hover { background: #FEF3C7; }
+tr.aff-inline-edit td { background: #F0F9FF; vertical-align: top; }
+tr.aff-inline-edit input, tr.aff-inline-edit select {
+  padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 13px; width: 100%; min-width: 80px;
+}
+tr.aff-inline-edit input:focus, tr.aff-inline-edit select:focus { border-color: var(--primary); outline: none; }
+.aff-comm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.aff-comm-grid label { font-size: 10px; color: var(--text2); }
+.aff-comm-grid input { width: 100%; }
+
 /* ─── Buttons ──────────────────────────────────────────── */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -433,6 +446,47 @@ table tbody tr:last-child td { border-bottom: none; }
 
       <!-- ═══ AFFILIATES ═══ -->
       <div id="sec-affiliates" class="section">
+        <!-- Default Commission Settings Card -->
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-header">
+            <h3>Comissao Padrao</h3>
+            <button class="btn btn-sm" onclick="saveDefaultCommission()">Salvar Padrao</button>
+          </div>
+          <div class="panel-body padded">
+            <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Taxas aplicadas automaticamente a novos afiliados registrados.</p>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Trial Iniciado (R$)</label>
+                <input type="number" id="defCommTrialStarted" step="0.01" value="5">
+              </div>
+              <div class="form-group">
+                <label>Assinatura Familia (R$)</label>
+                <input type="number" id="defCommSubFamilia" step="0.01" value="15">
+              </div>
+              <div class="form-group">
+                <label>Assinatura Central (R$)</label>
+                <input type="number" id="defCommSubCentral" step="0.01" value="25">
+              </div>
+              <div class="form-group">
+                <label>Recorrente Mensal (%)</label>
+                <input type="number" id="defCommRecurring" step="0.01" value="0.10">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bulk Actions Bar -->
+        <div id="affiliateBulkBar" class="panel" style="margin-bottom:20px;display:none">
+          <div class="panel-body padded" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span id="affiliateSelCount" style="font-weight:700;font-size:14px">0 selecionados</span>
+            <button class="btn btn-sm btn-success" onclick="bulkAffiliateAction('activate')">Ativar</button>
+            <button class="btn btn-sm btn-warning" onclick="bulkAffiliateAction('deactivate')">Desativar</button>
+            <button class="btn btn-sm" onclick="bulkAffiliateAction('apply_defaults')">Aplicar Comissao Padrao</button>
+            <button class="btn btn-sm btn-outline" onclick="clearAffiliateSelection()">Limpar Selecao</button>
+          </div>
+        </div>
+
+        <!-- Affiliates Table -->
         <div class="panel">
           <div class="panel-header">
             <h3>Gerenciamento de Afiliados</h3>
@@ -442,15 +496,19 @@ table tbody tr:last-child td { border-bottom: none; }
             <table>
               <thead>
                 <tr>
-                  <th>Código</th><th>Canal</th><th>Nome</th><th>Email</th><th>Total Ganho</th><th>Conversões</th><th>Status</th><th>Ações</th>
+                  <th style="width:40px"><input type="checkbox" id="affSelectAll" onchange="toggleAllAffiliates(this.checked)"></th>
+                  <th>Codigo</th><th>Canal</th><th>Nome</th><th>Email</th><th>PIX</th><th>Total Ganho</th><th>Conversoes</th><th>Status</th><th>Acoes</th>
                 </tr>
               </thead>
               <tbody id="affiliatesTableBody">
-                <tr><td colspan="8" class="loading">Carregando...</td></tr>
+                <tr><td colspan="10" class="loading">Carregando...</td></tr>
               </tbody>
             </table>
           </div>
         </div>
+
+        <!-- Inline Edit Row (hidden template) -->
+        <div id="affiliateEditRow" style="display:none"></div>
       </div>
 
       <!-- ═══ COMMISSIONS ═══ -->
@@ -679,16 +737,20 @@ table tbody tr:last-child td { border-bottom: none; }
           <input type="text" id="affPhone" placeholder="(11) 99999-0000">
         </div>
         <div class="form-group">
-          <label>Comissão — registro (R$)</label>
-          <input type="number" id="affCommRegister" step="0.01" value="5.00">
+          <label>Comissao — Trial Iniciado (R$)</label>
+          <input type="number" id="affCommTrialStarted" step="0.01" value="5.00">
         </div>
         <div class="form-group">
-          <label>Comissão — assinatura (R$)</label>
-          <input type="number" id="affCommSubscription" step="0.01" value="15.00">
+          <label>Comissao — Assinatura Familia (R$)</label>
+          <input type="number" id="affCommSubFamilia" step="0.01" value="15.00">
         </div>
         <div class="form-group">
-          <label>Comissão — compra (R$)</label>
-          <input type="number" id="affCommPurchase" step="0.01" value="10.00">
+          <label>Comissao — Assinatura Central (R$)</label>
+          <input type="number" id="affCommSubCentral" step="0.01" value="25.00">
+        </div>
+        <div class="form-group">
+          <label>Comissao — Recorrente Mensal (%)</label>
+          <input type="number" id="affCommRecurring" step="0.01" value="0.10">
         </div>
       </div>
     </div>
@@ -1172,42 +1234,212 @@ async function showUserDetail(id) {
 // ═══════════════════════════════════════════════════════════
 //  AFFILIATES
 // ═══════════════════════════════════════════════════════════
+let selectedAffiliateIds = new Set();
+let editingAffiliateId = null;
+
 async function loadAffiliates() {
   const tbody = document.getElementById('affiliatesTableBody');
-  tbody.innerHTML = '<tr><td colspan="8" class="loading">Carregando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10" class="loading">Carregando...</td></tr>';
   try {
     allAffiliates = await apiFetch('/admin/affiliates');
     renderAffiliates();
+    loadDefaultCommission();
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Não foi possível carregar afiliados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state">Nao foi possivel carregar afiliados.</td></tr>';
   }
+}
+
+async function loadDefaultCommission() {
+  try {
+    const settings = await apiFetch('/admin/settings');
+    const rates = settings.default_commission_rates || {};
+    document.getElementById('defCommTrialStarted').value = rates.trial_started ?? 5;
+    document.getElementById('defCommSubFamilia').value = rates.subscription_familia ?? 15;
+    document.getElementById('defCommSubCentral').value = rates.subscription_central ?? 25;
+    document.getElementById('defCommRecurring').value = rates.recurring_monthly ?? 0.10;
+  } catch (e) { /* use defaults from HTML */ }
+}
+
+async function saveDefaultCommission() {
+  const value = {
+    trial_started: parseFloat(document.getElementById('defCommTrialStarted').value) || 0,
+    subscription_familia: parseFloat(document.getElementById('defCommSubFamilia').value) || 0,
+    subscription_central: parseFloat(document.getElementById('defCommSubCentral').value) || 0,
+    recurring_monthly: parseFloat(document.getElementById('defCommRecurring').value) || 0,
+  };
+  try {
+    await apiFetch('/admin/settings', { method: 'PUT', body: { key: 'default_commission_rates', value } });
+    toast('Comissao padrao salva com sucesso', 'success');
+  } catch (e) {
+    toast('Erro ao salvar comissao padrao: ' + e.message, 'error');
+  }
+}
+
+function formatCommRate(cr) {
+  if (!cr || typeof cr !== 'object') return '—';
+  const parts = [];
+  if (cr.trial_started) parts.push('Trial: R$' + cr.trial_started);
+  if (cr.subscription_familia) parts.push('Fam: R$' + cr.subscription_familia);
+  if (cr.subscription_central) parts.push('Cent: R$' + cr.subscription_central);
+  if (cr.recurring_monthly) parts.push('Rec: ' + (cr.recurring_monthly * 100).toFixed(0) + '%');
+  // Legacy keys
+  if (cr.register) parts.push('Reg: R$' + cr.register);
+  if (cr.subscription) parts.push('Assn: R$' + cr.subscription);
+  if (cr.purchase) parts.push('Compra: R$' + cr.purchase);
+  return parts.length ? parts.join(', ') : '—';
 }
 
 function renderAffiliates() {
   const tbody = document.getElementById('affiliatesTableBody');
   if (!allAffiliates.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Nenhum afiliado cadastrado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state">Nenhum afiliado cadastrado.</td></tr>';
     return;
   }
-  tbody.innerHTML = allAffiliates.map(a => `
-    <tr>
+  tbody.innerHTML = allAffiliates.map(a => {
+    const isPending = !a.is_active;
+    const isEditing = editingAffiliateId === a.id;
+    const checked = selectedAffiliateIds.has(a.id) ? 'checked' : '';
+
+    if (isEditing) {
+      const cr = a.commission_rate || {};
+      return `
+      <tr class="aff-inline-edit" data-id="${a.id}">
+        <td><input type="checkbox" ${checked} onchange="toggleAffiliateSelect(${a.id}, this.checked)"></td>
+        <td><strong>${esc(a.code)}</strong></td>
+        <td>
+          <select id="affEditChannel_${a.id}">
+            <option value="influencer" ${a.channel==='influencer'?'selected':''}>Influenciador</option>
+            <option value="paid_media" ${a.channel==='paid_media'?'selected':''}>Midia Paga</option>
+            <option value="ad_network" ${a.channel==='ad_network'?'selected':''}>Rede Anuncios</option>
+            <option value="organic" ${a.channel==='organic'?'selected':''}>Organico</option>
+            <option value="referral" ${a.channel==='referral'?'selected':''}>Indicacao</option>
+            <option value="b2b_partner" ${a.channel==='b2b_partner'?'selected':''}>Parceiro B2B</option>
+          </select>
+        </td>
+        <td><input type="text" id="affEditName_${a.id}" value="${esc(a.name)}"></td>
+        <td><input type="email" id="affEditEmail_${a.id}" value="${esc(a.email || '')}"></td>
+        <td><input type="text" id="affEditPix_${a.id}" value="${esc(a.pix_key || '')}" placeholder="Chave PIX"></td>
+        <td colspan="2">
+          <div class="aff-comm-grid">
+            <div><label>Trial (R$)</label><input type="number" step="0.01" id="affEditCR_ts_${a.id}" value="${cr.trial_started || cr.register || 0}"></div>
+            <div><label>Familia (R$)</label><input type="number" step="0.01" id="affEditCR_sf_${a.id}" value="${cr.subscription_familia || cr.subscription || 0}"></div>
+            <div><label>Central (R$)</label><input type="number" step="0.01" id="affEditCR_sc_${a.id}" value="${cr.subscription_central || cr.purchase || 0}"></div>
+            <div><label>Rec. (%)</label><input type="number" step="0.01" id="affEditCR_rm_${a.id}" value="${cr.recurring_monthly || 0}"></div>
+          </div>
+        </td>
+        <td>
+          <select id="affEditActive_${a.id}">
+            <option value="true" ${a.is_active?'selected':''}>Ativo</option>
+            <option value="false" ${!a.is_active?'selected':''}>Inativo</option>
+          </select>
+        </td>
+        <td>
+          <div class="btn-group">
+            <button class="btn btn-sm btn-success" onclick="saveInlineAffiliate(${a.id})">Salvar</button>
+            <button class="btn btn-sm btn-outline" onclick="cancelInlineEdit()">Cancelar</button>
+          </div>
+        </td>
+      </tr>`;
+    }
+
+    return `
+    <tr class="${isPending ? 'aff-pending' : ''}" data-id="${a.id}">
+      <td><input type="checkbox" ${checked} onchange="toggleAffiliateSelect(${a.id}, this.checked)"></td>
       <td><strong>${esc(a.code)}</strong></td>
       <td>${channelName(a.channel)}</td>
       <td>${esc(a.name)}</td>
       <td>${esc(a.email || '—')}</td>
+      <td style="font-size:12px;max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${esc(a.pix_key || '')}">${esc(a.pix_key || '—')}</td>
       <td>${formatMoney(a.total_earned)}</td>
       <td>${a.total_conversions || 0}</td>
       <td>${activeBadge(a.is_active)}</td>
       <td>
         <div class="btn-group">
+          <button class="btn btn-sm btn-outline" onclick="startInlineEdit(${a.id})" title="Editar">Editar</button>
           <button class="btn btn-sm btn-outline" onclick="viewAffiliateDash('${esc(a.code)}')">Dashboard</button>
           <button class="btn btn-sm ${a.is_active ? 'btn-warning' : 'btn-success'}" onclick="toggleAffiliate(${a.id}, ${!a.is_active})">
             ${a.is_active ? 'Desativar' : 'Ativar'}
           </button>
         </div>
       </td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
+  updateBulkBar();
+}
+
+function startInlineEdit(id) {
+  editingAffiliateId = id;
+  renderAffiliates();
+}
+
+function cancelInlineEdit() {
+  editingAffiliateId = null;
+  renderAffiliates();
+}
+
+async function saveInlineAffiliate(id) {
+  const body = {
+    name: document.getElementById('affEditName_' + id).value.trim(),
+    email: document.getElementById('affEditEmail_' + id).value.trim(),
+    channel: document.getElementById('affEditChannel_' + id).value,
+    is_active: document.getElementById('affEditActive_' + id).value === 'true',
+    pix_key: document.getElementById('affEditPix_' + id).value.trim() || null,
+    commission_rate: {
+      trial_started: parseFloat(document.getElementById('affEditCR_ts_' + id).value) || 0,
+      subscription_familia: parseFloat(document.getElementById('affEditCR_sf_' + id).value) || 0,
+      subscription_central: parseFloat(document.getElementById('affEditCR_sc_' + id).value) || 0,
+      recurring_monthly: parseFloat(document.getElementById('affEditCR_rm_' + id).value) || 0,
+    },
+  };
+  if (!body.name) { toast('Nome e obrigatorio', 'error'); return; }
+  try {
+    await apiFetch(`/admin/affiliates/${id}`, { method: 'PUT', body });
+    toast('Afiliado atualizado', 'success');
+    editingAffiliateId = null;
+    loadAffiliates();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+function toggleAffiliateSelect(id, checked) {
+  if (checked) selectedAffiliateIds.add(id);
+  else selectedAffiliateIds.delete(id);
+  updateBulkBar();
+}
+
+function toggleAllAffiliates(checked) {
+  selectedAffiliateIds.clear();
+  if (checked) allAffiliates.forEach(a => selectedAffiliateIds.add(a.id));
+  renderAffiliates();
+}
+
+function clearAffiliateSelection() {
+  selectedAffiliateIds.clear();
+  document.getElementById('affSelectAll').checked = false;
+  renderAffiliates();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('affiliateBulkBar');
+  const count = selectedAffiliateIds.size;
+  document.getElementById('affiliateSelCount').textContent = count + ' selecionado' + (count !== 1 ? 's' : '');
+  bar.style.display = count > 0 ? 'block' : 'none';
+}
+
+async function bulkAffiliateAction(action) {
+  const ids = Array.from(selectedAffiliateIds);
+  if (!ids.length) { toast('Selecione pelo menos um afiliado', 'error'); return; }
+  try {
+    await apiFetch('/admin/affiliates/bulk', { method: 'POST', body: { ids, action } });
+    const labels = { activate: 'Afiliados ativados', deactivate: 'Afiliados desativados', apply_defaults: 'Comissao padrao aplicada' };
+    toast(labels[action] || 'Acao realizada', 'success');
+    selectedAffiliateIds.clear();
+    document.getElementById('affSelectAll').checked = false;
+    loadAffiliates();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
 }
 
 async function toggleAffiliate(id, active) {
@@ -1279,9 +1511,10 @@ async function saveAffiliate() {
     email: document.getElementById('affEmail').value.trim(),
     phone: document.getElementById('affPhone').value.trim(),
     commission_rate: {
-      register: parseFloat(document.getElementById('affCommRegister').value) || 0,
-      subscription: parseFloat(document.getElementById('affCommSubscription').value) || 0,
-      purchase: parseFloat(document.getElementById('affCommPurchase').value) || 0,
+      trial_started: parseFloat(document.getElementById('affCommTrialStarted').value) || 0,
+      subscription_familia: parseFloat(document.getElementById('affCommSubFamilia').value) || 0,
+      subscription_central: parseFloat(document.getElementById('affCommSubCentral').value) || 0,
+      recurring_monthly: parseFloat(document.getElementById('affCommRecurring').value) || 0,
     },
   };
   if (!body.code || !body.name) {
@@ -1309,9 +1542,10 @@ function clearAffiliateForm() {
   document.getElementById('affName').value = '';
   document.getElementById('affEmail').value = '';
   document.getElementById('affPhone').value = '';
-  document.getElementById('affCommRegister').value = '5.00';
-  document.getElementById('affCommSubscription').value = '15.00';
-  document.getElementById('affCommPurchase').value = '10.00';
+  document.getElementById('affCommTrialStarted').value = '5.00';
+  document.getElementById('affCommSubFamilia').value = '15.00';
+  document.getElementById('affCommSubCentral').value = '25.00';
+  document.getElementById('affCommRecurring').value = '0.10';
   document.getElementById('affiliateModalTitle').textContent = 'Novo Afiliado';
 }
 

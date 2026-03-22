@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estou Bem — Painel do Afiliado</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary:#2D4A3E;--primary-dark:#1E352B;--primary-light:#3B5E4F;
+  --gold:#C9A96E;--gold-light:#F5EFE0;--gold-dark:#A68B4B;
+  --bg:#F5F0EB;--card:#FFFFFF;--border:#E5DDD3;
+  --text:#1A1A1A;--text2:#5C5549;--text3:#9A9189;
+  --success:#2D4A3E;--success-light:#E8F0EC;
+  --warning:#C9A96E;--warning-light:#FAF5EB;
+  --danger:#8B3A3A;--danger-light:#F5E8E8;
+  --serif:'Playfair Display',Georgia,serif;
+  --sans:'Inter',-apple-system,sans-serif;
+  --radius:4px;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--text);}
+button{cursor:pointer;border:none;background:none;font-family:inherit;}
+
+/* Layout */
+.app{max-width:1100px;margin:0 auto;padding:24px 20px;}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid var(--border);}
+.logo{font-family:var(--serif);font-size:24px;color:var(--primary);font-weight:400;}
+.logo span{color:var(--gold);}
+.header-right{display:flex;align-items:center;gap:16px;}
+.code-badge{background:var(--primary);color:var(--gold);padding:6px 16px;border-radius:var(--radius);font-size:13px;letter-spacing:2px;font-weight:600;}
+.logout-btn{font-size:13px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;}
+.logout-btn:hover{color:var(--danger);}
+
+/* Login */
+.login-container{max-width:400px;margin:80px auto;text-align:center;}
+.login-container h1{font-family:var(--serif);font-size:28px;font-weight:400;margin-bottom:8px;}
+.login-container p{color:var(--text3);margin-bottom:32px;font-size:14px;}
+.login-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:32px;}
+.form-group{margin-bottom:20px;text-align:left;}
+.form-group label{display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+.form-group input{width:100%;padding:12px 0;border:none;border-bottom:1px solid var(--border);font-size:16px;background:transparent;color:var(--text);outline:none;transition:border-color .2s;}
+.form-group input:focus{border-bottom-color:var(--gold);}
+.btn{display:block;width:100%;padding:14px;background:var(--primary);color:#F5F0EB;border-radius:var(--radius);font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:500;transition:background .2s;}
+.btn:hover{background:var(--primary-dark);}
+.btn-gold{background:var(--gold);color:var(--text);}
+.btn-gold:hover{background:var(--gold-dark);color:#fff;}
+.error-msg{color:var(--danger);font-size:13px;margin-top:12px;}
+.gold-divider{width:40px;height:2px;background:var(--gold);margin:20px auto;}
+
+/* Stats Grid */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
+@media(max-width:768px){.stats-grid{grid-template-columns:repeat(2,1fr);}}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.stat-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;}
+.stat-value{font-family:var(--serif);font-size:32px;color:var(--primary);font-weight:400;}
+.stat-sub{font-size:12px;color:var(--text3);margin-top:4px;}
+.stat-card.gold .stat-value{color:var(--gold-dark);}
+
+/* Section */
+.section{margin-bottom:32px;}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.section-title{font-family:var(--serif);font-size:20px;font-weight:400;}
+.section-sub{font-size:12px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;}
+
+/* Table */
+.table-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;padding:12px 16px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);background:var(--bg);}
+td{padding:12px 16px;font-size:14px;border-bottom:1px solid var(--border);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(45,74,62,.02);}
+
+/* Badges */
+.badge{display:inline-block;padding:3px 10px;border-radius:2px;font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:600;}
+.badge-success{background:var(--success-light);color:var(--success);}
+.badge-pending{background:var(--warning-light);color:var(--gold-dark);}
+.badge-paid{background:var(--gold-light);color:var(--gold-dark);}
+
+/* Share Link */
+.share-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:32px;}
+.share-box h3{font-family:var(--serif);font-size:16px;font-weight:400;margin-bottom:12px;}
+.link-row{display:flex;gap:8px;}
+.link-input{flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);font-size:14px;background:var(--bg);color:var(--text);font-family:monospace;}
+.copy-btn{padding:10px 20px;background:var(--gold);color:var(--text);border-radius:var(--radius);font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:600;white-space:nowrap;}
+.copy-btn:hover{background:var(--gold-dark);color:#fff;}
+.copied{background:var(--success)!important;color:#fff!important;}
+
+/* Chart placeholder */
+.chart-container{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:32px;min-height:200px;}
+.chart-bars{display:flex;align-items:flex-end;gap:8px;height:160px;padding-top:20px;}
+.chart-bar{flex:1;background:var(--primary);border-radius:2px 2px 0 0;position:relative;min-height:4px;transition:height .5s ease;}
+.chart-bar:hover{background:var(--gold);}
+.chart-bar-label{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);white-space:nowrap;}
+.chart-bar-value{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--text2);font-weight:500;}
+
+/* Period selector */
+.period-tabs{display:flex;gap:4px;}
+.period-tab{padding:6px 14px;border-radius:var(--radius);font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);}
+.period-tab.active{background:var(--primary);color:#fff;}
+.period-tab:hover:not(.active){background:var(--border);}
+
+/* Empty state */
+.empty{text-align:center;padding:40px 20px;color:var(--text3);}
+.empty-icon{font-size:48px;margin-bottom:12px;}
+.empty p{font-size:14px;}
+
+/* Tabs */
+.tab-row{display:flex;gap:0;margin-bottom:24px;}
+.tab-btn{flex:1;padding:12px 0;font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:600;color:var(--text3);border-bottom:2px solid var(--border);transition:all .2s;}
+.tab-btn.active{color:var(--primary);border-bottom-color:var(--gold);}
+.tab-btn:hover:not(.active){color:var(--text2);border-bottom-color:var(--text3);}
+
+/* Select */
+.form-group select{width:100%;padding:12px 0;border:none;border-bottom:1px solid var(--border);font-size:16px;background:transparent;color:var(--text);outline:none;font-family:var(--sans);transition:border-color .2s;-webkit-appearance:none;appearance:none;}
+.form-group select:focus{border-bottom-color:var(--gold);}
+.optional-label{font-size:10px;color:var(--text3);font-style:italic;margin-left:4px;letter-spacing:0;text-transform:none;}
+
+/* Success message */
+.success-msg{background:var(--success-light);color:var(--success);padding:16px;border-radius:var(--radius);font-size:14px;line-height:1.5;margin-top:16px;text-align:center;}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--primary);color:#fff;padding:12px 20px;border-radius:var(--radius);font-size:14px;z-index:1000;transform:translateY(100px);opacity:0;transition:all .3s ease;}
+.toast.show{transform:translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+const API = window.location.origin;
+let affiliateData = null;
+let affiliateToken = null;
+let currentPeriod = '30d';
+let loginTab = 'login';
+
+// ─── i18n ─────────────────────────────────────────────
+const translations = {
+  'pt-BR': {
+    af_title: 'Painel do Afiliado', af_subtitle_login: 'Acesse seu painel para acompanhar seus resultados',
+    af_subtitle_register: 'Cadastre-se como afiliado do Estou Bem',
+    af_tab_login: 'ENTRAR', af_tab_register: 'CADASTRAR',
+    af_email: 'Email', af_password: 'Senha', af_name: 'Nome', af_phone: 'Telefone',
+    af_channel: 'Canal', af_company: 'Empresa', af_website: 'Website', af_social: 'Redes Sociais',
+    af_optional: 'opcional', af_btn_login: 'ACESSAR PAINEL', af_btn_register: 'ENVIAR CADASTRO',
+    af_logout: 'Sair', af_total_earned: 'Total Ganho', af_since_start: 'Desde o inicio',
+    af_conversions: 'Conversoes', af_total_sales: 'Total de vendas',
+    af_pending: 'Pendente', af_awaiting: 'Aguardando pagamento',
+    af_paid: 'Pago', af_total_received: 'Total recebido',
+    af_share_link: 'Seu link de indicacao', af_copy: 'COPIAR', af_copied: 'COPIADO!',
+    af_pix_title: 'Chave PIX para pagamento',
+    af_pix_desc: 'Informe sua chave PIX para receber suas comissoes. Pode ser CPF, email, telefone ou chave aleatoria.',
+    af_pix_save: 'SALVAR', af_pix_saved: 'SALVO!',
+    af_revenue: 'Receita Mensal', af_all: 'Tudo',
+    af_no_commissions: 'Nenhuma comissao ainda. Compartilhe seu link para comecar a ganhar!',
+    af_rates: 'Suas Taxas de Comissao', af_event: 'Evento', af_commission: 'Comissao',
+    af_recent: 'Comissoes Recentes', af_records: 'registro(s)',
+    af_date: 'Data', af_revenue_col: 'Receita', af_status: 'Status',
+    af_no_records: 'Nenhuma comissao registrada ainda. Quando alguem assinar usando seu link, voce vera aqui.',
+    af_loading: 'Carregando...',
+    af_fill_fields: 'Preencha email e senha.', af_invalid_login: 'Email ou senha invalidos.',
+    af_fill_name: 'Preencha nome, email e senha.', af_min_password: 'A senha deve ter pelo menos 6 caracteres.',
+    af_register_success: 'Cadastro recebido! Voce sera notificado quando sua conta for aprovada.',
+    af_register_sent: 'CADASTRO ENVIADO', af_error: 'Erro de conexao. Tente novamente.',
+    af_register_error: 'Erro ao cadastrar. Tente novamente.',
+    af_channel_influencer: 'Influenciador', af_channel_paid: 'Midia Paga',
+    af_channel_ad: 'Rede de Anuncios', af_channel_b2b: 'Parceiro B2B',
+    af_evt_registration: 'Registro', af_evt_trial: 'Inicio de Trial',
+    af_evt_sub_familia: 'Assinatura Familia', af_evt_sub_central: 'Assinatura Central',
+    af_evt_recurring: 'Recorrente Mensal',
+    af_evt_trial_short: 'Trial', af_evt_subscription: 'Assinatura',
+    af_evt_renewal: 'Renovacao', af_evt_cancelled: 'Cancelamento',
+    af_badge_paid: 'Pago', af_badge_pending: 'Pendente',
+    af_pix_enter: 'Informe sua chave PIX', af_pix_success: 'Chave PIX salva com sucesso!',
+    af_pix_error: 'Erro ao salvar. Tente novamente.', af_conn_error: 'Erro de conexao.',
+    lang_label: 'Idioma',
+  },
+  'en': {
+    af_title: 'Affiliate Dashboard', af_subtitle_login: 'Access your dashboard to track your results',
+    af_subtitle_register: 'Register as an Estou Bem affiliate',
+    af_tab_login: 'SIGN IN', af_tab_register: 'REGISTER',
+    af_email: 'Email', af_password: 'Password', af_name: 'Name', af_phone: 'Phone',
+    af_channel: 'Channel', af_company: 'Company', af_website: 'Website', af_social: 'Social Media',
+    af_optional: 'optional', af_btn_login: 'ACCESS DASHBOARD', af_btn_register: 'SUBMIT REGISTRATION',
+    af_logout: 'Logout', af_total_earned: 'Total Earned', af_since_start: 'Since the beginning',
+    af_conversions: 'Conversions', af_total_sales: 'Total sales',
+    af_pending: 'Pending', af_awaiting: 'Awaiting payment',
+    af_paid: 'Paid', af_total_received: 'Total received',
+    af_share_link: 'Your referral link', af_copy: 'COPY', af_copied: 'COPIED!',
+    af_pix_title: 'PIX Key for payouts',
+    af_pix_desc: 'Enter your PIX key to receive your commissions. Can be CPF, email, phone, or random key.',
+    af_pix_save: 'SAVE', af_pix_saved: 'SAVED!',
+    af_revenue: 'Monthly Revenue', af_all: 'All',
+    af_no_commissions: 'No commissions yet. Share your link to start earning!',
+    af_rates: 'Your Commission Rates', af_event: 'Event', af_commission: 'Commission',
+    af_recent: 'Recent Commissions', af_records: 'record(s)',
+    af_date: 'Date', af_revenue_col: 'Revenue', af_status: 'Status',
+    af_no_records: 'No commissions recorded yet. When someone subscribes using your link, you will see it here.',
+    af_loading: 'Loading...',
+    af_fill_fields: 'Please fill in email and password.', af_invalid_login: 'Invalid email or password.',
+    af_fill_name: 'Please fill in name, email, and password.', af_min_password: 'Password must be at least 6 characters.',
+    af_register_success: 'Registration received! You will be notified when your account is approved.',
+    af_register_sent: 'REGISTRATION SENT', af_error: 'Connection error. Try again.',
+    af_register_error: 'Registration error. Try again.',
+    af_channel_influencer: 'Influencer', af_channel_paid: 'Paid Media',
+    af_channel_ad: 'Ad Network', af_channel_b2b: 'B2B Partner',
+    af_evt_registration: 'Registration', af_evt_trial: 'Trial Start',
+    af_evt_sub_familia: 'Family Subscription', af_evt_sub_central: 'Central Subscription',
+    af_evt_recurring: 'Monthly Recurring',
+    af_evt_trial_short: 'Trial', af_evt_subscription: 'Subscription',
+    af_evt_renewal: 'Renewal', af_evt_cancelled: 'Cancellation',
+    af_badge_paid: 'Paid', af_badge_pending: 'Pending',
+    af_pix_enter: 'Enter your PIX key', af_pix_success: 'PIX key saved successfully!',
+    af_pix_error: 'Error saving. Try again.', af_conn_error: 'Connection error.',
+    lang_label: 'Language',
+  },
+  'es': {
+    af_title: 'Panel del Afiliado', af_subtitle_login: 'Accede a tu panel para seguir tus resultados',
+    af_subtitle_register: 'Registrate como afiliado de Estou Bem',
+    af_tab_login: 'INGRESAR', af_tab_register: 'REGISTRAR',
+    af_email: 'Correo', af_password: 'Contrasena', af_name: 'Nombre', af_phone: 'Telefono',
+    af_channel: 'Canal', af_company: 'Empresa', af_website: 'Sitio web', af_social: 'Redes Sociales',
+    af_optional: 'opcional', af_btn_login: 'ACCEDER AL PANEL', af_btn_register: 'ENVIAR REGISTRO',
+    af_logout: 'Salir', af_total_earned: 'Total Ganado', af_since_start: 'Desde el inicio',
+    af_conversions: 'Conversiones', af_total_sales: 'Total de ventas',
+    af_pending: 'Pendiente', af_awaiting: 'Esperando pago',
+    af_paid: 'Pagado', af_total_received: 'Total recibido',
+    af_share_link: 'Tu enlace de referido', af_copy: 'COPIAR', af_copied: 'COPIADO!',
+    af_pix_title: 'Clave PIX para pagos',
+    af_pix_desc: 'Ingresa tu clave PIX para recibir tus comisiones.',
+    af_pix_save: 'GUARDAR', af_pix_saved: 'GUARDADO!',
+    af_revenue: 'Ingresos Mensuales', af_all: 'Todo',
+    af_no_commissions: 'Sin comisiones aun. Comparte tu enlace para empezar a ganar!',
+    af_rates: 'Tus Tasas de Comision', af_event: 'Evento', af_commission: 'Comision',
+    af_recent: 'Comisiones Recientes', af_records: 'registro(s)',
+    af_date: 'Fecha', af_revenue_col: 'Ingreso', af_status: 'Estado',
+    af_no_records: 'Sin comisiones registradas aun. Cuando alguien se suscriba con tu enlace, lo veras aqui.',
+    af_loading: 'Cargando...',
+    af_fill_fields: 'Completa correo y contrasena.', af_invalid_login: 'Correo o contrasena invalidos.',
+    af_fill_name: 'Completa nombre, correo y contrasena.', af_min_password: 'La contrasena debe tener al menos 6 caracteres.',
+    af_register_success: 'Registro recibido! Te notificaremos cuando tu cuenta sea aprobada.',
+    af_register_sent: 'REGISTRO ENVIADO', af_error: 'Error de conexion. Intenta de nuevo.',
+    af_register_error: 'Error al registrar. Intenta de nuevo.',
+    af_channel_influencer: 'Influenciador', af_channel_paid: 'Medios Pagos',
+    af_channel_ad: 'Red de Anuncios', af_channel_b2b: 'Socio B2B',
+    af_evt_registration: 'Registro', af_evt_trial: 'Inicio de Prueba',
+    af_evt_sub_familia: 'Suscripcion Familia', af_evt_sub_central: 'Suscripcion Central',
+    af_evt_recurring: 'Recurrente Mensual',
+    af_evt_trial_short: 'Prueba', af_evt_subscription: 'Suscripcion',
+    af_evt_renewal: 'Renovacion', af_evt_cancelled: 'Cancelacion',
+    af_badge_paid: 'Pagado', af_badge_pending: 'Pendiente',
+    af_pix_enter: 'Ingresa tu clave PIX', af_pix_success: 'Clave PIX guardada!',
+    af_pix_error: 'Error al guardar. Intenta de nuevo.', af_conn_error: 'Error de conexion.',
+    lang_label: 'Idioma',
+  },
+  'de': {
+    af_title: 'Partner-Dashboard', af_subtitle_login: 'Greifen Sie auf Ihr Dashboard zu',
+    af_subtitle_register: 'Registrieren Sie sich als Estou Bem Partner',
+    af_tab_login: 'ANMELDEN', af_tab_register: 'REGISTRIEREN',
+    af_email: 'E-Mail', af_password: 'Passwort', af_name: 'Name', af_phone: 'Telefon',
+    af_channel: 'Kanal', af_company: 'Unternehmen', af_website: 'Webseite', af_social: 'Soziale Medien',
+    af_optional: 'optional', af_btn_login: 'DASHBOARD AUFRUFEN', af_btn_register: 'REGISTRIERUNG SENDEN',
+    af_logout: 'Abmelden', af_total_earned: 'Gesamt verdient', af_since_start: 'Seit Beginn',
+    af_conversions: 'Konversionen', af_total_sales: 'Gesamtverkaeufe',
+    af_pending: 'Ausstehend', af_awaiting: 'Zahlung ausstehend',
+    af_paid: 'Bezahlt', af_total_received: 'Gesamt erhalten',
+    af_share_link: 'Ihr Empfehlungslink', af_copy: 'KOPIEREN', af_copied: 'KOPIERT!',
+    af_pix_title: 'PIX-Schluessel fuer Auszahlungen',
+    af_pix_desc: 'Geben Sie Ihren PIX-Schluessel ein um Ihre Provisionen zu erhalten.',
+    af_pix_save: 'SPEICHERN', af_pix_saved: 'GESPEICHERT!',
+    af_revenue: 'Monatlicher Umsatz', af_all: 'Alle',
+    af_no_commissions: 'Noch keine Provisionen. Teilen Sie Ihren Link um zu verdienen!',
+    af_rates: 'Ihre Provisionssaetze', af_event: 'Ereignis', af_commission: 'Provision',
+    af_recent: 'Letzte Provisionen', af_records: 'Eintrag/Eintraege',
+    af_date: 'Datum', af_revenue_col: 'Umsatz', af_status: 'Status',
+    af_no_records: 'Noch keine Provisionen. Wenn jemand ueber Ihren Link abonniert, sehen Sie es hier.',
+    af_loading: 'Laden...',
+    af_fill_fields: 'Bitte E-Mail und Passwort eingeben.', af_invalid_login: 'Ungueltige E-Mail oder Passwort.',
+    af_fill_name: 'Bitte Name, E-Mail und Passwort eingeben.', af_min_password: 'Passwort muss mind. 6 Zeichen haben.',
+    af_register_success: 'Registrierung erhalten! Sie werden benachrichtigt wenn Ihr Konto genehmigt wird.',
+    af_register_sent: 'REGISTRIERUNG GESENDET', af_error: 'Verbindungsfehler. Erneut versuchen.',
+    af_register_error: 'Registrierungsfehler. Erneut versuchen.',
+    af_channel_influencer: 'Influencer', af_channel_paid: 'Bezahlte Medien',
+    af_channel_ad: 'Werbenetzwerk', af_channel_b2b: 'B2B-Partner',
+    af_evt_registration: 'Registrierung', af_evt_trial: 'Teststart',
+    af_evt_sub_familia: 'Familien-Abo', af_evt_sub_central: 'Zentral-Abo',
+    af_evt_recurring: 'Monatlich wiederkehrend',
+    af_evt_trial_short: 'Test', af_evt_subscription: 'Abonnement',
+    af_evt_renewal: 'Verlaengerung', af_evt_cancelled: 'Kuendigung',
+    af_badge_paid: 'Bezahlt', af_badge_pending: 'Ausstehend',
+    af_pix_enter: 'PIX-Schluessel eingeben', af_pix_success: 'PIX-Schluessel gespeichert!',
+    af_pix_error: 'Fehler beim Speichern.', af_conn_error: 'Verbindungsfehler.',
+    lang_label: 'Sprache',
+  },
+};
+
+let currentLang = localStorage.getItem('estoubem_lang') || 'pt-BR';
+function t(key) {
+  return translations[currentLang]?.[key] || translations['pt-BR'][key] || key;
+}
+function setLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('estoubem_lang', lang);
+  if (affiliateData) renderDashboard(); else renderLogin();
+}
+
+function showToast(msg, dur=3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function formatCurrency(val) {
+  return 'R$ ' + (val || 0).toFixed(2).replace('.', ',');
+}
+
+function formatDate(d) {
+  if (!d) return '-';
+  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+// ── Login Screen ──────────────────────────────────────
+function renderLogin(error = '', tab) {
+  if (tab) loginTab = tab;
+  const isLogin = loginTab === 'login';
+
+  document.getElementById('app').innerHTML = `
+    <div class="login-container">
+      <h1>${t('af_title')}</h1>
+      <p>${isLogin ? t('af_subtitle_login') : t('af_subtitle_register')}</p>
+      <div class="gold-divider"></div>
+      <div class="login-card">
+        <div class="tab-row">
+          <button class="tab-btn ${isLogin ? 'active' : ''}" onclick="renderLogin('', 'login')">${t('af_tab_login')}</button>
+          <button class="tab-btn ${!isLogin ? 'active' : ''}" onclick="renderLogin('', 'register')">${t('af_tab_register')}</button>
+        </div>
+        ${isLogin ? `
+          <div class="form-group">
+            <label>${t('af_email')}</label>
+            <input type="email" id="af-email" placeholder="seu@email.com">
+          </div>
+          <div class="form-group">
+            <label>${t('af_password')}</label>
+            <input type="password" id="af-password" placeholder="Sua senha">
+          </div>
+          <button class="btn" onclick="doLogin()">${t('af_btn_login')}</button>
+        ` : `
+          <div class="form-group">
+            <label>${t('af_name')}</label>
+            <input type="text" id="reg-name" placeholder="Seu nome completo">
+          </div>
+          <div class="form-group">
+            <label>${t('af_email')}</label>
+            <input type="email" id="reg-email" placeholder="seu@email.com">
+          </div>
+          <div class="form-group">
+            <label>${t('af_password')}</label>
+            <input type="password" id="reg-password" placeholder="Minimo 6 caracteres">
+          </div>
+          <div class="form-group">
+            <label>${t('af_phone')}</label>
+            <input type="tel" id="reg-phone" placeholder="+55 11 99999-9999">
+          </div>
+          <div class="form-group">
+            <label>${t('af_channel')}</label>
+            <select id="reg-channel">
+              <option value="influencer">${t('af_channel_influencer')}</option>
+              <option value="paid_media">${t('af_channel_paid')}</option>
+              <option value="ad_network">${t('af_channel_ad')}</option>
+              <option value="b2b_partner">${t('af_channel_b2b')}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>${t('af_company')} <span class="optional-label">${t('af_optional')}</span></label>
+            <input type="text" id="reg-company" placeholder="Nome da empresa">
+          </div>
+          <div class="form-group">
+            <label>${t('af_website')} <span class="optional-label">${t('af_optional')}</span></label>
+            <input type="url" id="reg-website" placeholder="https://seusite.com">
+          </div>
+          <div class="form-group">
+            <label>${t('af_social')} <span class="optional-label">${t('af_optional')}</span></label>
+            <input type="text" id="reg-social" placeholder="@seu_perfil ou link">
+          </div>
+          <button class="btn btn-gold" onclick="doRegister()">${t('af_btn_register')}</button>
+        `}
+        ${error ? `<p class="error-msg">${error}</p>` : ''}
+        <div id="register-success"></div>
+      </div>
+    </div>
+  `;
+
+  if (isLogin) {
+    const input = document.getElementById('af-email');
+    document.getElementById('af-password').addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+    input.focus();
+  } else {
+    document.getElementById('reg-name').focus();
+  }
+}
+
+async function doLogin() {
+  const email = document.getElementById('af-email').value.trim();
+  const password = document.getElementById('af-password').value;
+  if (!email || !password) { renderLogin(t('af_fill_fields')); return; }
+
+  try {
+    const res = await fetch(`${API}/api/affiliates/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      renderLogin(err.error || t('af_invalid_login'));
+      return;
+    }
+    const data = await res.json();
+    affiliateToken = data.token;
+    localStorage.setItem('af_token', data.token);
+    await loadDashboard();
+  } catch (err) {
+    renderLogin(t('af_error'));
+  }
+}
+
+async function doRegister() {
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const phone = document.getElementById('reg-phone').value.trim();
+  const channel = document.getElementById('reg-channel').value;
+  const company = document.getElementById('reg-company').value.trim();
+  const website = document.getElementById('reg-website').value.trim();
+  const social_media = document.getElementById('reg-social').value.trim();
+
+  if (!name || !email || !password) { renderLogin(t('af_fill_name'), 'register'); return; }
+  if (password.length < 6) { renderLogin(t('af_min_password'), 'register'); return; }
+
+  try {
+    const res = await fetch(`${API}/api/affiliates/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, phone, channel, company: company || undefined, website: website || undefined, social_media: social_media || undefined }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      renderLogin(err.error || t('af_register_error'), 'register');
+      return;
+    }
+    // Show success message
+    document.getElementById('register-success').innerHTML = `
+      <div class="success-msg">${t('af_register_success')}</div>
+    `;
+    // Disable submit button
+    const btn = document.querySelector('.btn-gold');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.textContent = t('af_register_sent'); }
+  } catch (err) {
+    renderLogin(t('af_error'), 'register');
+  }
+}
+
+async function loadDashboard() {
+  try {
+    const res = await fetch(`${API}/api/affiliates/me/dashboard`, {
+      headers: { 'Authorization': `Bearer ${affiliateToken}` },
+    });
+    if (!res.ok) { doLogout(); return; }
+    affiliateData = await res.json();
+    renderDashboard();
+  } catch (err) {
+    doLogout();
+  }
+}
+
+// ── Dashboard ─────────────────────────────────────────
+function renderDashboard() {
+  const af = affiliateData.affiliate;
+  const stats = affiliateData.stats;
+  const commissions = affiliateData.commissions || [];
+
+  // Calculate stats
+  const totalEarned = parseFloat(af.total_earned || 0);
+  const totalConversions = parseInt(af.total_conversions || 0);
+  const pendingAmount = commissions.filter(c => c.status === 'pending').reduce((s, c) => s + parseFloat(c.amount || 0), 0);
+  const paidAmount = commissions.filter(c => c.status === 'paid').reduce((s, c) => s + parseFloat(c.amount || 0), 0);
+
+  // Monthly data for chart
+  const monthlyData = getMonthlyData(commissions);
+
+  document.getElementById('app').innerHTML = `
+    <div class="app">
+      <div class="header">
+        <div class="logo">Estou Bem <span>Partner</span></div>
+        <div class="header-right">
+          <select onchange="setLanguage(this.value)" style="border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-size:12px;background:var(--card);color:var(--text);cursor:pointer;font-family:var(--sans)">
+            <option value="pt-BR" ${currentLang==='pt-BR'?'selected':''}>PT-BR</option>
+            <option value="en" ${currentLang==='en'?'selected':''}>EN</option>
+            <option value="es" ${currentLang==='es'?'selected':''}>ES</option>
+            <option value="de" ${currentLang==='de'?'selected':''}>DE</option>
+          </select>
+          <span class="code-badge">${af.code || affiliateData.code}</span>
+          <button class="logout-btn" onclick="doLogout()">${t('af_logout')}</button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card gold">
+          <div class="stat-label">${t('af_total_earned')}</div>
+          <div class="stat-value">${formatCurrency(totalEarned)}</div>
+          <div class="stat-sub">${t('af_since_start')}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">${t('af_conversions')}</div>
+          <div class="stat-value">${totalConversions}</div>
+          <div class="stat-sub">${t('af_total_sales')}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">${t('af_pending')}</div>
+          <div class="stat-value">${formatCurrency(pendingAmount)}</div>
+          <div class="stat-sub">${t('af_awaiting')}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">${t('af_paid')}</div>
+          <div class="stat-value">${formatCurrency(paidAmount)}</div>
+          <div class="stat-sub">${t('af_total_received')}</div>
+        </div>
+      </div>
+
+      <!-- Share Link -->
+      <div class="share-box">
+        <h3>${t('af_share_link')}</h3>
+        <div class="link-row">
+          <input type="text" class="link-input" id="share-link" value="https://estoubem.com/invite?ref=${af.code || affiliateData.code}&channel=${af.channel || 'influencer'}" readonly>
+          <button class="copy-btn" id="copy-btn" onclick="copyLink()">${t('af_copy')}</button>
+        </div>
+      </div>
+
+      <!-- PIX Key for Payouts -->
+      <div class="share-box">
+        <h3>${t('af_pix_title')}</h3>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">${t('af_pix_desc')}</p>
+        <div class="link-row">
+          <input type="text" class="link-input" id="pix-key" value="${af.pix_key || ''}" placeholder="CPF, email, telefone ou chave aleatoria" style="font-family:var(--sans);">
+          <button class="copy-btn btn-gold" id="pix-btn" onclick="savePixKey()">${t('af_pix_save')}</button>
+        </div>
+      </div>
+
+      <!-- Revenue Chart -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">${t('af_revenue')}</span>
+          <div class="period-tabs">
+            <button class="period-tab ${currentPeriod === '7d' ? 'active' : ''}" onclick="setPeriod('7d')">7D</button>
+            <button class="period-tab ${currentPeriod === '30d' ? 'active' : ''}" onclick="setPeriod('30d')">30D</button>
+            <button class="period-tab ${currentPeriod === '90d' ? 'active' : ''}" onclick="setPeriod('90d')">90D</button>
+            <button class="period-tab ${currentPeriod === 'all' ? 'active' : ''}" onclick="setPeriod('all')">${t('af_all')}</button>
+          </div>
+        </div>
+        <div class="chart-container">
+          ${monthlyData.length > 0 ? `
+            <div class="chart-bars">
+              ${monthlyData.map(m => {
+                const maxVal = Math.max(...monthlyData.map(x => x.total), 1);
+                const h = Math.max((m.total / maxVal) * 140, 4);
+                return `<div class="chart-bar" style="height:${h}px;">
+                  <span class="chart-bar-value">${formatCurrency(m.total)}</span>
+                  <span class="chart-bar-label">${m.label}</span>
+                </div>`;
+              }).join('')}
+            </div>
+          ` : `
+            <div class="empty">
+              <div class="empty-icon">📊</div>
+              <p>${t('af_no_commissions')}</p>
+            </div>
+          `}
+        </div>
+      </div>
+
+      <!-- Commission Rates -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">${t('af_rates')}</span>
+          <span class="section-sub">Canal: ${af.channel || 'influencer'}</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>${t('af_event')}</th><th>${t('af_commission')}</th></tr></thead>
+            <tbody>
+              ${renderCommissionRates(af.commission_rate || af.channel)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recent Commissions -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">${t('af_recent')}</span>
+          <span class="section-sub">${commissions.length} ${t('af_records')}</span>
+        </div>
+        ${commissions.length > 0 ? `
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>${t('af_date')}</th><th>${t('af_event')}</th><th>${t('af_revenue_col')}</th><th>${t('af_commission')}</th><th>${t('af_status')}</th></tr></thead>
+              <tbody>
+                ${commissions.slice(0, 50).map(c => `
+                  <tr>
+                    <td>${formatDate(c.created_at)}</td>
+                    <td>${translateEvent(c.event || '-')}</td>
+                    <td>${formatCurrency(c.conversion_revenue)}</td>
+                    <td><strong>${formatCurrency(c.amount)}</strong></td>
+                    <td><span class="badge ${c.status === 'paid' ? 'badge-paid' : c.status === 'pending' ? 'badge-pending' : 'badge-success'}">${c.status === 'paid' ? t('af_badge_paid') : c.status === 'pending' ? t('af_badge_pending') : c.status}</span></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : `
+          <div class="table-wrap">
+            <div class="empty">
+              <div class="empty-icon">💰</div>
+              <p>${t('af_no_records')}</p>
+            </div>
+          </div>
+        `}
+      </div>
+
+      <div style="text-align:center;padding:32px 0;color:var(--text3);font-size:12px;">
+        Estou Bem Partner Program &bull; Duvidas? <a href="mailto:parceiros@estoubem.com" style="color:var(--gold);">parceiros@estoubem.com</a>
+      </div>
+    </div>
+  `;
+}
+
+function renderCommissionRates(ratesOrChannel) {
+  const defaultRates = {
+    influencer: { trial_started: 5, subscription_familia: 15, subscription_central: 25, recurring_monthly: '10%' },
+    paid_media: { trial_started: 3, subscription_familia: 10, subscription_central: 18, recurring_monthly: '5%' },
+    ad_network: { registration: 2, trial_started: 4, subscription_familia: 12, subscription_central: 20, recurring_monthly: '8%' },
+    referral: { subscription_familia: 10, subscription_central: 15, recurring_monthly: '5%' },
+    b2b_partner: { subscription_familia: 20, subscription_central: 35, recurring_monthly: '15%' },
+  };
+
+  let rates = typeof ratesOrChannel === 'object' ? ratesOrChannel : (defaultRates[ratesOrChannel] || defaultRates.influencer);
+
+  const labels = {
+    registration: t('af_evt_registration'),
+    trial_started: t('af_evt_trial'),
+    subscription_familia: t('af_evt_sub_familia'),
+    subscription_central: t('af_evt_sub_central'),
+    recurring_monthly: t('af_evt_recurring'),
+  };
+
+  return Object.entries(rates).map(([k, v]) => {
+    const label = labels[k] || k;
+    const value = typeof v === 'string' ? v : (v >= 1 ? formatCurrency(v) : `${(v * 100).toFixed(0)}%`);
+    return `<tr><td>${label}</td><td><strong>${value}</strong></td></tr>`;
+  }).join('');
+}
+
+function translateEvent(event) {
+  const map = {
+    registration: t('af_evt_registration'),
+    trial_started: t('af_evt_trial_short'),
+    subscription_started: t('af_evt_subscription'),
+    subscription_familia: 'Familia',
+    subscription_central: 'Central',
+    subscription_renewed: t('af_evt_renewal'),
+    subscription_cancelled: t('af_evt_cancelled'),
+  };
+  return map[event] || event;
+}
+
+function getMonthlyData(commissions) {
+  const months = {};
+  commissions.forEach(c => {
+    const d = new Date(c.created_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+    if (!months[key]) months[key] = { label, total: 0 };
+    months[key].total += parseFloat(c.amount || 0);
+  });
+  return Object.entries(months).sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v).slice(-6);
+}
+
+function copyLink() {
+  const input = document.getElementById('share-link');
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = t('af_copied');
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = t('af_copy'); btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+async function savePixKey() {
+  const pixKey = document.getElementById('pix-key').value.trim();
+  if (!pixKey) { showToast(t('af_pix_enter')); return; }
+
+  try {
+    const res = await fetch(`${API}/api/affiliates/me`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${affiliateToken}` },
+      body: JSON.stringify({ pix_key: pixKey }),
+    });
+    if (res.ok) {
+      affiliateData.affiliate.pix_key = pixKey;
+      const btn = document.getElementById('pix-btn');
+      btn.textContent = t('af_pix_saved');
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = t('af_pix_save'); btn.classList.remove('copied'); }, 2000);
+      showToast(t('af_pix_success'));
+    } else {
+      showToast(t('af_pix_error'));
+    }
+  } catch (err) {
+    showToast(t('af_conn_error'));
+  }
+}
+
+function setPeriod(p) {
+  currentPeriod = p;
+  renderDashboard();
+}
+
+function doLogout() {
+  localStorage.removeItem('af_token');
+  affiliateData = null;
+  affiliateToken = null;
+  renderLogin();
+}
+
+// ── Init ──────────────────────────────────────────────
+(function init() {
+  const saved = localStorage.getItem('af_token');
+  if (saved) {
+    affiliateToken = saved;
+    document.getElementById('app').innerHTML = `<div style="text-align:center;padding:80px;color:var(--text3);">${t('af_loading')}</div>`;
+    loadDashboard();
+  } else {
+    renderLogin();
+  }
+})();
+</script>
+</body>
+</html>

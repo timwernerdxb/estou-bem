@@ -213,8 +213,10 @@ export function useSubscription() {
   return {
     tier,
     isActive: state.subscription.isActive,
-    isFamilia: tier === "familia" || tier === "central",
-    isCentral: tier === "central",
+    isPro: tier === "pro",
     isPaid: tier !== "free",
+    // Legacy aliases for backward compatibility during migration
+    isFamilia: tier === "pro",
+    isCentral: tier === "pro",
   };
 }

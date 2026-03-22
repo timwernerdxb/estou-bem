@@ -170,38 +170,63 @@ Categoria Secundária: Lifestyle
 
 ---
 
-## 11. Screenshot Captions
+## 11. Screenshot Strategy
+
+> **Approach:** Marketing-first. Only Screenshot 1 shows the actual app UI. The remaining screenshots are designed marketing frames that communicate value propositions with bold headlines, lifestyle imagery, and feature highlights — similar to top health/wellness apps like Noom, Calm, and Life360.
 
 ### iPhone (6 screenshots)
 
-**Screenshot 1 — Tela de Check-in**
-> Tela principal mostrando o grande botão circular "Estou Bem" em dourado sobre fundo verde floresta. Saudação personalizada com o nome do idoso ("Bom dia, Dona Maria") e horário do próximo check-in. Design limpo, tipografia ampliada, estética premium.
+**Screenshot 1 — App Real: Tela de Check-in** _(único screenshot do app)_
+> iPhone mockup showing the actual check-in screen: big gold "Toque Aqui" button, "Boa tarde, Dona Maria" greeting, warm cream background, dark tab bar. Small device frame with subtle drop shadow on a clean cream/green gradient background.
+> **Headline acima do mockup:** "Um toque. Toda a tranquilidade."
 
-**Screenshot 2 — Sistema de Escalonamento**
-> Diagrama visual mostrando as etapas de escalonamento: check-in pendente > WhatsApp para a família > ligação automática > alerta de emergência. Ícones elegantes em linha do tempo vertical com status em tempo real de cada etapa. Fundo creme com destaques em verde e dourado.
+**Screenshot 2 — Marketing: Como Funciona**
+> Full-bleed marketing frame. Background: warm cream with soft green gradient. Center: 4-step vertical timeline with elegant icons connected by a gold line:
+> 1. 🔔 "Lembrete carinhoso" (notification bell)
+> 2. ✅ "Um toque: Estou Bem" (check mark)
+> 3. 📱 "Família notificada" (WhatsApp icon)
+> 4. 🚨 "Emergência acionada" (alert icon)
+> **Headline:** "Se a resposta não chegar, nós agimos."
+> **Subline:** "Escalonamento automático via WhatsApp, ligação e serviços de emergência."
 
-**Screenshot 3 — Controle de Medicamentos**
-> Lista de medicamentos do dia com horários, dosagens e status (tomado/pendente). Indicador de estoque mostrando "Losartana — 8 comprimidos restantes". Botão de confirmação de dose. Visual organizado com cards em creme e ícones dourados.
+**Screenshot 3 — Marketing: Apple Watch**
+> Lifestyle photo background (elderly person's wrist wearing Apple Watch, soft warm lighting, slightly blurred). Overlaid: clean mockup of the Watch app showing the green check-in button.
+> **Headline:** "Cuidado no pulso."
+> **3 feature pills below:** "Check-in com 1 toque" · "Detecção de quedas" · "Monitor cardíaco"
 
-**Screenshot 4 — Painel da Família**
-> Dashboard do familiar mostrando: status "Estou Bem" confirmado às 08:32, frequência cardíaca 72bpm, 3 de 4 medicamentos tomados, último movimento detectado há 12 min. Cards informativos com gráficos suaves em verde floresta sobre fundo creme.
+**Screenshot 4 — Marketing: Painel da Família**
+> Split composition. Left side: illustrated family silhouette (warm tones). Right side: floating UI cards showing key stats — "✅ Check-in às 08:32", "❤️ 72 bpm", "💊 3/4 medicamentos", "🚶 Ativo há 12 min".
+> **Headline:** "Acompanhe quem você ama. Em tempo real."
+> **Subline:** "Painel exclusivo para familiares com dados de saúde, medicamentos e alertas."
 
-**Screenshot 5 — Marketplace de Saúde**
-> Grade de serviços disponíveis: Farmácia, Telemedicina, Cuidador, Fisioterapia — cada um com ícone elegante e breve descrição. Card de destaque mostrando "Consulta por vídeo a partir de R$ 49". Estética sofisticada com fundo creme e acentos dourados.
+**Screenshot 5 — Marketing: Proteção Completa**
+> Dark green background (Soho House aesthetic). Center: large gold shield icon with heart inside. Around it, 6 feature icons in a circle: Check-in, Medicamentos, SOS, Apple Watch, Escalonamento, Relatórios.
+> **Headline:** "Tudo que sua família precisa."
+> **Subline:** "Check-in · Medicamentos · SOS · Apple Watch · WhatsApp · Relatórios"
 
-**Screenshot 6 — Relatório Mensal de Saúde**
-> Relatório visual mostrando: taxa de check-in 96%, adesão a medicamentos 91%, frequência cardíaca média 74bpm, gráfico de tendência semanal. Seção de insights com recomendação personalizada. Design editorial com tipografia refinada em verde e dourado.
+**Screenshot 6 — Marketing: Social Proof / CTA**
+> Clean cream background. Top: 5 gold stars. Center: large testimonial quote in serif italic:
+> _"Minha mãe mora sozinha. Antes eu ligava 3 vezes por dia. Agora recebo um 'Estou Bem' e fico tranquila."_
+> — Ana C., São Paulo
+> Below: "Comece grátis" button mockup. Small text: "Planos a partir de R$ 49,90/mês"
 
 ### Apple Watch (4 screenshots)
 
-**Screenshot Watch 1 — Check-in no Pulso**
-> Mostrador do Apple Watch com botão central "Estou Bem" em dourado. Texto "Toque para confirmar" abaixo. Fundo verde floresta com borda dourada sutil. Máxima simplicidade — um toque resolve.
+**Screenshot Watch 1 — Check-in no Pulso** _(screenshot real)_
+> Watch mockup on cream background showing the big green check-in button with "Estou Bem" text.
+> **Headline:** "Um toque. No pulso."
 
-**Screenshot Watch 2 — Confirmação de Check-in**
-> Tela de sucesso após o toque: ícone de coração com check-mark em dourado, texto "Tudo certo!" e horário da confirmação. Animação de pulso suave no coração. Fundo verde floresta.
+**Screenshot Watch 2 — Marketing: Detecção de Movimento**
+> Watch mockup showing movement detection UI. Background: soft green gradient.
+> **Headline:** "Detecta quedas automaticamente."
+> **Subline:** "Alertas instantâneos para a família."
 
-**Screenshot Watch 3 — Monitoramento Cardíaco**
-> Tela mostrando frequência cardíaca atual (72 bpm) com gráfico de batimentos em tempo real. Indicador de status "Normal" em verde claro. Complicação compacta no canto mostrando último check-in.
+**Screenshot Watch 3 — Marketing: Monitor Cardíaco**
+> Watch mockup showing heart rate screen (72 bpm with pulse line). Background: dark green.
+> **Headline:** "Monitoramento 24h."
+> **Subline:** "Frequência cardíaca · Passos · Atividade"
 
-**Screenshot Watch 4 — SOS de Emergência**
-> Botão SOS vermelho centralizado com texto "Segurar para SOS". Contatos de emergência listados abaixo com ícones pequenos. Design claro e de alto contraste para máxima legibilidade em situação de urgência.
+**Screenshot Watch 4 — Marketing: SOS**
+> Watch mockup showing red SOS button. Background: cream with red accent.
+> **Headline:** "Emergência? Um gesto."
+> **Subline:** "Aciona todos os contatos instantaneamente."

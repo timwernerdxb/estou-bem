@@ -291,6 +291,385 @@ const icons = {
   person: `<svg viewBox="0 0 24 24" width="24" height="24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`,
 };
 
+// ─── i18n ─────────────────────────────────────────────────
+const translations = {
+  'pt-BR': {
+    // Greetings
+    greeting_morning: 'Bom dia', greeting_afternoon: 'Boa tarde', greeting_evening: 'Boa noite',
+    // Tabs
+    tab_checkin: 'Check-in', tab_meds: 'Remédios', tab_sos: 'SOS', tab_settings: 'Config',
+    tab_dashboard: 'Painel', tab_contacts: 'Contatos',
+    // Check-in
+    checkin_touch: 'TOQUE AQUI', checkin_done: 'ESTOU BEM', checkin_pending: 'Check-in pendente',
+    checkin_next: 'Próximo check-in às {time}', checkin_all_done: 'Todos os check-ins concluídos',
+    checkin_today: 'Check-ins hoje', checkin_confirmed: 'Confirmado', checkin_pending_status: 'Pendente',
+    checkin_missed: 'Perdido', checkin_none_today: 'Nenhum check-in hoje',
+    checkin_none_yet: 'Nenhum check-in ainda',
+    checkin_fixed_times: 'Horários fixos', checkin_interval: 'A cada X horas',
+    checkin_interval_label: 'Intervalo entre check-ins:',
+    checkin_plan_limit: 'Seu plano permite até {max} check-in(s)/dia',
+    checkin_recent: 'Check-ins Recentes',
+    // Roles
+    role_elder: 'Idoso', role_family: 'Familiar', role_caregiver: 'Cuidador',
+    role_elder_label: 'Sou o Idoso', role_family_label: 'Sou Familiar', role_caregiver_label: 'Sou Cuidador',
+    // Login
+    login_welcome: 'Bem-vindo', login_subtitle: 'Acesse sua conta Estou Bem',
+    login_email: 'E-mail', login_password: 'Senha', login_enter: 'Entrar',
+    login_create_account: 'Criar conta', login_skip: 'Usar sem conta', login_already_have: 'Já tenho conta',
+    // Register
+    register_title: 'Criar conta', register_subtitle: 'Configure seu perfil para usar o Estou Bem',
+    register_who: 'Quem é você?', register_name: 'Seu nome', register_name_placeholder: 'Como devemos te chamar?',
+    register_phone: 'Telefone', register_confirm_password: 'Confirmar senha',
+    register_referral: 'Código de indicação (opcional)', register_submit: 'Criar conta',
+    register_free_trial: '30 dias grátis',
+    register_free_trial_desc: 'Todos os recursos liberados. Depois, escolha seu plano ou continue no gratuito.',
+    register_consents: 'Consentimentos (LGPD)',
+    // Setup
+    setup_title: 'Vamos começar!', setup_subtitle: 'Configure seu perfil para usar o Estou Bem',
+    setup_phone_optional: 'Telefone (opcional)', setup_start: 'Começar a usar!',
+    // Onboarding
+    onboarding_welcome: 'Bem-vindo ao Estou Bem',
+    onboarding_welcome_desc: 'O app que cuida de quem você ama. Check-ins diários para garantir que seu familiar idoso está seguro.',
+    onboarding_checkin: 'Check-in Simples',
+    onboarding_checkin_desc: 'O idoso recebe um alarme e toca um botão. Se não responder, você é avisado imediatamente.',
+    onboarding_meds: 'Medicamentos e Saúde',
+    onboarding_meds_desc: 'Controle de medicamentos com estoque, lembretes e diário de saúde completo.',
+    onboarding_family: 'Proteção em Família',
+    onboarding_family_desc: 'Conecte toda a família. Todos acompanham, todos cuidam. Juntos.',
+    onboarding_skip: 'Pular', onboarding_next: 'Próximo', onboarding_start: 'Começar',
+    // Medications
+    meds_title: 'Medicamentos', meds_empty: 'Nenhum medicamento cadastrado',
+    meds_empty_desc: 'Adicione seus medicamentos para receber lembretes',
+    meds_add: '+ Adicionar Medicamento', meds_new: 'Novo Medicamento',
+    meds_name: 'Nome do medicamento', meds_dosage: 'Dosagem', meds_frequency: 'Frequência',
+    meds_time: 'Horário', meds_stock: 'Estoque', meds_unit: 'Unidade',
+    meds_save: 'Salvar Medicamento', meds_took: 'Tomei', meds_stock_low: 'Baixo!',
+    meds_stock_label: 'Estoque',
+    meds_freq_1x: '1x ao dia', meds_freq_2x: '2x ao dia', meds_freq_3x: '3x ao dia',
+    meds_freq_weekly: 'Semanal', meds_freq_asneeded: 'Quando necessário',
+    // SOS
+    sos_title: '🆘 Emergência', sos_subtitle: 'Segure o botão por 3 segundos para acionar emergência',
+    sos_emergency_contacts: 'Contatos de emergência',
+    // Contacts
+    contacts_title: '📞 Contatos de Emergência',
+    contacts_subtitle: 'Essas pessoas serão notificadas quando um check-in for perdido ou o SOS for acionado',
+    contacts_empty: 'Nenhum contato cadastrado', contacts_add: '+ Adicionar Contato',
+    contacts_new: 'Novo Contato', contacts_name: 'Nome', contacts_phone: 'Telefone',
+    contacts_relationship: 'Parentesco', contacts_save: 'Salvar Contato',
+    contacts_not_informed: 'Não informado', contacts_upgrade: '🔒 Upgrade para mais contatos',
+    // Settings
+    settings_title: '⚙️ Configurações', settings_profile: 'Perfil', settings_checkins: 'Check-ins',
+    settings_subscription: 'Assinatura', settings_language: 'Idioma',
+    settings_plan_free: 'Plano Gratuito', settings_plan_family: 'Plano Família', settings_plan_central: 'Plano Central',
+    settings_upgrade: 'Upgrade', settings_manage: 'Gerenciar',
+    settings_link_family: 'Vincular Familiar', settings_link_elder: 'Vincular ao Idoso',
+    settings_more: 'Mais', settings_emergency_contacts: 'Contatos de Emergência',
+    settings_escalation: 'Escalação', settings_marketplace: 'Marketplace',
+    settings_calendar: 'Agenda / Calendário', settings_health_report: 'Relatório Mensal de Saúde',
+    settings_whatsapp: 'Integração WhatsApp',
+    settings_whatsapp_desc: 'Alertas automáticos, chamadas e escalação completa.',
+    settings_connected: 'Conectado', settings_logout: 'Sair da conta',
+    settings_trial_period: 'Período de teste', settings_trial_days: '{days} dias restantes',
+    settings_trial_features: 'Todos os recursos liberados',
+    settings_movement: 'Detecção de Movimento',
+    // Dashboard
+    dashboard_title: 'Painel Familiar', dashboard_tracking: 'Acompanhando: {name}',
+    dashboard_all_confirmed: '✅ Todos confirmados',
+    dashboard_missed: '⚠️ {count} check-in(s) perdido(s)',
+    dashboard_pending: '⏳ {count} check-in(s) pendente(s)',
+    dashboard_none: 'Nenhum check-in hoje',
+    dashboard_confirmed_today: '{confirmed}/{total} check-ins confirmados hoje',
+    dashboard_adherence: 'Aderência (7 dias)', dashboard_medications: 'Medicamentos',
+    dashboard_total_checkins: 'Check-ins total', dashboard_low_stock: 'Estoque baixo',
+    // Paywall
+    paywall_title: 'Escolha seu plano', paywall_subtitle: 'Proteja quem você ama com o plano ideal',
+    paywall_popular: 'MAIS POPULAR', paywall_current: 'ATUAL',
+    paywall_legal: 'A assinatura inicia imediatamente. Cancele a qualquer momento antes do 2º mês para não ser cobrado. Renova automaticamente. Gerencie nas configurações do dispositivo.',
+    // Misc
+    achievements: 'Conquistas', streak_days: 'dias seguidos', points: 'pontos',
+    badges_empty: 'Complete check-ins para ganhar badges', demo: 'Demo',
+    escalation_active: 'Escalação ativa',
+    plan_activated: '✅ Plano {plan} ativado!',
+    health_title: 'Saúde', health_data_title: 'Dados de Saúde',
+    health_no_data: 'Nenhum dado de saúde disponível.',
+    health_history: 'Ver histórico ({count} registros)',
+    lang_label: 'Idioma',
+  },
+  'en': {
+    greeting_morning: 'Good morning', greeting_afternoon: 'Good afternoon', greeting_evening: 'Good evening',
+    tab_checkin: 'Check-in', tab_meds: 'Meds', tab_sos: 'SOS', tab_settings: 'Settings',
+    tab_dashboard: 'Dashboard', tab_contacts: 'Contacts',
+    checkin_touch: 'TAP HERE', checkin_done: "I'M OK", checkin_pending: 'Check-in pending',
+    checkin_next: 'Next check-in at {time}', checkin_all_done: 'All check-ins completed',
+    checkin_today: 'Check-ins today', checkin_confirmed: 'Confirmed', checkin_pending_status: 'Pending',
+    checkin_missed: 'Missed', checkin_none_today: 'No check-ins today',
+    checkin_none_yet: 'No check-ins yet',
+    checkin_fixed_times: 'Fixed times', checkin_interval: 'Every X hours',
+    checkin_interval_label: 'Interval between check-ins:',
+    checkin_plan_limit: 'Your plan allows up to {max} check-in(s)/day',
+    checkin_recent: 'Recent Check-ins',
+    role_elder: 'Elder', role_family: 'Family', role_caregiver: 'Caregiver',
+    role_elder_label: "I'm the Elder", role_family_label: "I'm Family", role_caregiver_label: "I'm a Caregiver",
+    login_welcome: 'Welcome', login_subtitle: 'Access your Estou Bem account',
+    login_email: 'Email', login_password: 'Password', login_enter: 'Sign In',
+    login_create_account: 'Create account', login_skip: 'Use without account', login_already_have: 'I already have an account',
+    register_title: 'Create account', register_subtitle: 'Set up your profile to use Estou Bem',
+    register_who: 'Who are you?', register_name: 'Your name', register_name_placeholder: 'What should we call you?',
+    register_phone: 'Phone', register_confirm_password: 'Confirm password',
+    register_referral: 'Referral code (optional)', register_submit: 'Create account',
+    register_free_trial: '30 free days',
+    register_free_trial_desc: 'All features unlocked. Then choose your plan or stay on free.',
+    register_consents: 'Consents (LGPD)',
+    setup_title: "Let's get started!", setup_subtitle: 'Set up your profile to use Estou Bem',
+    setup_phone_optional: 'Phone (optional)', setup_start: 'Start using!',
+    onboarding_welcome: 'Welcome to Estou Bem',
+    onboarding_welcome_desc: 'The app that takes care of those you love. Daily check-ins to ensure your elderly family member is safe.',
+    onboarding_checkin: 'Simple Check-in',
+    onboarding_checkin_desc: 'The elder receives an alarm and taps a button. If they don\'t respond, you are notified immediately.',
+    onboarding_meds: 'Medications & Health',
+    onboarding_meds_desc: 'Medication management with stock tracking, reminders, and a complete health diary.',
+    onboarding_family: 'Family Protection',
+    onboarding_family_desc: 'Connect the whole family. Everyone watches, everyone cares. Together.',
+    onboarding_skip: 'Skip', onboarding_next: 'Next', onboarding_start: 'Get Started',
+    meds_title: 'Medications', meds_empty: 'No medications registered',
+    meds_empty_desc: 'Add your medications to receive reminders',
+    meds_add: '+ Add Medication', meds_new: 'New Medication',
+    meds_name: 'Medication name', meds_dosage: 'Dosage', meds_frequency: 'Frequency',
+    meds_time: 'Time', meds_stock: 'Stock', meds_unit: 'Unit',
+    meds_save: 'Save Medication', meds_took: 'Taken', meds_stock_low: 'Low!',
+    meds_stock_label: 'Stock',
+    meds_freq_1x: 'Once daily', meds_freq_2x: 'Twice daily', meds_freq_3x: '3x daily',
+    meds_freq_weekly: 'Weekly', meds_freq_asneeded: 'As needed',
+    sos_title: '🆘 Emergency', sos_subtitle: 'Hold the button for 3 seconds to trigger emergency',
+    sos_emergency_contacts: 'Emergency contacts',
+    contacts_title: '📞 Emergency Contacts',
+    contacts_subtitle: 'These people will be notified when a check-in is missed or SOS is triggered',
+    contacts_empty: 'No contacts registered', contacts_add: '+ Add Contact',
+    contacts_new: 'New Contact', contacts_name: 'Name', contacts_phone: 'Phone',
+    contacts_relationship: 'Relationship', contacts_save: 'Save Contact',
+    contacts_not_informed: 'Not provided', contacts_upgrade: '🔒 Upgrade for more contacts',
+    settings_title: '⚙️ Settings', settings_profile: 'Profile', settings_checkins: 'Check-ins',
+    settings_subscription: 'Subscription', settings_language: 'Language',
+    settings_plan_free: 'Free Plan', settings_plan_family: 'Family Plan', settings_plan_central: 'Central Plan',
+    settings_upgrade: 'Upgrade', settings_manage: 'Manage',
+    settings_link_family: 'Link Family Member', settings_link_elder: 'Link to Elder',
+    settings_more: 'More', settings_emergency_contacts: 'Emergency Contacts',
+    settings_escalation: 'Escalation', settings_marketplace: 'Marketplace',
+    settings_calendar: 'Schedule / Calendar', settings_health_report: 'Monthly Health Report',
+    settings_whatsapp: 'WhatsApp Integration',
+    settings_whatsapp_desc: 'Automatic alerts, calls, and full escalation.',
+    settings_connected: 'Connected', settings_logout: 'Sign out',
+    settings_trial_period: 'Trial period', settings_trial_days: '{days} days remaining',
+    settings_trial_features: 'All features unlocked',
+    settings_movement: 'Movement Detection',
+    dashboard_title: 'Family Dashboard', dashboard_tracking: 'Tracking: {name}',
+    dashboard_all_confirmed: '✅ All confirmed',
+    dashboard_missed: '⚠️ {count} check-in(s) missed',
+    dashboard_pending: '⏳ {count} check-in(s) pending',
+    dashboard_none: 'No check-ins today',
+    dashboard_confirmed_today: '{confirmed}/{total} check-ins confirmed today',
+    dashboard_adherence: 'Adherence (7 days)', dashboard_medications: 'Medications',
+    dashboard_total_checkins: 'Total check-ins', dashboard_low_stock: 'Low stock',
+    paywall_title: 'Choose your plan', paywall_subtitle: 'Protect those you love with the ideal plan',
+    paywall_popular: 'MOST POPULAR', paywall_current: 'CURRENT',
+    paywall_legal: 'The subscription starts immediately. Cancel any time before the 2nd month to avoid being charged. Renews automatically. Manage in device settings.',
+    achievements: 'Achievements', streak_days: 'day streak', points: 'points',
+    badges_empty: 'Complete check-ins to earn badges', demo: 'Demo',
+    escalation_active: 'Active escalation',
+    plan_activated: '✅ {plan} plan activated!',
+    health_title: 'Health', health_data_title: 'Health Data',
+    health_no_data: 'No health data available.',
+    health_history: 'View history ({count} records)',
+    lang_label: 'Language',
+  },
+  'es': {
+    greeting_morning: 'Buenos días', greeting_afternoon: 'Buenas tardes', greeting_evening: 'Buenas noches',
+    tab_checkin: 'Check-in', tab_meds: 'Medicinas', tab_sos: 'SOS', tab_settings: 'Ajustes',
+    tab_dashboard: 'Panel', tab_contacts: 'Contactos',
+    checkin_touch: 'TOCA AQUÍ', checkin_done: 'ESTOY BIEN', checkin_pending: 'Check-in pendiente',
+    checkin_next: 'Próximo check-in a las {time}', checkin_all_done: 'Todos los check-ins completados',
+    checkin_today: 'Check-ins hoy', checkin_confirmed: 'Confirmado', checkin_pending_status: 'Pendiente',
+    checkin_missed: 'Perdido', checkin_none_today: 'Ningún check-in hoy',
+    checkin_none_yet: 'Ningún check-in aún',
+    checkin_fixed_times: 'Horarios fijos', checkin_interval: 'Cada X horas',
+    checkin_interval_label: 'Intervalo entre check-ins:',
+    checkin_plan_limit: 'Tu plan permite hasta {max} check-in(s)/día',
+    checkin_recent: 'Check-ins Recientes',
+    role_elder: 'Adulto mayor', role_family: 'Familiar', role_caregiver: 'Cuidador',
+    role_elder_label: 'Soy el adulto mayor', role_family_label: 'Soy familiar', role_caregiver_label: 'Soy cuidador',
+    login_welcome: 'Bienvenido', login_subtitle: 'Accede a tu cuenta Estou Bem',
+    login_email: 'Correo electrónico', login_password: 'Contraseña', login_enter: 'Iniciar sesión',
+    login_create_account: 'Crear cuenta', login_skip: 'Usar sin cuenta', login_already_have: 'Ya tengo cuenta',
+    register_title: 'Crear cuenta', register_subtitle: 'Configura tu perfil para usar Estou Bem',
+    register_who: '¿Quién eres?', register_name: 'Tu nombre', register_name_placeholder: '¿Cómo debemos llamarte?',
+    register_phone: 'Teléfono', register_confirm_password: 'Confirmar contraseña',
+    register_referral: 'Código de referido (opcional)', register_submit: 'Crear cuenta',
+    register_free_trial: '30 días gratis',
+    register_free_trial_desc: 'Todas las funciones desbloqueadas. Luego elige tu plan o continúa en el gratuito.',
+    register_consents: 'Consentimientos (LGPD)',
+    setup_title: '¡Empecemos!', setup_subtitle: 'Configura tu perfil para usar Estou Bem',
+    setup_phone_optional: 'Teléfono (opcional)', setup_start: '¡Comenzar a usar!',
+    onboarding_welcome: 'Bienvenido a Estou Bem',
+    onboarding_welcome_desc: 'La app que cuida a quienes amas. Check-ins diarios para garantizar que tu familiar mayor está seguro.',
+    onboarding_checkin: 'Check-in Simple',
+    onboarding_checkin_desc: 'El adulto mayor recibe una alarma y toca un botón. Si no responde, te avisamos inmediatamente.',
+    onboarding_meds: 'Medicamentos y Salud',
+    onboarding_meds_desc: 'Control de medicamentos con inventario, recordatorios y diario de salud completo.',
+    onboarding_family: 'Protección en Familia',
+    onboarding_family_desc: 'Conecta a toda la familia. Todos acompañan, todos cuidan. Juntos.',
+    onboarding_skip: 'Saltar', onboarding_next: 'Siguiente', onboarding_start: 'Comenzar',
+    meds_title: 'Medicamentos', meds_empty: 'Ningún medicamento registrado',
+    meds_empty_desc: 'Agrega tus medicamentos para recibir recordatorios',
+    meds_add: '+ Agregar Medicamento', meds_new: 'Nuevo Medicamento',
+    meds_name: 'Nombre del medicamento', meds_dosage: 'Dosis', meds_frequency: 'Frecuencia',
+    meds_time: 'Horario', meds_stock: 'Inventario', meds_unit: 'Unidad',
+    meds_save: 'Guardar Medicamento', meds_took: 'Tomado', meds_stock_low: '¡Bajo!',
+    meds_stock_label: 'Inventario',
+    meds_freq_1x: '1x al día', meds_freq_2x: '2x al día', meds_freq_3x: '3x al día',
+    meds_freq_weekly: 'Semanal', meds_freq_asneeded: 'Cuando sea necesario',
+    sos_title: '🆘 Emergencia', sos_subtitle: 'Mantén presionado el botón por 3 segundos para activar la emergencia',
+    sos_emergency_contacts: 'Contactos de emergencia',
+    contacts_title: '📞 Contactos de Emergencia',
+    contacts_subtitle: 'Estas personas serán notificadas cuando se pierda un check-in o se active el SOS',
+    contacts_empty: 'Ningún contacto registrado', contacts_add: '+ Agregar Contacto',
+    contacts_new: 'Nuevo Contacto', contacts_name: 'Nombre', contacts_phone: 'Teléfono',
+    contacts_relationship: 'Parentesco', contacts_save: 'Guardar Contacto',
+    contacts_not_informed: 'No proporcionado', contacts_upgrade: '🔒 Mejora para más contactos',
+    settings_title: '⚙️ Ajustes', settings_profile: 'Perfil', settings_checkins: 'Check-ins',
+    settings_subscription: 'Suscripción', settings_language: 'Idioma',
+    settings_plan_free: 'Plan Gratuito', settings_plan_family: 'Plan Familia', settings_plan_central: 'Plan Central',
+    settings_upgrade: 'Mejorar', settings_manage: 'Administrar',
+    settings_link_family: 'Vincular Familiar', settings_link_elder: 'Vincular al Adulto Mayor',
+    settings_more: 'Más', settings_emergency_contacts: 'Contactos de Emergencia',
+    settings_escalation: 'Escalación', settings_marketplace: 'Marketplace',
+    settings_calendar: 'Agenda / Calendario', settings_health_report: 'Reporte Mensual de Salud',
+    settings_whatsapp: 'Integración WhatsApp',
+    settings_whatsapp_desc: 'Alertas automáticas, llamadas y escalación completa.',
+    settings_connected: 'Conectado', settings_logout: 'Cerrar sesión',
+    settings_trial_period: 'Periodo de prueba', settings_trial_days: '{days} días restantes',
+    settings_trial_features: 'Todas las funciones desbloqueadas',
+    settings_movement: 'Detección de Movimiento',
+    dashboard_title: 'Panel Familiar', dashboard_tracking: 'Siguiendo a: {name}',
+    dashboard_all_confirmed: '✅ Todos confirmados',
+    dashboard_missed: '⚠️ {count} check-in(s) perdido(s)',
+    dashboard_pending: '⏳ {count} check-in(s) pendiente(s)',
+    dashboard_none: 'Ningún check-in hoy',
+    dashboard_confirmed_today: '{confirmed}/{total} check-ins confirmados hoy',
+    dashboard_adherence: 'Adherencia (7 días)', dashboard_medications: 'Medicamentos',
+    dashboard_total_checkins: 'Check-ins totales', dashboard_low_stock: 'Inventario bajo',
+    paywall_title: 'Elige tu plan', paywall_subtitle: 'Protege a quienes amas con el plan ideal',
+    paywall_popular: 'MÁS POPULAR', paywall_current: 'ACTUAL',
+    paywall_legal: 'La suscripción inicia inmediatamente. Cancela en cualquier momento antes del 2º mes. Se renueva automáticamente. Administra en los ajustes del dispositivo.',
+    achievements: 'Logros', streak_days: 'días seguidos', points: 'puntos',
+    badges_empty: 'Completa check-ins para ganar insignias', demo: 'Demo',
+    escalation_active: 'Escalación activa',
+    plan_activated: '✅ ¡Plan {plan} activado!',
+    health_title: 'Salud', health_data_title: 'Datos de Salud',
+    health_no_data: 'No hay datos de salud disponibles.',
+    health_history: 'Ver historial ({count} registros)',
+    lang_label: 'Idioma',
+  },
+  'de': {
+    greeting_morning: 'Guten Morgen', greeting_afternoon: 'Guten Tag', greeting_evening: 'Guten Abend',
+    tab_checkin: 'Check-in', tab_meds: 'Medikamente', tab_sos: 'SOS', tab_settings: 'Einstellungen',
+    tab_dashboard: 'Dashboard', tab_contacts: 'Kontakte',
+    checkin_touch: 'HIER TIPPEN', checkin_done: "MIR GEHT'S GUT", checkin_pending: 'Check-in ausstehend',
+    checkin_next: 'Nächster Check-in um {time}', checkin_all_done: 'Alle Check-ins abgeschlossen',
+    checkin_today: 'Check-ins heute', checkin_confirmed: 'Bestätigt', checkin_pending_status: 'Ausstehend',
+    checkin_missed: 'Verpasst', checkin_none_today: 'Keine Check-ins heute',
+    checkin_none_yet: 'Noch keine Check-ins',
+    checkin_fixed_times: 'Feste Zeiten', checkin_interval: 'Alle X Stunden',
+    checkin_interval_label: 'Intervall zwischen Check-ins:',
+    checkin_plan_limit: 'Ihr Tarif erlaubt bis zu {max} Check-in(s)/Tag',
+    checkin_recent: 'Letzte Check-ins',
+    role_elder: 'Senior', role_family: 'Familienmitglied', role_caregiver: 'Betreuer',
+    role_elder_label: 'Ich bin Senior', role_family_label: 'Ich bin Familienmitglied', role_caregiver_label: 'Ich bin Betreuer',
+    login_welcome: 'Willkommen', login_subtitle: 'Melden Sie sich bei Ihrem Estou Bem Konto an',
+    login_email: 'E-Mail', login_password: 'Passwort', login_enter: 'Anmelden',
+    login_create_account: 'Konto erstellen', login_skip: 'Ohne Konto nutzen', login_already_have: 'Ich habe bereits ein Konto',
+    register_title: 'Konto erstellen', register_subtitle: 'Richten Sie Ihr Profil ein um Estou Bem zu nutzen',
+    register_who: 'Wer sind Sie?', register_name: 'Ihr Name', register_name_placeholder: 'Wie sollen wir Sie nennen?',
+    register_phone: 'Telefon', register_confirm_password: 'Passwort bestätigen',
+    register_referral: 'Empfehlungscode (optional)', register_submit: 'Konto erstellen',
+    register_free_trial: '30 Tage kostenlos',
+    register_free_trial_desc: 'Alle Funktionen freigeschaltet. Danach wählen Sie Ihren Tarif oder bleiben beim kostenlosen.',
+    register_consents: 'Einwilligungen (LGPD)',
+    setup_title: "Los geht's!", setup_subtitle: 'Richten Sie Ihr Profil ein um Estou Bem zu nutzen',
+    setup_phone_optional: 'Telefon (optional)', setup_start: 'Jetzt starten!',
+    onboarding_welcome: 'Willkommen bei Estou Bem',
+    onboarding_welcome_desc: 'Die App, die sich um Ihre Liebsten kümmert. Tägliche Check-ins um sicherzustellen, dass Ihr älteres Familienmitglied in Sicherheit ist.',
+    onboarding_checkin: 'Einfacher Check-in',
+    onboarding_checkin_desc: 'Der Senior erhält einen Alarm und tippt auf einen Button. Bei ausbleibender Antwort werden Sie sofort benachrichtigt.',
+    onboarding_meds: 'Medikamente & Gesundheit',
+    onboarding_meds_desc: 'Medikamentenverwaltung mit Bestandskontrolle, Erinnerungen und vollständigem Gesundheitstagebuch.',
+    onboarding_family: 'Familienschutz',
+    onboarding_family_desc: 'Verbinden Sie die ganze Familie. Alle begleiten, alle kümmern sich. Gemeinsam.',
+    onboarding_skip: 'Überspringen', onboarding_next: 'Weiter', onboarding_start: 'Loslegen',
+    meds_title: 'Medikamente', meds_empty: 'Keine Medikamente registriert',
+    meds_empty_desc: 'Fügen Sie Ihre Medikamente hinzu um Erinnerungen zu erhalten',
+    meds_add: '+ Medikament hinzufügen', meds_new: 'Neues Medikament',
+    meds_name: 'Medikamentenname', meds_dosage: 'Dosierung', meds_frequency: 'Häufigkeit',
+    meds_time: 'Uhrzeit', meds_stock: 'Bestand', meds_unit: 'Einheit',
+    meds_save: 'Medikament speichern', meds_took: 'Eingenommen', meds_stock_low: 'Niedrig!',
+    meds_stock_label: 'Bestand',
+    meds_freq_1x: '1x täglich', meds_freq_2x: '2x täglich', meds_freq_3x: '3x täglich',
+    meds_freq_weekly: 'Wöchentlich', meds_freq_asneeded: 'Bei Bedarf',
+    sos_title: '🆘 Notfall', sos_subtitle: 'Halten Sie den Button 3 Sekunden gedrückt um den Notfall auszulösen',
+    sos_emergency_contacts: 'Notfallkontakte',
+    contacts_title: '📞 Notfallkontakte',
+    contacts_subtitle: 'Diese Personen werden benachrichtigt wenn ein Check-in verpasst wird oder SOS ausgelöst wird',
+    contacts_empty: 'Keine Kontakte registriert', contacts_add: '+ Kontakt hinzufügen',
+    contacts_new: 'Neuer Kontakt', contacts_name: 'Name', contacts_phone: 'Telefon',
+    contacts_relationship: 'Verwandtschaft', contacts_save: 'Kontakt speichern',
+    contacts_not_informed: 'Nicht angegeben', contacts_upgrade: '🔒 Upgrade für mehr Kontakte',
+    settings_title: '⚙️ Einstellungen', settings_profile: 'Profil', settings_checkins: 'Check-ins',
+    settings_subscription: 'Abonnement', settings_language: 'Sprache',
+    settings_plan_free: 'Kostenloser Tarif', settings_plan_family: 'Familientarif', settings_plan_central: 'Zentraltarif',
+    settings_upgrade: 'Upgrade', settings_manage: 'Verwalten',
+    settings_link_family: 'Familienmitglied verknüpfen', settings_link_elder: 'Senior verknüpfen',
+    settings_more: 'Mehr', settings_emergency_contacts: 'Notfallkontakte',
+    settings_escalation: 'Eskalation', settings_marketplace: 'Marktplatz',
+    settings_calendar: 'Termine / Kalender', settings_health_report: 'Monatlicher Gesundheitsbericht',
+    settings_whatsapp: 'WhatsApp Integration',
+    settings_whatsapp_desc: 'Automatische Benachrichtigungen, Anrufe und vollständige Eskalation.',
+    settings_connected: 'Verbunden', settings_logout: 'Abmelden',
+    settings_trial_period: 'Testzeitraum', settings_trial_days: '{days} Tage verbleibend',
+    settings_trial_features: 'Alle Funktionen freigeschaltet',
+    settings_movement: 'Bewegungserkennung',
+    dashboard_title: 'Familien-Dashboard', dashboard_tracking: 'Begleitung: {name}',
+    dashboard_all_confirmed: '✅ Alle bestätigt',
+    dashboard_missed: '⚠️ {count} Check-in(s) verpasst',
+    dashboard_pending: '⏳ {count} Check-in(s) ausstehend',
+    dashboard_none: 'Keine Check-ins heute',
+    dashboard_confirmed_today: '{confirmed}/{total} Check-ins heute bestätigt',
+    dashboard_adherence: 'Einhaltung (7 Tage)', dashboard_medications: 'Medikamente',
+    dashboard_total_checkins: 'Check-ins gesamt', dashboard_low_stock: 'Niedriger Bestand',
+    paywall_title: 'Wählen Sie Ihren Tarif', paywall_subtitle: 'Schützen Sie Ihre Liebsten mit dem idealen Tarif',
+    paywall_popular: 'AM BELIEBTESTEN', paywall_current: 'AKTUELL',
+    paywall_legal: 'Das Abonnement startet sofort. Kündigen Sie jederzeit vor dem 2. Monat. Verlängert sich automatisch. Verwalten Sie es in den Geräteeinstellungen.',
+    achievements: 'Erfolge', streak_days: 'Tage in Folge', points: 'Punkte',
+    badges_empty: 'Schließen Sie Check-ins ab um Abzeichen zu verdienen', demo: 'Demo',
+    escalation_active: 'Aktive Eskalation',
+    plan_activated: '✅ Tarif {plan} aktiviert!',
+    health_title: 'Gesundheit', health_data_title: 'Gesundheitsdaten',
+    health_no_data: 'Keine Gesundheitsdaten verfügbar.',
+    health_history: 'Verlauf anzeigen ({count} Einträge)',
+    lang_label: 'Sprache',
+  },
+};
+
+let currentLang = localStorage.getItem('estoubem_lang') || 'pt-BR';
+function t(key, replacements) {
+  const str = translations[currentLang]?.[key] || translations['pt-BR'][key] || key;
+  if (!replacements) return str;
+  return str.replace(/\{(\w+)\}/g, (_, k) => replacements[k] ?? '');
+}
+function setLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('estoubem_lang', lang);
+  render();
+}
+
 // ─── State ────────────────────────────────────────────────
 let state = {
   screen: 'onboarding', // onboarding | login | register | setup | elder | family
@@ -448,9 +827,9 @@ function toast(msg, duration=2500) {
 
 function getGreeting() {
   const h = new Date().getHours();
-  if (h < 12) return 'Bom dia';
-  if (h < 18) return 'Boa tarde';
-  return 'Boa noite';
+  if (h < 12) return t('greeting_morning');
+  if (h < 18) return t('greeting_afternoon');
+  return t('greeting_evening');
 }
 
 function formatDate(d) {
@@ -558,15 +937,18 @@ function render() {
 }
 
 // ─── Onboarding ───────────────────────────────────────────
-const slides = [
-  { icon: 'shield', title: 'Bem-vindo ao Estou Bem', desc: 'O app que cuida de quem você ama. Check-ins diários para garantir que seu familiar idoso está seguro.' },
-  { icon: 'alarm', title: 'Check-in Simples', desc: 'O idoso recebe um alarme e toca um botão. Se não responder, você é avisado imediatamente.' },
-  { icon: 'medical', title: 'Medicamentos e Saúde', desc: 'Controle de medicamentos com estoque, lembretes e diário de saúde completo.' },
-  { icon: 'people', title: 'Proteção em Família', desc: 'Conecte toda a família. Todos acompanham, todos cuidam. Juntos.' },
-];
+function getSlides() {
+  return [
+    { icon: 'shield', title: t('onboarding_welcome'), desc: t('onboarding_welcome_desc') },
+    { icon: 'alarm', title: t('onboarding_checkin'), desc: t('onboarding_checkin_desc') },
+    { icon: 'medical', title: t('onboarding_meds'), desc: t('onboarding_meds_desc') },
+    { icon: 'people', title: t('onboarding_family'), desc: t('onboarding_family_desc') },
+  ];
+}
 
 function renderOnboarding() {
-  const s = slides[state.onboardingSlide];
+  const allSlides = getSlides();
+  const s = allSlides[state.onboardingSlide];
   return `
     <div class="screen active screen-padtop" style="justify-content:space-between;padding-bottom:40px">
       <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center">
@@ -576,12 +958,12 @@ function renderOnboarding() {
         <p style="font-size:16px;color:var(--text2);line-height:1.7;margin-top:8px">${s.desc}</p>
       </div>
       <div>
-        <div class="dots">${slides.map((_,i) => `<div class="dot ${i===state.onboardingSlide?'active':''}"></div>`).join('')}</div>
+        <div class="dots">${allSlides.map((_,i) => `<div class="dot ${i===state.onboardingSlide?'active':''}"></div>`).join('')}</div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:0 16px;margin-top:8px">
           ${state.onboardingSlide < 3
-            ? `<button class="btn-ghost btn" style="width:auto;color:var(--text3)" data-action="skip-onboarding">Pular</button>
-               <button class="btn" style="width:auto;min-width:140px" data-action="next-slide">Próximo</button>`
-            : `<button class="btn btn-elder w100" data-action="skip-onboarding">Começar</button>`
+            ? `<button class="btn-ghost btn" style="width:auto;color:var(--text3)" data-action="skip-onboarding">${t('onboarding_skip')}</button>
+               <button class="btn" style="width:auto;min-width:140px" data-action="next-slide">${t('onboarding_next')}</button>`
+            : `<button class="btn btn-elder w100" data-action="skip-onboarding">${t('onboarding_start')}</button>`
           }
         </div>
       </div>
@@ -593,67 +975,78 @@ function renderLogin() {
     <div class="screen active screen-padtop" style="padding-bottom:40px;justify-content:center">
       <div style="text-align:center;margin-bottom:32px">
         <div class="onboarding-icon" style="margin:0 auto 24px">${icons.shield}</div>
-        <h1>Bem-vindo</h1>
+        <h1>${t('login_welcome')}</h1>
         <div class="gold-divider"></div>
-        <p class="subtitle" style="margin-top:8px">Acesse sua conta Estou Bem</p>
+        <p class="subtitle" style="margin-top:8px">${t('login_subtitle')}</p>
       </div>
 
-      <div class="input-label">E-mail</div>
+      <div class="input-label">${t('login_email')}</div>
       <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
 
-      <div class="input-label">Senha</div>
+      <div class="input-label">${t('login_password')}</div>
       <input type="password" id="login-password" placeholder="Sua senha" autocomplete="current-password">
 
-      <button class="btn btn-elder mt-lg" data-action="do-login">Entrar</button>
-      <button class="btn-outline btn mt-md" data-action="go-register" style="border-color:var(--border);color:var(--text2)">Criar conta</button>
-      <button class="btn-ghost btn mt-sm" style="font-size:13px;color:var(--text3);letter-spacing:.04em" data-action="skip-login">Usar sem conta</button>
+      <button class="btn btn-elder mt-lg" data-action="do-login">${t('login_enter')}</button>
+      <button class="btn-outline btn mt-md" data-action="go-register" style="border-color:var(--border);color:var(--text2)">${t('login_create_account')}</button>
+      <button class="btn-ghost btn mt-sm" style="font-size:13px;color:var(--text3);letter-spacing:.04em" data-action="skip-login">${t('login_skip')}</button>
+      <div style="margin-top:24px;text-align:center">
+        <select onchange="setLanguage(this.value)" style="padding:6px 12px;border:1px solid var(--border);border-radius:4px;font-size:13px;background:var(--card);color:var(--text2);cursor:pointer;font-family:var(--sans)">
+          <option value="pt-BR" ${currentLang==='pt-BR'?'selected':''}>🇧🇷 Português</option>
+          <option value="en" ${currentLang==='en'?'selected':''}>🇬🇧 English</option>
+          <option value="es" ${currentLang==='es'?'selected':''}>🇪🇸 Español</option>
+          <option value="de" ${currentLang==='de'?'selected':''}>🇩🇪 Deutsch</option>
+        </select>
+      </div>
     </div>`;
 }
 
 function renderRegister() {
   return `
     <div class="screen active screen-padtop" style="padding-bottom:40px">
-      <h1>Criar conta</h1>
-      <p class="subtitle">Configure seu perfil para usar o Estou Bem</p>
+      <h1>${t('register_title')}</h1>
+      <p class="subtitle">${t('register_subtitle')}</p>
 
-      <div class="input-label" style="margin-top:20px;font-size:17px;font-weight:700">Quem é você?</div>
+      <div class="input-label" style="margin-top:20px;font-size:17px;font-weight:700">${t('register_who')}</div>
       <div class="role-grid mt-sm">
         <button class="role-card" data-role="elder" id="role-elder">
           ${icons.person}
-          Sou o Idoso
+          ${t('role_elder_label')}
         </button>
         <button class="role-card" data-role="family" id="role-family">
           ${icons.people}
-          Sou Familiar
+          ${t('role_family_label')}
         </button>
         <button class="role-card" data-role="caregiver" id="role-caregiver">
           ${icons.medkit}
-          Sou Cuidador
+          ${t('role_caregiver_label')}
         </button>
       </div>
 
-      <div class="input-label">Seu nome</div>
-      <input type="text" id="reg-name" placeholder="Como devemos te chamar?" autocomplete="name">
+      <div class="input-label">${t('register_name')}</div>
+      <input type="text" id="reg-name" placeholder="${t('register_name_placeholder')}" autocomplete="name">
 
-      <div class="input-label">E-mail</div>
+      <div class="input-label">${t('login_email')}</div>
       <input type="email" id="reg-email" placeholder="seu@email.com" autocomplete="email">
 
-      <div class="input-label">Telefone</div>
+      <div class="input-label">${t('register_phone')}</div>
       <input type="tel" id="reg-phone" placeholder="(11) 99999-9999" autocomplete="tel">
 
-      <div class="input-label">Senha</div>
+      <div class="input-label">${t('login_password')}</div>
       <input type="password" id="reg-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
 
-      <div class="input-label">Confirmar senha</div>
+      <div class="input-label">${t('register_confirm_password')}</div>
       <input type="password" id="reg-password2" placeholder="Repita a senha">
 
+      <div class="input-label">${t('register_referral')}</div>
+      <input type="text" id="reg-referral" placeholder="Ex: EB4K2A" maxlength="10" style="text-transform:uppercase;letter-spacing:2px" value="${localStorage.getItem('estoubem_ref') || ''}">
+
       <div class="card mt-md" style="background:var(--gold-light);border-color:var(--gold)">
-        <div style="font-weight:500;font-size:13px;color:var(--gold-dark);letter-spacing:.04em">30 dias grátis</div>
-        <div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.5">Todos os recursos liberados. Depois, escolha seu plano ou continue no gratuito.</div>
+        <div style="font-weight:500;font-size:13px;color:var(--gold-dark);letter-spacing:.04em">${t('register_free_trial')}</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.5">${t('register_free_trial_desc')}</div>
       </div>
 
       <div class="card mt-md">
-        <div style="font-weight:500;font-size:11px;color:var(--text3);margin-bottom:16px;letter-spacing:.1em;text-transform:uppercase">Consentimentos (LGPD)</div>
+        <div style="font-weight:500;font-size:11px;color:var(--text3);margin-bottom:16px;letter-spacing:.1em;text-transform:uppercase">${t('register_consents')}</div>
         <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;cursor:pointer;font-size:14px;color:var(--text2);line-height:1.4">
           <input type="checkbox" id="consent-terms" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;accent-color:var(--primary)">
           <span>Li e aceito os <a href="#" style="color:var(--primary);font-weight:600">Termos de Uso</a> e <a href="#" style="color:var(--primary);font-weight:600">Política de Privacidade</a> <span style="color:var(--danger)">*</span></span>
@@ -668,50 +1061,50 @@ function renderRegister() {
         </label>
       </div>
 
-      <button class="btn btn-elder mt-lg" data-action="do-register">Criar conta</button>
-      <button class="btn-ghost btn mt-sm" data-action="go-login">Já tenho conta</button>
+      <button class="btn btn-elder mt-lg" data-action="do-register">${t('register_submit')}</button>
+      <button class="btn-ghost btn mt-sm" data-action="go-login">${t('login_already_have')}</button>
     </div>`;
 }
 
 function renderSetup() {
   return `
     <div class="screen active screen-padtop" style="padding-bottom:40px">
-      <h1>Vamos começar!</h1>
-      <p class="subtitle">Configure seu perfil para usar o Estou Bem</p>
+      <h1>${t('setup_title')}</h1>
+      <p class="subtitle">${t('setup_subtitle')}</p>
 
-      <div class="input-label" style="margin-top:20px;font-size:17px;font-weight:700">Quem é você?</div>
+      <div class="input-label" style="margin-top:20px;font-size:17px;font-weight:700">${t('register_who')}</div>
       <div class="role-grid mt-sm">
         <button class="role-card" data-role="elder" id="role-elder">
           ${icons.person}
-          Sou o Idoso
+          ${t('role_elder_label')}
         </button>
         <button class="role-card" data-role="family" id="role-family">
           ${icons.people}
-          Sou Familiar
+          ${t('role_family_label')}
         </button>
         <button class="role-card" data-role="caregiver" id="role-caregiver">
           ${icons.medkit}
-          Sou Cuidador
+          ${t('role_caregiver_label')}
         </button>
       </div>
 
-      <div class="input-label">Seu nome</div>
-      <input type="text" id="setup-name" placeholder="Como devemos te chamar?" autocomplete="name">
+      <div class="input-label">${t('register_name')}</div>
+      <input type="text" id="setup-name" placeholder="${t('register_name_placeholder')}" autocomplete="name">
 
-      <div class="input-label">Telefone (opcional)</div>
+      <div class="input-label">${t('setup_phone_optional')}</div>
       <input type="tel" id="setup-phone" placeholder="(11) 99999-9999" autocomplete="tel">
 
-      <button class="btn btn-elder mt-lg" data-action="complete-setup">Começar a usar!</button>
+      <button class="btn btn-elder mt-lg" data-action="complete-setup">${t('setup_start')}</button>
     </div>`;
 }
 
 // ─── Elder App ────────────────────────────────────────────
 function renderElderApp() {
   const tabs = [
-    { id:'checkin', label:'Check-in', icon:'checkmark' },
-    { id:'meds', label:'Remédios', icon:'medical' },
-    { id:'sos', label:'SOS', icon:'warning', cls:'sos-tab' },
-    { id:'settings', label:'Config', icon:'settings' },
+    { id:'checkin', label:t('tab_checkin'), icon:'checkmark' },
+    { id:'meds', label:t('tab_meds'), icon:'medical' },
+    { id:'sos', label:t('tab_sos'), icon:'warning', cls:'sos-tab' },
+    { id:'settings', label:t('tab_settings'), icon:'settings' },
   ];
   return `
     ${renderElderScreen()}
@@ -766,16 +1159,16 @@ function renderElderHome() {
       <div class="checkin-container">
         <button class="checkin-btn ${btnClass}" data-action="do-checkin">
           ${icons.hand}
-          <span>${pending ? 'TOQUE AQUI' : 'ESTOU BEM'}</span>
+          <span>${pending ? t('checkin_touch') : t('checkin_done')}</span>
         </button>
-        ${pending ? '<p style="color:var(--gold-dark);font-size:14px;font-weight:500;margin-top:16px;letter-spacing:.04em;text-transform:uppercase">Check-in pendente</p>' : ''}
-        ${nextTime ? `<p style="color:var(--text3);font-size:13px;margin-top:${pending ? '4' : '16'}px;letter-spacing:.03em">Próximo check-in às <strong style="color:var(--text)">${nextTime}</strong></p>` : '<p style="color:var(--primary);font-size:13px;margin-top:16px;letter-spacing:.03em">Todos os check-ins concluídos</p>'}
+        ${pending ? `<p style="color:var(--gold-dark);font-size:14px;font-weight:500;margin-top:16px;letter-spacing:.04em;text-transform:uppercase">${t('checkin_pending')}</p>` : ''}
+        ${nextTime ? `<p style="color:var(--text3);font-size:13px;margin-top:${pending ? '4' : '16'}px;letter-spacing:.03em">${t('checkin_next',{time:nextTime})}</p>` : `<p style="color:var(--primary);font-size:13px;margin-top:16px;letter-spacing:.03em">${t('checkin_all_done')}</p>`}
       </div>
 
       <div class="card">
         <div class="row gap-sm">
           ${icons.alarm.replace('width','style="width:20px;height:20px;fill:var(--primary)" width')}
-          <span style="flex:1;font-weight:500;font-size:15px">Check-ins hoje</span>
+          <span style="flex:1;font-weight:500;font-size:15px">${t('checkin_today')}</span>
           <span style="font-family:var(--serif);font-size:24px;font-weight:400;color:var(--primary)">${conf}</span>
         </div>
         ${todayCheckins().length > 0 ? `
@@ -784,7 +1177,7 @@ function renderElderHome() {
               <div class="checkin-row">
                 <span style="font-weight:600">${c.time}</span>
                 <span class="badge ${c.status==='confirmed'?'badge-success':c.status==='pending'?'badge-warning':'badge-danger'}">
-                  ${c.status==='confirmed'?'✅ Confirmado':c.status==='pending'?'⏳ Pendente':'❌ Perdido'}
+                  ${c.status==='confirmed'?'✅ '+t('checkin_confirmed'):c.status==='pending'?'⏳ '+t('checkin_pending_status'):'❌ '+t('checkin_missed')}
                 </span>
               </div>
             `).join('')}
@@ -797,7 +1190,7 @@ function renderElderHome() {
           <div style="display:flex;align-items:center;gap:10px">
             <span style="font-size:24px">🚨</span>
             <div style="flex:1">
-              <div style="font-weight:700;color:var(--danger)">Escalação ativa</div>
+              <div style="font-weight:700;color:var(--danger)">${t('escalation_active')}</div>
               <div style="font-size:13px;color:var(--text2)">${ESCALATION_LEVELS[Math.min(state.escalation.levelIndex, ESCALATION_LEVELS.length-1)]?.label || 'Máximo'}</div>
             </div>
             ${icons.chevron.replace('width','style="width:20px;height:20px;fill:var(--danger)" width')}
@@ -809,27 +1202,27 @@ function renderElderHome() {
         <div class="card info-card">
           ${icons.medical.replace('width','style="width:28px;height:28px;fill:var(--primary)" width')}
           <div class="value">${state.medications.length}</div>
-          <div class="label">Medicamentos</div>
+          <div class="label">${t('dashboard_medications')}</div>
         </div>
         <div class="card info-card">
           ${icons.people.replace('width','style="width:28px;height:28px;fill:var(--primary)" width')}
           <div class="value">${state.contacts.length}</div>
-          <div class="label">Contatos</div>
+          <div class="label">${t('tab_contacts')}</div>
         </div>
       </div>
 
       <div class="card" style="background:var(--gold-light);border-color:var(--gold)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-          <h2 style="margin:0;font-size:18px">Conquistas</h2>
+          <h2 style="margin:0;font-size:18px">${t('achievements')}</h2>
         </div>
         <div style="display:flex;gap:24px;margin-bottom:16px">
           <div style="text-align:center">
             <div style="font-family:var(--serif);font-size:28px;font-weight:400;color:var(--gold-dark)">${state.gamification?.streak || 0}</div>
-            <div style="font-size:10px;color:var(--text3);font-weight:500;letter-spacing:.1em;text-transform:uppercase">dias seguidos</div>
+            <div style="font-size:10px;color:var(--text3);font-weight:500;letter-spacing:.1em;text-transform:uppercase">${t('streak_days')}</div>
           </div>
           <div style="text-align:center">
             <div style="font-family:var(--serif);font-size:28px;font-weight:400;color:var(--gold-dark)">${state.gamification?.points || 0}</div>
-            <div style="font-size:10px;color:var(--text3);font-weight:500;letter-spacing:.1em;text-transform:uppercase">pontos</div>
+            <div style="font-size:10px;color:var(--text3);font-weight:500;letter-spacing:.1em;text-transform:uppercase">${t('points')}</div>
           </div>
         </div>
         ${(state.gamification?.badges || []).length > 0 ? `
@@ -837,7 +1230,7 @@ function renderElderHome() {
             ${state.gamification.badges.map(b => `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:var(--card);border-radius:2px;font-size:12px;font-weight:500;border:1px solid var(--border)">${b}</span>`).join('')}
           </div>
         ` : `
-          <div style="font-size:13px;color:var(--text3)">Complete check-ins para ganhar badges</div>
+          <div style="font-size:13px;color:var(--text3)">${t('badges_empty')}</div>
         `}
       </div>
 
@@ -856,8 +1249,8 @@ function renderElderHome() {
 function renderSOS() {
   return `
     <div class="screen active screen-padtop" style="align-items:center">
-      <h1>🆘 Emergência</h1>
-      <p class="subtitle text-center">Segure o botão por 3 segundos para acionar emergência</p>
+      <h1>${t('sos_title')}</h1>
+      <p class="subtitle text-center">${t('sos_subtitle')}</p>
 
       <div style="display:flex;flex-direction:column;align-items:center;margin:20px 0">
         <button class="sos-btn" id="sos-btn" data-action="sos-hold">
@@ -877,7 +1270,7 @@ function renderSOS() {
 
       ${state.contacts.length > 0 ? `
         <div class="w100 mt-lg">
-          <h2>Contatos de emergência</h2>
+          <h2>${t('sos_emergency_contacts')}</h2>
           ${state.contacts.sort((a,b)=>a.priority-b.priority).map(c => `
             <a href="tel:${c.phone}" class="card" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
               <div><div class="contact-name">${c.name}</div><div class="contact-rel">${c.relationship}</div></div>
@@ -893,12 +1286,12 @@ function renderSOS() {
 function renderMedications() {
   return `
     <div class="screen active screen-padtop">
-      <h1>💊 Medicamentos</h1>
+      <h1>💊 ${t('meds_title')}</h1>
       ${state.medications.length === 0 ? `
         <div class="empty-state mt-lg">
           ${icons.medical}
-          <p>Nenhum medicamento cadastrado</p>
-          <p style="font-size:13px;color:var(--text3);margin-top:4px">Adicione seus medicamentos para receber lembretes</p>
+          <p>${t('meds_empty')}</p>
+          <p style="font-size:13px;color:var(--text3);margin-top:4px">${t('meds_empty_desc')}</p>
         </div>
       ` : state.medications.map(m => `
         <div class="card med-card">
@@ -908,15 +1301,15 @@ function renderMedications() {
           <div class="med-freq">${m.frequency} — ${m.time}</div>
           <div class="stock-row ${m.stock <= m.lowThreshold ? 'low' : ''}">
             ${icons.cube.replace('width','style="width:16px;height:16px;fill:currentColor" width')}
-            Estoque: ${m.stock} ${m.unit}${m.stock <= m.lowThreshold ? ' ⚠️ Baixo!' : ''}
+            ${t('meds_stock_label')}: ${m.stock} ${m.unit}${m.stock <= m.lowThreshold ? ' ⚠️ '+t('meds_stock_low') : ''}
           </div>
           <button class="take-btn" data-action="take-med" data-id="${m.id}">
             ${icons.checkmark.replace('width','style="width:20px;height:20px;fill:#FFF" width')}
-            Tomei
+            ${t('meds_took')}
           </button>
         </div>
       `).join('')}
-      <button class="btn mt-md" data-action="show-add-med">+ Adicionar Medicamento</button>
+      <button class="btn mt-md" data-action="show-add-med">${t('meds_add')}</button>
     </div>
     ${renderAddMedModal()}`;
 }
@@ -926,40 +1319,40 @@ function renderAddMedModal() {
     <div class="modal-overlay" id="modal-add-med">
       <div class="modal">
         <div class="modal-header">
-          <h2>Novo Medicamento</h2>
+          <h2>${t('meds_new')}</h2>
           <button class="modal-close" data-action="close-modal" data-modal="modal-add-med">${icons.close}</button>
         </div>
         <div class="modal-body">
-          <div class="input-label">Nome do medicamento *</div>
+          <div class="input-label">${t('meds_name')} *</div>
           <input type="text" id="med-name" placeholder="Ex: Losartana">
 
-          <div class="input-label">Dosagem</div>
+          <div class="input-label">${t('meds_dosage')}</div>
           <input type="text" id="med-dosage" placeholder="Ex: 50mg">
 
-          <div class="input-label">Frequência</div>
+          <div class="input-label">${t('meds_frequency')}</div>
           <div class="freq-chips" id="freq-chips">
-            <button class="freq-chip active" data-freq="1x ao dia">1x ao dia</button>
-            <button class="freq-chip" data-freq="2x ao dia">2x ao dia</button>
-            <button class="freq-chip" data-freq="3x ao dia">3x ao dia</button>
-            <button class="freq-chip" data-freq="Semanal">Semanal</button>
-            <button class="freq-chip" data-freq="Quando necessário">Quando necessário</button>
+            <button class="freq-chip active" data-freq="${t('meds_freq_1x')}">${t('meds_freq_1x')}</button>
+            <button class="freq-chip" data-freq="${t('meds_freq_2x')}">${t('meds_freq_2x')}</button>
+            <button class="freq-chip" data-freq="${t('meds_freq_3x')}">${t('meds_freq_3x')}</button>
+            <button class="freq-chip" data-freq="${t('meds_freq_weekly')}">${t('meds_freq_weekly')}</button>
+            <button class="freq-chip" data-freq="${t('meds_freq_asneeded')}">${t('meds_freq_asneeded')}</button>
           </div>
 
-          <div class="input-label">Horário</div>
+          <div class="input-label">${t('meds_time')}</div>
           <input type="time" id="med-time" value="08:00">
 
           <div style="display:flex;gap:8px">
             <div style="flex:1">
-              <div class="input-label">Estoque</div>
+              <div class="input-label">${t('meds_stock')}</div>
               <input type="number" id="med-stock" placeholder="30" value="30">
             </div>
             <div style="flex:1">
-              <div class="input-label">Unidade</div>
+              <div class="input-label">${t('meds_unit')}</div>
               <input type="text" id="med-unit" placeholder="comprimidos" value="comprimidos">
             </div>
           </div>
 
-          <button class="btn btn-elder mt-lg" data-action="save-med">Salvar Medicamento</button>
+          <button class="btn btn-elder mt-lg" data-action="save-med">${t('meds_save')}</button>
         </div>
       </div>
     </div>`;
@@ -968,8 +1361,8 @@ function renderAddMedModal() {
 // ─── Family Dashboard ─────────────────────────────────────
 function renderFamilyApp() {
   const tabs = [
-    { id:'dashboard', label:'Painel', icon:'grid' },
-    { id:'settings', label:'Config', icon:'settings' },
+    { id:'dashboard', label:t('tab_dashboard'), icon:'grid' },
+    { id:'settings', label:t('tab_settings'), icon:'settings' },
   ];
   let screen;
   switch(state.currentTab) {
@@ -1069,38 +1462,38 @@ function renderDashboard() {
   const missed = tc.filter(c => c.status==='missed');
   const pending = tc.filter(c => c.status==='pending');
   const statusClass = missed.length ? 'alert' : pending.length ? 'warn' : conf.length ? 'ok' : '';
-  const statusText = missed.length ? `⚠️ ${missed.length} check-in(s) perdido(s)` : pending.length ? `⏳ ${pending.length} check-in(s) pendente(s)` : conf.length ? '✅ Todos confirmados' : 'Nenhum check-in hoje';
+  const statusText = missed.length ? t('dashboard_missed',{count:missed.length}) : pending.length ? t('dashboard_pending',{count:pending.length}) : conf.length ? t('dashboard_all_confirmed') : t('dashboard_none');
   const elderMeds = elderData.medications || [];
   const lsm = elderMeds.filter(m => m.stock <= m.lowThreshold);
   const allCheckins = elderData.checkins || [];
 
   return `
     <div class="screen active screen-padtop">
-      <h1>Painel Familiar</h1>
-      <p class="subtitle">Acompanhando: ${elderName}${state.linkedElderEmail ? '' : ' (você mesmo — vincule um idoso nas configurações)'}</p>
+      <h1>${t('dashboard_title')}</h1>
+      <p class="subtitle">${t('dashboard_tracking',{name:elderName})}${state.linkedElderEmail ? '' : ''}</p>
 
       <div class="card status-card ${statusClass}">
         <div style="font-weight:600;font-size:16px">${statusText}</div>
-        <div class="caption mt-sm">${conf.length}/${tc.length} check-ins confirmados hoje</div>
+        <div class="caption mt-sm">${t('dashboard_confirmed_today',{confirmed:conf.length,total:tc.length})}</div>
       </div>
 
       <div class="stats-grid">
-        <div class="card stat-card"><div class="value">${(() => { const now=Date.now(); const week=allCheckins.filter(c=>now-new Date(c.date+'T12:00:00').getTime()<7*86400000); return week.length?Math.round(week.filter(c=>c.status==='confirmed').length/week.length*100):0; })()}%</div><div class="label">Aderência (7 dias)</div></div>
-        <div class="card stat-card"><div class="value">${elderMeds.length}</div><div class="label">Medicamentos</div></div>
-        <div class="card stat-card"><div class="value">${allCheckins.length}</div><div class="label">Check-ins total</div></div>
-        <div class="card stat-card"><div class="value" ${lsm.length?'style="color:var(--danger)"':''}>${lsm.length}</div><div class="label">Estoque baixo</div></div>
+        <div class="card stat-card"><div class="value">${(() => { const now=Date.now(); const week=allCheckins.filter(c=>now-new Date(c.date+'T12:00:00').getTime()<7*86400000); return week.length?Math.round(week.filter(c=>c.status==='confirmed').length/week.length*100):0; })()}%</div><div class="label">${t('dashboard_adherence')}</div></div>
+        <div class="card stat-card"><div class="value">${elderMeds.length}</div><div class="label">${t('dashboard_medications')}</div></div>
+        <div class="card stat-card"><div class="value">${allCheckins.length}</div><div class="label">${t('dashboard_total_checkins')}</div></div>
+        <div class="card stat-card"><div class="value" ${lsm.length?'style="color:var(--danger)"':''}>${lsm.length}</div><div class="label">${t('dashboard_low_stock')}</div></div>
       </div>
 
       <div class="card">
-        <h2>Check-ins Recentes</h2>
-        ${allCheckins.length === 0 ? '<p class="caption text-center" style="padding:16px 0">Nenhum check-in ainda</p>' :
+        <h2>${t('checkin_recent')}</h2>
+        ${allCheckins.length === 0 ? `<p class="caption text-center" style="padding:16px 0">${t('checkin_none_yet')}</p>` :
           allCheckins.slice(0,5).map(c => `
             <div class="checkin-row">
               <div>
                 <div style="font-weight:600">${c.date} ${c.time}</div>
               </div>
               <span class="badge ${c.status==='confirmed'?'badge-success':c.status==='pending'?'badge-warning':'badge-danger'}">
-                ${c.status==='confirmed'?'✅ Confirmado':c.status==='pending'?'⏳ Pendente':'❌ Perdido'}
+                ${c.status==='confirmed'?'✅ '+t('checkin_confirmed'):c.status==='pending'?'⏳ '+t('checkin_pending_status'):'❌ '+t('checkin_missed')}
               </span>
             </div>
           `).join('')}
@@ -1169,13 +1562,13 @@ function renderContacts() {
 
   return `
     <div class="screen active screen-padtop">
-      <h1>📞 Contatos de Emergência</h1>
-      <p class="subtitle">Essas pessoas serão notificadas quando um check-in for perdido ou o SOS for acionado</p>
+      <h1>${t('contacts_title')}</h1>
+      <p class="subtitle">${t('contacts_subtitle')}</p>
 
       ${state.contacts.length === 0 ? `
         <div class="empty-state">
           ${icons.people}
-          <p>Nenhum contato cadastrado</p>
+          <p>${t('contacts_empty')}</p>
         </div>
       ` : state.contacts.sort((a,b)=>a.priority-b.priority).map((c,i) => `
         <div class="card">
@@ -1195,8 +1588,8 @@ function renderContacts() {
       `).join('')}
 
       ${state.contacts.length >= maxContacts()
-        ? `<button class="btn btn-outline mt-md" data-action="show-paywall">🔒 Upgrade para mais contatos</button>`
-        : `<button class="btn mt-md" data-action="show-add-contact">+ Adicionar Contato</button>`
+        ? `<button class="btn btn-outline mt-md" data-action="show-paywall">${t('contacts_upgrade')}</button>`
+        : `<button class="btn mt-md" data-action="show-add-contact">${t('contacts_add')}</button>`
       }
     </div>
     ${renderAddContactModal()}`;
@@ -1207,17 +1600,17 @@ function renderAddContactModal() {
     <div class="modal-overlay" id="modal-add-contact">
       <div class="modal">
         <div class="modal-header">
-          <h2>Novo Contato</h2>
+          <h2>${t('contacts_new')}</h2>
           <button class="modal-close" data-action="close-modal" data-modal="modal-add-contact">${icons.close}</button>
         </div>
         <div class="modal-body">
-          <div class="input-label">Nome *</div>
-          <input type="text" id="contact-name" placeholder="Nome do contato">
-          <div class="input-label">Telefone *</div>
+          <div class="input-label">${t('contacts_name')} *</div>
+          <input type="text" id="contact-name" placeholder="${t('contacts_name')}">
+          <div class="input-label">${t('contacts_phone')} *</div>
           <input type="tel" id="contact-phone" placeholder="(11) 99999-9999">
-          <div class="input-label">Parentesco</div>
+          <div class="input-label">${t('contacts_relationship')}</div>
           <input type="text" id="contact-rel" placeholder="Ex: Filho(a), Vizinho(a)">
-          <button class="btn btn-elder mt-lg" data-action="save-contact">Salvar Contato</button>
+          <button class="btn btn-elder mt-lg" data-action="save-contact">${t('contacts_save')}</button>
         </div>
       </div>
     </div>`;
@@ -1229,31 +1622,42 @@ function renderSettings() {
   const mc = maxCheckins();
   return `
     <div class="screen active screen-padtop">
-      <h1>⚙️ Configurações</h1>
+      <h1>${t('settings_title')}</h1>
 
       <div class="card">
-        <h2>Perfil</h2>
+        <h2>${t('settings_profile')}</h2>
         <div class="profile-row">
           <div class="avatar">${(state.user?.name||'?')[0].toUpperCase()}</div>
           <div>
             <div style="font-weight:600;font-size:16px">${state.user?.name}</div>
-            <div class="caption">${state.user?.role==='elder'?'Idoso':state.user?.role==='family'?'Familiar':'Cuidador'}</div>
+            <div class="caption">${state.user?.role==='elder'?t('role_elder'):state.user?.role==='family'?t('role_family'):t('role_caregiver')}</div>
           </div>
         </div>
       </div>
 
+      <!-- Language Selector -->
+      <div class="card">
+        <h2>${t('settings_language')}</h2>
+        <select onchange="setLanguage(this.value)" style="width:100%;padding:12px 0;border:none;border-bottom:1px solid var(--border);font-size:16px;background:transparent;color:var(--text);font-family:var(--sans);cursor:pointer">
+          <option value="pt-BR" ${currentLang==='pt-BR'?'selected':''}>Portugues (Brasil)</option>
+          <option value="en" ${currentLang==='en'?'selected':''}>English</option>
+          <option value="es" ${currentLang==='es'?'selected':''}>Espanol</option>
+          <option value="de" ${currentLang==='de'?'selected':''}>Deutsch</option>
+        </select>
+      </div>
+
       ${isElder ? `
         <div class="card">
-          <h2>Check-ins</h2>
-          <div class="caption mb-md">Seu plano permite até ${mc} check-in(s)/dia</div>
+          <h2>${t('settings_checkins')}</h2>
+          <div class="caption mb-md">${t('checkin_plan_limit',{max:mc})}</div>
 
           <div style="display:flex;gap:8px;margin-bottom:12px">
-            <button class="btn btn-small ${state.checkinMode!=='interval'?'':'btn-outline'}" style="flex:1" data-action="set-checkin-mode" data-mode="scheduled">Horários fixos</button>
-            <button class="btn btn-small ${state.checkinMode==='interval'?'':'btn-outline'}" style="flex:1" data-action="set-checkin-mode" data-mode="interval">A cada X horas</button>
+            <button class="btn btn-small ${state.checkinMode!=='interval'?'':'btn-outline'}" style="flex:1" data-action="set-checkin-mode" data-mode="scheduled">${t('checkin_fixed_times')}</button>
+            <button class="btn btn-small ${state.checkinMode==='interval'?'':'btn-outline'}" style="flex:1" data-action="set-checkin-mode" data-mode="interval">${t('checkin_interval')}</button>
           </div>
 
           ${state.checkinMode === 'interval' ? `
-            <div class="caption mb-md">Intervalo entre check-ins:</div>
+            <div class="caption mb-md">${t('checkin_interval_label')}</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
               ${[1,2,3,4,6].map(h => `
                 <button class="btn btn-small ${state.checkinIntervalHours===h?'':'btn-outline'}" style="width:auto;min-width:50px" data-action="set-interval" data-hours="${h}">${h}h</button>
@@ -1290,7 +1694,7 @@ function renderSettings() {
         <div class="card">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
             <span style="font-size:20px">⌚</span>
-            <h2 style="margin:0">Detecção de Movimento</h2>
+            <h2 style="margin:0">${t('settings_movement')}</h2>
           </div>
           <div class="caption mb-md" style="line-height:1.5">Se ativado e um check-in for perdido, mas houver movimento detectado pelo relógio, o check-in será adiado para a próxima janela ao invés de iniciar a escalação.</div>
           ${getEffectiveSub() === 'central' ? `
@@ -1319,25 +1723,25 @@ function renderSettings() {
 
       ${isInTrial() ? `
         <div class="card" style="background:var(--gold-light);border-color:var(--gold)">
-          <div style="font-weight:500;font-size:11px;color:var(--gold-dark);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Período de teste</div>
-          <div style="font-family:var(--serif);font-size:24px;font-weight:400;color:var(--text)">${trialDaysLeft()} dias restantes</div>
-          <div style="font-size:13px;color:var(--text2);margin-top:4px">Todos os recursos liberados</div>
+          <div style="font-weight:500;font-size:11px;color:var(--gold-dark);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">${t('settings_trial_period')}</div>
+          <div style="font-family:var(--serif);font-size:24px;font-weight:400;color:var(--text)">${t('settings_trial_days',{days:trialDaysLeft()})}</div>
+          <div style="font-size:13px;color:var(--text2);margin-top:4px">${t('settings_trial_features')}</div>
         </div>
       ` : ''}
 
       <div class="card">
-        <h2>Assinatura</h2>
+        <h2>${t('settings_subscription')}</h2>
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
-            <div style="font-weight:600;color:var(--primary)">${getEffectiveSub()==='free'?'Plano Gratuito':getEffectiveSub()==='familia'?'Plano Família':'Plano Central'}${isInTrial()?' (teste)':''}</div>
+            <div style="font-weight:600;color:var(--primary)">${getEffectiveSub()==='free'?t('settings_plan_free'):getEffectiveSub()==='familia'?t('settings_plan_family'):t('settings_plan_central')}${isInTrial()?' (teste)':''}</div>
           </div>
-          <button class="btn btn-small" style="width:auto" data-action="show-paywall">${state.subscription==='free'?'Upgrade':'Gerenciar'}</button>
+          <button class="btn btn-small" style="width:auto" data-action="show-paywall">${state.subscription==='free'?t('settings_upgrade'):t('settings_manage')}</button>
         </div>
       </div>
 
       ${state.user?.linkCode && isElder ? `
         <div class="card">
-          <h2>Vincular Familiar</h2>
+          <h2>${t('settings_link_family')}</h2>
           <div class="caption mb-md">Compartilhe este código com seu familiar para vincular as contas:</div>
           <div style="text-align:center;font-size:32px;font-weight:700;letter-spacing:8px;color:var(--primary);background:var(--bg);padding:16px;border-radius:12px">${state.user.linkCode}</div>
           <div class="caption text-center mt-sm">O familiar digita este código na conta dele</div>
@@ -1346,7 +1750,7 @@ function renderSettings() {
 
       ${!isElder ? `
         <div class="card">
-          <h2>Vincular ao Idoso</h2>
+          <h2>${t('settings_link_elder')}</h2>
           ${state.linkedElderEmail ? `
             <div style="display:flex;align-items:center;gap:8px">
               <span style="color:var(--success);font-size:20px">✅</span>
@@ -1366,47 +1770,47 @@ function renderSettings() {
       ` : ''}
 
       <div class="card">
-        <h2>Mais</h2>
+        <h2>${t('settings_more')}</h2>
         <button class="menu-row w100" data-tab="contacts" style="border:none;background:none;text-align:left">
           ${icons.call.replace('width','style="width:20px;height:20px;fill:var(--primary)" width')}
-          <span class="label">Contatos de Emergência</span>
+          <span class="label">${t('settings_emergency_contacts')}</span>
           ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
         </button>
         <button class="menu-row w100" data-action="show-escalation" style="border:none;background:none;text-align:left">
           ${icons.shield.replace('width','style="width:20px;height:20px;fill:var(--primary)" width')}
-          <span class="label">Escalação ${state.escalation && !state.escalation?.resolved ? '<span class="badge badge-danger" style="margin-left:6px;font-size:10px">ATIVA</span>' : ''}</span>
+          <span class="label">${t('settings_escalation')} ${state.escalation && !state.escalation?.resolved ? '<span class="badge badge-danger" style="margin-left:6px;font-size:10px">ATIVA</span>' : ''}</span>
           ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
         </button>
         ${getEffectiveSub() !== 'free' ? `
           <button class="menu-row w100" data-tab="marketplace" style="border:none;background:none;text-align:left">
             <span style="font-size:20px;width:20px;text-align:center">🛒</span>
-            <span class="label">Marketplace</span>
+            <span class="label">${t('settings_marketplace')}</span>
             ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
           </button>
           <button class="menu-row w100" data-tab="calendar" style="border:none;background:none;text-align:left">
             <span style="font-size:20px;width:20px;text-align:center">📅</span>
-            <span class="label">Agenda / Calendário</span>
+            <span class="label">${t('settings_calendar')}</span>
             ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
           </button>
         ` : ''}
         ${getEffectiveSub() === 'central' ? `
           <button class="menu-row w100" data-tab="health-report" style="border:none;background:none;text-align:left">
             <span style="font-size:20px;width:20px;text-align:center">📊</span>
-            <span class="label">Relatório Mensal de Saúde</span>
+            <span class="label">${t('settings_health_report')}</span>
             ${icons.chevron.replace('width','style="width:18px;height:18px;fill:var(--text3)" width')}
           </button>
         ` : ''}
       </div>
 
       <div class="card" style="border-color:var(--primary)">
-        <h2 style="font-size:16px">Integração WhatsApp</h2>
-        <div class="caption mb-md">Alertas automáticos, chamadas e escalação completa.</div>
+        <h2 style="font-size:16px">${t('settings_whatsapp')}</h2>
+        <div class="caption mb-md">${t('settings_whatsapp_desc')}</div>
         <div style="font-size:12px;color:var(--text3)">
-          <span style="color:var(--primary)">●</span> Conectado
+          <span style="color:var(--primary)">●</span> ${t('settings_connected')}
         </div>
       </div>
 
-      <button class="btn btn-danger mt-lg" data-action="logout">Sair da conta</button>
+      <button class="btn btn-danger mt-lg" data-action="logout">${t('settings_logout')}</button>
       <p class="caption text-center mt-md">Estou Bem v1.1.0 — Web Preview</p>
     </div>
     ${renderPaywallModal()}`;
@@ -1626,15 +2030,15 @@ function renderPaywallModal() {
     <div class="modal-overlay" id="modal-paywall">
       <div class="modal" style="max-height:95vh">
         <div class="modal-header">
-          <h2>Escolha seu plano</h2>
+          <h2>${t('paywall_title')}</h2>
           <button class="modal-close" data-action="close-modal" data-modal="modal-paywall">${icons.close}</button>
         </div>
         <div class="modal-body">
-          <p class="subtitle text-center">Proteja quem você ama com o plano ideal</p>
+          <p class="subtitle text-center">${t('paywall_subtitle')}</p>
           ${plans.map(p => `
             <div class="card plan-card ${state.subscription===p.id?'selected':''} ${p.highlighted?'highlighted':''}" data-action="select-plan" data-plan="${p.id}" style="cursor:pointer;position:relative">
-              ${p.highlighted?'<div class="popular-badge">MAIS POPULAR</div>':''}
-              ${state.subscription===p.id?'<div style="position:absolute;top:-10px;left:12px;background:var(--success);color:#FFF;padding:2px 12px;border-radius:999px;font-size:11px;font-weight:700">ATUAL</div>':''}
+              ${p.highlighted?`<div class="popular-badge">${t('paywall_popular')}</div>`:''}
+              ${state.subscription===p.id?`<div style="position:absolute;top:-10px;left:12px;background:var(--success);color:#FFF;padding:2px 12px;border-radius:999px;font-size:11px;font-weight:700">${t('paywall_current')}</div>`:''}
               <div class="plan-header"><div class="plan-name">${p.name}</div><div class="plan-price">${p.price}</div></div>
               <div class="plan-desc">${p.desc}</div>
               <div class="feature-list">
@@ -1650,8 +2054,7 @@ function renderPaywallModal() {
             </div>
           ` : ''}
           <div class="legal-text">
-            A assinatura inicia imediatamente. Cancele a qualquer momento antes do 2º mês para não ser cobrado.
-            Renova automaticamente. Gerencie nas configurações do dispositivo.
+            ${t('paywall_legal')}
           </div>
         </div>
       </div>
@@ -1725,7 +2128,7 @@ function bindEvents() {
 function handleAction(action, el) {
   switch(action) {
     case 'next-slide':
-      state.onboardingSlide = Math.min(state.onboardingSlide + 1, slides.length - 1);
+      state.onboardingSlide = Math.min(state.onboardingSlide + 1, getSlides().length - 1);
       render();
       break;
     case 'skip-onboarding':
@@ -1762,7 +2165,8 @@ function handleAction(action, el) {
       const consentComms = $('#consent-comms')?.checked;
       if (!consentTerms) { toast('❌ Você deve aceitar os Termos de Uso e Política de Privacidade'); return; }
       if (!consentHealth) { toast('❌ Você deve autorizar o compartilhamento de dados de saúde'); return; }
-      api('POST', '/api/register', { email, password: pw, name, phone, role }).then(async res => {
+      const referralCode = ($('#reg-referral')?.value?.trim() || localStorage.getItem('estoubem_ref') || '').toUpperCase();
+      api('POST', '/api/register', { email, password: pw, name, phone, role, referral_code: referralCode || undefined }).then(async res => {
         if (!res.ok) { toast(`❌ ${res.error}`); return; }
         setToken(res.data.token);
         // Record LGPD consents
@@ -2505,6 +2909,17 @@ function renderEscalation() {
       `}
     </div>`;
 }
+
+// ─── Handle referral code from URL ────────────────────────
+(function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const refCode = urlParams.get('ref');
+  if (refCode) {
+    localStorage.setItem('estoubem_ref', refCode);
+    // Show toast after first render
+    setTimeout(() => toast('✅ Código de indicação aplicado: ' + refCode), 500);
+  }
+})();
 
 // ─── Initial render (with auto-login) ─────────────────────
 (async () => {

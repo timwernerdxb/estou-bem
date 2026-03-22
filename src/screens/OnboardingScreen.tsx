@@ -21,6 +21,7 @@ import { Button } from "../components/Button";
 import { UserRole, ElderProfile, FamilyProfile, RootStackParamList } from "../types";
 import { notificationService } from "../services/NotificationService";
 import { checkInService } from "../services/CheckInService";
+import { affiliateService } from "../services/AffiliateService";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -62,6 +63,7 @@ export function OnboardingScreen() {
   const [role, setRole] = useState<UserRole | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [referralCode, setReferralCode] = useState("");
 
   const handleNext = () => {
     if (currentSlide < ONBOARDING_SLIDES.length - 1) {
@@ -116,6 +118,11 @@ export function OnboardingScreen() {
 
     // Initialize notifications
     await notificationService.initialize();
+
+    // Process referral code if entered
+    if (referralCode.trim()) {
+      await affiliateService.processReferralCode(referralCode.trim(), "", "");
+    }
 
     // Schedule default check-in if elder
     if (role === "elder") {
@@ -220,6 +227,18 @@ export function OnboardingScreen() {
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
+            placeholderTextColor={COLORS.textLight}
+          />
+
+          {/* Referral Code */}
+          <Text style={styles.label}>Codigo de indicacao (opcional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: EB4K2A"
+            value={referralCode}
+            onChangeText={(t) => setReferralCode(t.toUpperCase())}
+            autoCapitalize="characters"
+            maxLength={10}
             placeholderTextColor={COLORS.textLight}
           />
 

@@ -207,11 +207,7 @@ export function FamilyDashboardScreen() {
             <View>
               <Text style={styles.subLabel}>Plano atual</Text>
               <Text style={styles.subTier}>
-                {tier === "free"
-                  ? "Gratuito"
-                  : tier === "familia"
-                  ? "Familia"
-                  : "Central"}
+                {tier === "free" ? "Gratuito" : "Estou Bem Pro"}
               </Text>
             </View>
             {tier === "free" && (

@@ -7,10 +7,12 @@ import Purchases, {
 } from "react-native-purchases";
 import Constants from "expo-constants";
 import { SubscriptionInfo, SubscriptionTier } from "../types";
-import { ENTITLEMENTS, OFFERING_ID } from "../constants/subscriptions";
+import { ENTITLEMENT_ID, OFFERING_ID } from "../constants/subscriptions";
 
+// API keys — use env variable if available, otherwise fall back to the test key
 const APPLE_API_KEY =
-  Constants.expoConfig?.extra?.revenueCatAppleApiKey || "";
+  Constants.expoConfig?.extra?.revenueCatAppleApiKey ||
+  "test_cHyaMgQCNfspyCJvEhlgIXqIalw";
 const GOOGLE_API_KEY =
   Constants.expoConfig?.extra?.revenueCatGoogleApiKey || "";
 
@@ -22,7 +24,7 @@ class RevenueCatService {
 
     const apiKey = Platform.OS === "ios" ? APPLE_API_KEY : GOOGLE_API_KEY;
 
-    if (!apiKey || apiKey.includes("YOUR_KEY")) {
+    if (!apiKey || apiKey.includes("YOUR_KEY") || apiKey === "placeholder") {
       console.warn(
         "[RevenueCat] No API key configured. Subscriptions will not work."
       );
@@ -32,6 +34,11 @@ class RevenueCatService {
     Purchases.setLogLevel(LOG_LEVEL.DEBUG);
     await Purchases.configure({ apiKey, appUserID: userId });
     this.initialized = true;
+    console.log("[RevenueCat] Initialized successfully");
+  }
+
+  isInitialized(): boolean {
+    return this.initialized;
   }
 
   async getOfferings(): Promise<PurchasesOffering | null> {
@@ -45,14 +52,16 @@ class RevenueCatService {
     }
   }
 
-  async purchasePackage(pkg: PurchasesPackage): Promise<SubscriptionInfo | null> {
+  async purchasePackage(
+    pkg: PurchasesPackage
+  ): Promise<SubscriptionInfo | null> {
     if (!this.initialized) return null;
     try {
       const { customerInfo } = await Purchases.purchasePackage(pkg);
       return this.mapCustomerInfo(customerInfo);
     } catch (error: any) {
       if (error.userCancelled) {
-        return null; // User cancelled — not an error
+        return null; // User cancelled -- not an error
       }
       throw error;
     }
@@ -82,6 +91,18 @@ class RevenueCatService {
     }
   }
 
+  async checkProAccess(): Promise<boolean> {
+    if (!this.initialized) return false;
+    try {
+      const customerInfo = await Purchases.getCustomerInfo();
+      return (
+        customerInfo.entitlements.active[ENTITLEMENT_ID]?.isActive ?? false
+      );
+    } catch {
+      return false;
+    }
+  }
+
   async setUserId(userId: string): Promise<void> {
     if (!this.initialized) return;
     try {
@@ -100,24 +121,33 @@ class RevenueCatService {
     }
   }
 
+  /**
+   * Add a listener for customer info changes (e.g. subscription renewals/cancellations).
+   * Returns an unsubscribe function.
+   */
+  onCustomerInfoUpdated(
+    callback: (info: SubscriptionInfo) => void
+  ): () => void {
+    const listener = (customerInfo: CustomerInfo) => {
+      callback(this.mapCustomerInfo(customerInfo));
+    };
+    Purchases.addCustomerInfoUpdateListener(listener);
+    return () => {
+      Purchases.removeCustomerInfoUpdateListener(listener);
+    };
+  }
+
   private mapCustomerInfo(info: CustomerInfo): SubscriptionInfo {
-    const hasCentral =
-      info.entitlements.active[ENTITLEMENTS.central]?.isActive ?? false;
-    const hasFamilia =
-      info.entitlements.active[ENTITLEMENTS.familia]?.isActive ?? false;
+    const hasPro =
+      info.entitlements.active[ENTITLEMENT_ID]?.isActive ?? false;
 
     let tier: SubscriptionTier = "free";
     let expiresAt: string | undefined;
     let productId: string | undefined;
 
-    if (hasCentral) {
-      tier = "central";
-      const ent = info.entitlements.active[ENTITLEMENTS.central];
-      expiresAt = ent?.expirationDate ?? undefined;
-      productId = ent?.productIdentifier;
-    } else if (hasFamilia) {
-      tier = "familia";
-      const ent = info.entitlements.active[ENTITLEMENTS.familia];
+    if (hasPro) {
+      tier = "pro";
+      const ent = info.entitlements.active[ENTITLEMENT_ID];
       expiresAt = ent?.expirationDate ?? undefined;
       productId = ent?.productIdentifier;
     }

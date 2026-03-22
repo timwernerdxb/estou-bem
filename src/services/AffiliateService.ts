@@ -72,6 +72,8 @@ const COMMISSION_RATES: Record<AffiliateChannel, Record<string, number>> = {
   },
 };
 
+const API_BASE = "https://estou-bem-web-production.up.railway.app";
+
 const AFFILIATE_STORAGE_KEY = "@estoubem_affiliate";
 const REFERRAL_STORAGE_KEY = "@estoubem_referral";
 
@@ -205,9 +207,20 @@ class AffiliateService {
 
     // Send to backend for commission calculation
     try {
-      // This would call your API
-      // await fetch(`${API_BASE}/api/conversions`, { method: 'POST', body: JSON.stringify(payload) });
-      console.log("[Affiliate] Conversion reported:", JSON.stringify(payload));
+      await fetch(`${API_BASE}/api/conversions/track`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event,
+          revenue,
+          affiliate_code: affiliate?.code,
+          affiliate_channel: affiliate?.channel,
+          partner_id: affiliate?.partnerId,
+          campaign_id: affiliate?.campaignId,
+          referrer_user_id: referral?.referrerUserId,
+          metadata: { userId, timestamp: new Date().toISOString() },
+        }),
+      });
 
       analyticsService.trackCustomEvent("af_conversion_reported", {
         event,

@@ -72,6 +72,18 @@ class NotificationService {
         lightColor: "#F44336",
       });
 
+      await Notifications.setNotificationChannelAsync("critical-alerts", {
+        name: "Alertas Criticos",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 1000, 500, 1000, 500, 1000],
+        lockscreenVisibility:
+          Notifications.AndroidNotificationVisibility.PUBLIC,
+        enableVibrate: true,
+        enableLights: true,
+        lightColor: "#FF0000",
+        bypassDnd: true,
+      });
+
       await Notifications.setNotificationChannelAsync("medication", {
         name: "Medicamentos",
         importance: Notifications.AndroidImportance.HIGH,
@@ -108,11 +120,36 @@ class NotificationService {
 
     try {
       const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: "YOUR_EAS_PROJECT_ID",
+        projectId: "2c5b816f-19cf-46ec-bc64-33fc65b47033",
       });
-      return tokenData.data;
-    } catch {
+      const token = tokenData.data;
+
+      // Register token with the server
+      this.registerTokenWithServer(token);
+
+      return token;
+    } catch (err) {
+      console.warn("[Notifications] Failed to get push token:", err);
       return null;
+    }
+  }
+
+  private async registerTokenWithServer(token: string): Promise<void> {
+    try {
+      await fetch(
+        "https://estou-bem-web-production.up.railway.app/api/push-token",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token,
+            platform: Platform.OS,
+          }),
+        }
+      );
+      console.log("[Notifications] Push token registered with server");
+    } catch (err) {
+      console.warn("[Notifications] Failed to register token:", err);
     }
   }
 

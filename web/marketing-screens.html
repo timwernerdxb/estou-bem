@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estou Bem — Marketing Screens</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#1A1A1A; font-family:'Inter',sans-serif; padding:40px 20px; }
+h1 { color:#F5F0EB; text-align:center; font-family:'Playfair Display',serif; font-size:28px; margin-bottom:8px; font-weight:400; }
+.subtitle { color:#9A9189; text-align:center; font-size:14px; margin-bottom:40px; letter-spacing:2px; text-transform:uppercase; }
+
+.screens-grid {
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:32px;
+  max-width:1100px;
+  margin:0 auto;
+}
+
+.screen-wrapper {
+  text-align:center;
+}
+.screen-label {
+  color:#C9A96E;
+  font-size:11px;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  margin-bottom:12px;
+  font-weight:500;
+}
+
+/* iPhone frame */
+.iphone {
+  width:280px;
+  height:560px;
+  background:#F5F0EB;
+  border-radius:36px;
+  padding:12px;
+  margin:0 auto;
+  position:relative;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+.iphone-inner {
+  width:100%;
+  height:100%;
+  background:#F5F0EB;
+  border-radius:28px;
+  overflow:hidden;
+  position:relative;
+}
+.status-bar {
+  height:44px;
+  background:transparent;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0 20px;
+}
+.status-bar .time { font-size:14px; font-weight:600; color:#1A1A1A; }
+.notch {
+  width:120px; height:28px;
+  background:#1A1A1A;
+  border-radius:0 0 16px 16px;
+  position:absolute;
+  top:12px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:10;
+}
+.screen-content {
+  padding:0 16px 16px;
+  height:calc(100% - 44px);
+  overflow:hidden;
+}
+
+/* Screen 1: Check-in */
+.checkin-screen .greeting {
+  font-family:'Playfair Display',serif;
+  font-size:22px;
+  color:#1A1A1A;
+  margin-bottom:4px;
+  font-weight:400;
+}
+.checkin-screen .date {
+  font-size:12px;
+  color:#9A9189;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  margin-bottom:24px;
+}
+.checkin-btn {
+  width:160px;
+  height:160px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#2D4A3E 0%,#3B5E4F 100%);
+  margin:0 auto 20px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  box-shadow: 0 8px 32px rgba(45,74,62,0.3);
+}
+.checkin-btn .check { font-size:40px; color:#fff; margin-bottom:4px; }
+.checkin-btn .label { color:#C9A96E; font-size:13px; letter-spacing:2px; text-transform:uppercase; font-weight:500; }
+.streak-card {
+  background:#fff;
+  border:1px solid #E5DDD3;
+  border-radius:4px;
+  padding:12px 16px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:12px;
+}
+.streak-num { font-family:'Playfair Display',serif; font-size:28px; color:#2D4A3E; }
+.streak-text { font-size:12px; color:#5C5549; letter-spacing:1px; text-transform:uppercase; }
+.next-checkin {
+  background:#fff;
+  border:1px solid #E5DDD3;
+  border-radius:4px;
+  padding:12px 16px;
+  font-size:12px;
+  color:#5C5549;
+}
+.next-checkin span { color:#C9A96E; font-weight:600; }
+
+/* Tab bar */
+.tab-bar {
+  position:absolute;
+  bottom:0;
+  left:0;
+  right:0;
+  height:56px;
+  background:rgba(26,26,26,0.95);
+  display:flex;
+  align-items:center;
+  justify-content:space-around;
+  padding:0 8px;
+  border-radius:0 0 28px 28px;
+}
+.tab-item {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+}
+.tab-icon { width:20px; height:20px; background:rgba(255,255,255,0.3); border-radius:4px; }
+.tab-icon.active { background:#C9A96E; }
+.tab-label { font-size:9px; color:rgba(255,255,255,0.5); letter-spacing:0.5px; }
+.tab-label.active { color:#C9A96E; }
+
+/* Screen 2: Family Dashboard */
+.family-screen .title {
+  font-family:'Playfair Display',serif;
+  font-size:20px;
+  color:#1A1A1A;
+  margin-bottom:16px;
+}
+.elder-card {
+  background:#fff;
+  border:1px solid #E5DDD3;
+  border-radius:4px;
+  padding:14px;
+  margin-bottom:10px;
+}
+.elder-top {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:10px;
+}
+.elder-name { font-family:'Playfair Display',serif; font-size:16px; color:#1A1A1A; }
+.elder-status {
+  font-size:10px;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  padding:4px 10px;
+  border-radius:2px;
+  font-weight:600;
+}
+.status-ok { background:#E8F0EC; color:#2D4A3E; }
+.status-pending { background:#FAF5EB; color:#A68B4B; }
+.elder-stats {
+  display:flex;
+  gap:16px;
+}
+.stat-item { text-align:center; }
+.stat-val { font-family:'Playfair Display',serif; font-size:18px; color:#2D4A3E; }
+.stat-label { font-size:9px; color:#9A9189; letter-spacing:1px; text-transform:uppercase; }
+.gold-divider { width:40px; height:2px; background:#C9A96E; margin:14px 0; }
+
+/* Screen 3: Watch */
+.watch-frame {
+  width:180px;
+  height:220px;
+  background:#1A1A1A;
+  border-radius:44px;
+  margin:60px auto 20px;
+  padding:16px;
+  position:relative;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+.watch-frame::before {
+  content:'';
+  position:absolute;
+  right:-12px;
+  top:60px;
+  width:6px;
+  height:40px;
+  background:#333;
+  border-radius:0 3px 3px 0;
+}
+.watch-inner {
+  width:100%;
+  height:100%;
+  background:#0a0a0a;
+  border-radius:32px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:12px;
+}
+.watch-time { font-size:11px; color:#9A9189; margin-bottom:8px; }
+.watch-btn {
+  width:100px;
+  height:100px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#2D4A3E,#3B5E4F);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  margin-bottom:8px;
+}
+.watch-btn .check { font-size:28px; color:#fff; }
+.watch-btn .label { font-size:8px; color:#C9A96E; letter-spacing:1.5px; text-transform:uppercase; }
+.watch-health {
+  display:flex;
+  gap:16px;
+  font-size:10px;
+  color:#9A9189;
+}
+.watch-health span { color:#C9A96E; }
+.watch-desc {
+  color:#9A9189;
+  font-size:12px;
+  text-align:center;
+  margin-top:16px;
+  line-height:1.6;
+}
+
+/* Screen 4: SOS */
+.sos-screen .title {
+  font-family:'Playfair Display',serif;
+  font-size:20px;
+  color:#1A1A1A;
+  margin-bottom:8px;
+}
+.sos-screen .desc {
+  font-size:12px;
+  color:#9A9189;
+  margin-bottom:20px;
+  line-height:1.5;
+}
+.sos-btn {
+  width:140px;
+  height:140px;
+  border-radius:50%;
+  background:#8B3A3A;
+  margin:0 auto 20px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  box-shadow:0 8px 32px rgba(139,58,58,0.3);
+}
+.sos-btn .icon { font-size:36px; color:#fff; margin-bottom:4px; }
+.sos-btn .label { font-size:11px; color:#F5E8E8; letter-spacing:2px; text-transform:uppercase; }
+.sos-features {
+  list-style:none;
+  padding:0;
+}
+.sos-features li {
+  font-size:12px;
+  color:#5C5549;
+  padding:8px 0;
+  border-bottom:1px solid #E5DDD3;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.sos-features li::before {
+  content:'✓';
+  color:#2D4A3E;
+  font-weight:700;
+  font-size:14px;
+}
+
+/* Screen 5: Paywall */
+.paywall-screen .title {
+  font-family:'Playfair Display',serif;
+  font-size:18px;
+  color:#1A1A1A;
+  text-align:center;
+  margin-bottom:4px;
+}
+.paywall-screen .sub {
+  font-size:11px;
+  color:#9A9189;
+  text-align:center;
+  margin-bottom:16px;
+}
+.plan-card {
+  background:#fff;
+  border:1px solid #E5DDD3;
+  border-radius:4px;
+  padding:14px;
+  margin-bottom:10px;
+  position:relative;
+}
+.plan-card.featured {
+  border-color:#C9A96E;
+  border-width:2px;
+}
+.plan-badge {
+  position:absolute;
+  top:-8px;
+  right:12px;
+  background:#C9A96E;
+  color:#fff;
+  font-size:8px;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  padding:2px 8px;
+  border-radius:2px;
+  font-weight:600;
+}
+.plan-name { font-family:'Playfair Display',serif; font-size:15px; color:#1A1A1A; margin-bottom:4px; }
+.plan-price { font-size:12px; color:#2D4A3E; font-weight:600; margin-bottom:8px; }
+.plan-features { font-size:10px; color:#5C5549; line-height:1.8; }
+.plan-btn {
+  display:block;
+  width:100%;
+  padding:10px;
+  background:#2D4A3E;
+  color:#F5F0EB;
+  border:none;
+  border-radius:4px;
+  font-size:11px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  text-align:center;
+  margin-top:14px;
+  font-weight:500;
+}
+
+/* Screen 6: Onboarding */
+.onboard-screen {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+  text-align:center;
+  padding-top:20px;
+}
+.onboard-icon {
+  width:80px;
+  height:80px;
+  background:linear-gradient(135deg,#2D4A3E,#3B5E4F);
+  border-radius:20px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:36px;
+  color:#fff;
+  margin-bottom:20px;
+}
+.onboard-screen .title {
+  font-family:'Playfair Display',serif;
+  font-size:22px;
+  color:#1A1A1A;
+  margin-bottom:8px;
+  font-weight:400;
+}
+.onboard-screen .desc {
+  font-size:12px;
+  color:#9A9189;
+  line-height:1.6;
+  margin-bottom:24px;
+  padding:0 8px;
+}
+.onboard-btn {
+  width:100%;
+  padding:14px;
+  background:#2D4A3E;
+  color:#F5F0EB;
+  border:none;
+  border-radius:4px;
+  font-size:12px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  font-weight:500;
+  margin-bottom:10px;
+}
+.onboard-dots {
+  display:flex;
+  gap:6px;
+  margin-top:12px;
+}
+.dot { width:6px; height:6px; border-radius:50%; background:#E5DDD3; }
+.dot.active { background:#C9A96E; width:18px; border-radius:3px; }
+</style>
+</head>
+<body>
+
+<h1>Estou Bem</h1>
+<p class="subtitle">App Store Marketing Screens</p>
+
+<div class="screens-grid">
+
+  <!-- Screen 1: Check-in -->
+  <div class="screen-wrapper">
+    <div class="screen-label">Tela 1 — Check-in</div>
+    <div class="iphone">
+      <div class="iphone-inner">
+        <div class="notch"></div>
+        <div class="status-bar"><span class="time">9:41</span></div>
+        <div class="screen-content checkin-screen">
+          <div class="greeting">Bom dia, Maria</div>
+          <div class="date">Quinta-feira, 20 de março</div>
+          <div class="checkin-btn">
+            <span class="check">✓</span>
+            <span class="label">Estou Bem</span>
+          </div>
+          <div class="streak-card">
+            <span class="streak-num">14</span>
+            <div>
+              <div class="streak-text">Dias seguidos</div>
+              <div style="font-size:10px;color:#9A9189;">Sequência ativa</div>
+            </div>
+          </div>
+          <div class="next-checkin">
+            Próximo check-in: <span>18:00</span>
+          </div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item"><div class="tab-icon active"></div><span class="tab-label active">Início</span></div>
+          <div class="tab-item"><div class="tab-icon"></div><span class="tab-label">Saúde</span></div>
+          <div class="tab-item"><div class="tab-icon"></div><span class="tab-label">SOS</span></div>
+          <div class="tab-item"><div class="tab-icon"></div><span class="tab-label">Config</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 2: Family Dashboard -->
+  <div class="screen-wrapper">
+    <div class="screen-label">Tela 2 — Painel Familiar</div>
+    <div class="iphone">
+      <div class="iphone-inner">
+        <div class="notch"></div>
+        <div class="status-bar"><span class="time">9:41</span></div>
+        <div class="screen-content family-screen">
+          <div class="title">Minha Família</div>
+          <div class="elder-card">
+            <div class="elder-top">
+              <span class="elder-name">Maria, 78</span>
+              <span class="elder-status status-ok">BEM</span>
+            </div>
+            <div class="elder-stats">
+              <div class="stat-item"><div class="stat-val">14</div><div class="stat-label">Sequência</div></div>
+              <div class="stat-item"><div class="stat-val">72</div><div class="stat-label">BPM</div></div>
+              <div class="stat-item"><div class="stat-val">2.4k</div><div class="stat-label">Passos</div></div>
+            </div>
+          </div>
+          <div class="elder-card">
+            <div class="elder-top">
+              <span class="elder-name">José, 82</span>
+              <span class="elder-status status-pending">PENDENTE</span>
+            </div>
+            <div class="elder-stats">
+              <div class="stat-item"><div class="stat-val">7</div><div class="stat-label">Sequência</div></div>
+              <div class="stat-item"><div class="stat-val">68</div><div class="stat-label">BPM</div></div>
+              <div class="stat-item"><div class="stat-val">1.1k</div><div class="stat-label">Passos</div></div>
+            </div>
+          </div>
+          <div class="gold-divider"></div>
+          <div style="font-size:11px;color:#9A9189;letter-spacing:1px;text-transform:uppercase;">Atividade recente</div>
+          <div style="font-size:12px;color:#5C5549;margin-top:8px;padding:8px 0;border-bottom:1px solid #E5DDD3;">Maria fez check-in às 08:30</div>
+          <div style="font-size:12px;color:#5C5549;padding:8px 0;border-bottom:1px solid #E5DDD3;">José — aguardando check-in</div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item"><div class="tab-icon active"></div><span class="tab-label active">Família</span></div>
+          <div class="tab-item"><div class="tab-icon"></div><span class="tab-label">Alertas</span></div>
+          <div class="tab-item"><div class="tab-icon"></div><span class="tab-label">Config</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 3: Apple Watch -->
+  <div class="screen-wrapper">
+    <div class="screen-label">Tela 3 — Apple Watch</div>
+    <div style="background:transparent;">
+      <div class="watch-frame">
+        <div class="watch-inner">
+          <div class="watch-time">9:41</div>
+          <div class="watch-btn">
+            <span class="check">✓</span>
+            <span class="label">Estou Bem</span>
+          </div>
+          <div class="watch-health">
+            <span>♥ 72</span>
+            <span>👣 2.4k</span>
+          </div>
+        </div>
+      </div>
+      <div class="watch-desc">
+        Check-in com um toque.<br>
+        Detecção de movimento automática.
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 4: SOS -->
+  <div class="screen-wrapper">
+    <div class="screen-label">Tela 4 — Emergência SOS</div>
+    <div class="iphone">
+      <div class="iphone-inner">
+        <div class="notch"></div>
+        <div class="status-bar"><span class="time">9:41</span></div>
+        <div class="screen-content sos-screen">
+          <div class="title">Emergência</div>
+          <div class="desc">Pressione e segure por 3 segundos para alertar sua família imediatamente.</div>
+          <div class="sos-btn">
+            <span class="icon">🆘</span>
+            <span class="label">SOS</span>
+          </div>
+          <ul class="sos-features">
+            <li>Alerta instantâneo para família</li>
+            <li>Localização GPS em tempo real</li>
+            <li>Ligação automática de emergência</li>
+            <li>Funciona no Apple Watch</li>
+          </ul>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item"><div class="tab-icon"></div><span class="tab-label">Início</span></div>
+          <div class="tab-item"><div class="tab-icon"></div><span class="tab-label">Saúde</span></div>
+          <div class="tab-item"><div class="tab-icon active"></div><span class="tab-label active">SOS</span></div>
+          <div class="tab-item"><div class="tab-icon"></div><span class="tab-label">Config</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 5: Paywall -->
+  <div class="screen-wrapper">
+    <div class="screen-label">Tela 5 — Planos</div>
+    <div class="iphone">
+      <div class="iphone-inner">
+        <div class="notch"></div>
+        <div class="status-bar"><span class="time">9:41</span></div>
+        <div class="screen-content paywall-screen">
+          <div class="title">Escolha seu plano</div>
+          <div class="sub">Tranquilidade para toda a família</div>
+          <div class="gold-divider" style="margin:8px auto 16px;"></div>
+          <div class="plan-card">
+            <div class="plan-name">Família</div>
+            <div class="plan-price">R$ 49,90 / mês</div>
+            <div class="plan-features">
+              ✓ 1 idoso monitorado<br>
+              ✓ Check-ins ilimitados<br>
+              ✓ Alertas de emergência<br>
+              ✓ Apple Watch
+            </div>
+          </div>
+          <div class="plan-card featured">
+            <div class="plan-badge">POPULAR</div>
+            <div class="plan-name">Central</div>
+            <div class="plan-price">R$ 89,90 / mês</div>
+            <div class="plan-features">
+              ✓ Até 5 idosos<br>
+              ✓ Tudo do Família<br>
+              ✓ Detecção de movimento<br>
+              ✓ Monitoramento cardíaco<br>
+              ✓ Suporte prioritário
+            </div>
+          </div>
+          <div class="plan-btn">COMEÇAR AGORA</div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item"><div class="tab-icon"></div><span class="tab-label">Início</span></div>
+          <div class="tab-item"><div class="tab-icon"></div><span class="tab-label">Planos</span></div>
+          <div class="tab-item"><div class="tab-icon"></div><span class="tab-label">Config</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 6: Onboarding -->
+  <div class="screen-wrapper">
+    <div class="screen-label">Tela 6 — Onboarding</div>
+    <div class="iphone">
+      <div class="iphone-inner">
+        <div class="notch"></div>
+        <div class="status-bar"><span class="time">9:41</span></div>
+        <div class="screen-content">
+          <div class="onboard-screen">
+            <div class="onboard-icon">🤍</div>
+            <div class="title">Cuidado com carinho</div>
+            <div class="desc">Acompanhe o bem-estar dos seus pais e avós com check-ins simples e alertas inteligentes.</div>
+            <div class="onboard-btn">COMEÇAR</div>
+            <div style="font-size:11px;color:#9A9189;">Já tem conta? <span style="color:#C9A96E;">Entrar</span></div>
+            <div class="onboard-dots">
+              <div class="dot active"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -124,6 +124,16 @@ async function initDB() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- Affiliate password for dashboard login
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
+      -- Affiliate self-registration fields
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS company TEXT;
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS website TEXT;
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS social_media TEXT;
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS applied_at TIMESTAMPTZ DEFAULT NOW();
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS pix_key TEXT;
+
       -- User referral codes
       ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by INTEGER REFERENCES users(id);
@@ -225,6 +235,34 @@ async function initDB() {
       CREATE INDEX IF NOT EXISTS idx_conversions_affiliate ON conversions(affiliate_code);
       CREATE INDEX IF NOT EXISTS idx_commissions_affiliate ON commissions(affiliate_id);
       CREATE INDEX IF NOT EXISTS idx_consent_user ON consent_records(user_id);
+
+      CREATE TABLE IF NOT EXISTS escalation_alerts (
+        id SERIAL PRIMARY KEY,
+        elder_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        checkin_id INTEGER REFERENCES checkins(id) ON DELETE CASCADE,
+        level INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'active' CHECK (status IN ('active','resolved','dismissed')),
+        notified_contacts JSONB DEFAULT '[]',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_escalation_elder ON escalation_alerts(elder_id);
+
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL,
+        platform TEXT DEFAULT 'unknown',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, token)
+      );
+      CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id);
+
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value JSONB NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      INSERT INTO app_settings (key, value) VALUES ('default_commission_rates', '{"trial_started": 5, "subscription_familia": 15, "subscription_central": 25, "recurring_monthly": 0.10}') ON CONFLICT (key) DO NOTHING;
     `);
     console.log('Database initialized');
 
@@ -364,6 +402,96 @@ app.post('/api/login', async (req, res) => {
   tokens.set(token, user.id);
 
   res.json({ ok: true, token, user });
+});
+
+// ── Push Notification Helper ─────────────────────────────
+async function sendPushNotifications(tokens, title, body, data = {}, critical = false) {
+  if (!tokens.length) return;
+
+  const messages = tokens.map(token => ({
+    to: token,
+    sound: 'default',
+    title,
+    body,
+    data,
+    priority: 'high',
+    channelId: critical ? 'critical-alerts' : 'default',
+    ...(critical ? { _contentAvailable: true } : {}),
+  }));
+
+  // Expo push API accepts up to 100 messages at once
+  const chunks = [];
+  for (let i = 0; i < messages.length; i += 100) {
+    chunks.push(messages.slice(i, i + 100));
+  }
+
+  for (const chunk of chunks) {
+    try {
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(chunk),
+      });
+      const result = await response.json();
+      console.log(`[Push] Sent ${chunk.length} notifications:`, JSON.stringify(result.data?.map(d => d.status) || result));
+    } catch (err) {
+      console.error('[Push] Error sending notifications:', err.message);
+    }
+  }
+}
+
+// ── Push Token Routes ────────────────────────────────────
+// Authenticated version (web app users)
+app.post('/api/push-token', authMiddleware, async (req, res) => {
+  const { token, platform } = req.body;
+  if (!token) return res.status(400).json({ error: 'token is required' });
+
+  await pool.query(
+    `INSERT INTO push_tokens (user_id, token, platform) VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, token) DO UPDATE SET platform = $3, created_at = NOW()`,
+    [req.userId, token, platform || 'unknown']
+  );
+  res.json({ ok: true });
+});
+
+// Public version for mobile app (accepts email to identify user)
+app.post('/api/push-token/register', async (req, res) => {
+  const { token, platform, email, user_id } = req.body;
+  if (!token) return res.status(400).json({ error: 'token is required' });
+
+  let userId = user_id;
+  if (!userId && email) {
+    const user = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    if (user.rows[0]) userId = user.rows[0].id;
+  }
+
+  if (userId) {
+    await pool.query(
+      `INSERT INTO push_tokens (user_id, token, platform) VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, token) DO UPDATE SET platform = $3, created_at = NOW()`,
+      [userId, token, platform || 'unknown']
+    );
+  } else {
+    // Store token without user_id (can be linked later)
+    await pool.query(
+      `INSERT INTO push_tokens (token, platform) VALUES ($1, $2)
+       ON CONFLICT DO NOTHING`,
+      [token, platform || 'unknown']
+    ).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
+app.delete('/api/push-token', authMiddleware, async (req, res) => {
+  const { token } = req.body;
+  if (token) {
+    await pool.query('DELETE FROM push_tokens WHERE user_id = $1 AND token = $2', [req.userId, token]);
+  }
+  res.json({ ok: true });
 });
 
 // ── User Routes ───────────────────────────────────────────
@@ -623,6 +751,45 @@ async function getEffectiveSub(userId) {
 }
 
 // ── Conversion Tracking Routes ────────────────────────────
+// Public conversion endpoint (for mobile app affiliate tracking without auth)
+app.post('/api/conversions/track', async (req, res) => {
+  const { event, revenue, affiliate_code, affiliate_channel, partner_id, campaign_id, referrer_user_id, metadata } = req.body;
+  if (!event) return res.status(400).json({ error: 'event is required' });
+  if (!affiliate_code && !referrer_user_id) return res.status(400).json({ error: 'affiliate_code or referrer_user_id is required' });
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO conversions (event, revenue, affiliate_code, affiliate_channel, partner_id, campaign_id, referrer_user_id, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [event, revenue || 0, affiliate_code, affiliate_channel, partner_id, campaign_id, referrer_user_id, JSON.stringify(metadata || {})]
+    );
+
+    // Auto-create commission if affiliate exists
+    if (affiliate_code) {
+      const affiliate = await pool.query(`SELECT id, commission_rate FROM affiliates WHERE code = $1 AND is_active = true`, [affiliate_code]);
+      if (affiliate.rows[0]) {
+        const rates = affiliate.rows[0].commission_rate || {};
+        const commissionAmount = rates[event] || 0;
+        if (commissionAmount > 0) {
+          await pool.query(
+            `INSERT INTO commissions (affiliate_id, conversion_id, amount) VALUES ($1, $2, $3)`,
+            [affiliate.rows[0].id, result.rows[0].id, commissionAmount]
+          );
+          await pool.query(
+            `UPDATE affiliates SET total_earned = total_earned + $1, total_conversions = total_conversions + 1 WHERE id = $2`,
+            [commissionAmount, affiliate.rows[0].id]
+          );
+        }
+      }
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Public conversion track error:', err);
+    res.status(500).json({ error: 'Failed to track conversion' });
+  }
+});
+
 app.post('/api/conversions', authMiddleware, async (req, res) => {
   const { event, revenue, affiliate_code, affiliate_channel, partner_id, campaign_id, referrer_user_id, metadata } = req.body;
   if (!event) return res.status(400).json({ error: 'event is required' });
@@ -670,14 +837,15 @@ app.get('/api/affiliates', async (req, res) => {
 });
 
 app.post('/api/affiliates', async (req, res) => {
-  const { code, channel, name, email, phone, commission_rate } = req.body;
+  const { code, channel, name, email, phone, password, commission_rate } = req.body;
   if (!code || !channel || !name) return res.status(400).json({ error: 'code, channel, and name are required' });
 
+  const pwHash = password ? hashPassword(password) : null;
   try {
     const result = await pool.query(
-      `INSERT INTO affiliates (code, channel, name, email, phone, commission_rate)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [code, channel, name, email, phone, JSON.stringify(commission_rate || {})]
+      `INSERT INTO affiliates (code, channel, name, email, phone, password_hash, commission_rate)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [code, channel, name, email, phone, pwHash, JSON.stringify(commission_rate || {})]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -686,6 +854,128 @@ app.post('/api/affiliates', async (req, res) => {
   }
 });
 
+// Affiliate self-registration
+app.post('/api/affiliates/register', async (req, res) => {
+  const { name, email, password, phone, channel = 'influencer', company, website, social_media } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ error: 'name, email, and password are required' });
+  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+  const validChannels = ['influencer', 'paid_media', 'ad_network', 'b2b_partner'];
+  const ch = validChannels.includes(channel) ? channel : 'influencer';
+
+  // Generate unique affiliate code: first 3 chars of channel uppercase + 4 random chars
+  const prefix = ch.slice(0, 3).toUpperCase();
+  const randomChars = crypto.randomBytes(3).toString('hex').slice(0, 4).toUpperCase();
+  let code = prefix + randomChars;
+
+  const pwHash = hashPassword(password);
+
+  try {
+    // Ensure code uniqueness (retry once if collision)
+    const existing = await pool.query(`SELECT id FROM affiliates WHERE code = $1`, [code]);
+    if (existing.rows.length > 0) {
+      const retry = crypto.randomBytes(3).toString('hex').slice(0, 4).toUpperCase();
+      code = prefix + retry;
+    }
+
+    const defaultRates = await pool.query("SELECT value FROM app_settings WHERE key = 'default_commission_rates'");
+    const commissionRate = defaultRates.rows[0]?.value || {};
+
+    const result = await pool.query(
+      `INSERT INTO affiliates (code, channel, name, email, phone, password_hash, is_active, company, website, social_media, commission_rate)
+       VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8, $9, $10) RETURNING *`,
+      [code, ch, name, email.toLowerCase(), phone || null, pwHash, company || null, website || null, social_media || null, JSON.stringify(commissionRate)]
+    );
+
+    const affiliate = result.rows[0];
+    delete affiliate.password_hash;
+    res.json({ ok: true, affiliate });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Email or code already exists' });
+    console.error('Affiliate registration error:', err);
+    res.status(500).json({ error: 'Failed to register affiliate' });
+  }
+});
+
+// Affiliate login with email + password
+app.post('/api/affiliates/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
+
+  const hash = hashPassword(password);
+  const affiliate = await pool.query(
+    `SELECT * FROM affiliates WHERE email = $1 AND password_hash = $2 AND is_active = true`,
+    [email.toLowerCase(), hash]
+  );
+  if (affiliate.rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
+
+  const token = generateToken('af_' + affiliate.rows[0].id);
+  tokens.set(token, 'af_' + affiliate.rows[0].id);
+
+  res.json({ ok: true, token, affiliate: { id: affiliate.rows[0].id, code: affiliate.rows[0].code, name: affiliate.rows[0].name, channel: affiliate.rows[0].channel } });
+});
+
+// Authenticated affiliate dashboard
+app.get('/api/affiliates/me/dashboard', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  const token = auth.slice(7);
+  const userId = tokens.get(token);
+  if (!userId || !String(userId).startsWith('af_')) return res.status(401).json({ error: 'Invalid token' });
+
+  const affiliateId = String(userId).replace('af_', '');
+  const affiliate = await pool.query(`SELECT * FROM affiliates WHERE id = $1`, [affiliateId]);
+  if (affiliate.rows.length === 0) return res.status(404).json({ error: 'Affiliate not found' });
+
+  const commissions = await pool.query(
+    `SELECT c.*, cv.event, cv.revenue, cv.created_at as conversion_date
+     FROM commissions c JOIN conversions cv ON c.conversion_id = cv.id
+     WHERE c.affiliate_id = $1 ORDER BY c.created_at DESC LIMIT 100`,
+    [affiliate.rows[0].id]
+  );
+
+  const stats = await pool.query(
+    `SELECT COUNT(*) as total_conversions, SUM(amount) as total_earned,
+     SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) as pending_amount,
+     SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) as paid_amount
+     FROM commissions WHERE affiliate_id = $1`,
+    [affiliate.rows[0].id]
+  );
+
+  res.json({
+    affiliate: affiliate.rows[0],
+    commissions: commissions.rows,
+    stats: stats.rows[0],
+  });
+});
+
+// Update affiliate profile (PIX key, phone, etc)
+app.put('/api/affiliates/me', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  const token = auth.slice(7);
+  const userId = tokens.get(token);
+  if (!userId || !String(userId).startsWith('af_')) return res.status(401).json({ error: 'Invalid token' });
+
+  const affiliateId = String(userId).replace('af_', '');
+  const { pix_key, phone, company, website, social_media } = req.body;
+
+  const result = await pool.query(
+    `UPDATE affiliates SET
+      pix_key = COALESCE($1, pix_key),
+      phone = COALESCE($2, phone),
+      company = COALESCE($3, company),
+      website = COALESCE($4, website),
+      social_media = COALESCE($5, social_media)
+    WHERE id = $6 RETURNING id, name, email, phone, pix_key, company, website, social_media`,
+    [pix_key, phone, company, website, social_media, affiliateId]
+  );
+
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Affiliate not found' });
+  res.json(result.rows[0]);
+});
+
+// Keep public dashboard for backward compat (admin use only)
 app.get('/api/affiliates/:code/dashboard', async (req, res) => {
   const affiliate = await pool.query(`SELECT * FROM affiliates WHERE code = $1`, [req.params.code]);
   if (affiliate.rows.length === 0) return res.status(404).json({ error: 'Affiliate not found' });
@@ -1197,7 +1487,7 @@ app.get('/api/admin/affiliates', adminAuth, async (req, res) => {
 // PUT /api/admin/affiliates/:id - update affiliate
 app.put('/api/admin/affiliates/:id', adminAuth, async (req, res) => {
   try {
-    const { is_active, name, email, phone, channel, commission_rate } = req.body;
+    const { is_active, name, email, phone, channel, commission_rate, pix_key } = req.body;
     const result = await pool.query(
       `UPDATE affiliates SET
         is_active = COALESCE($1, is_active),
@@ -1205,15 +1495,70 @@ app.put('/api/admin/affiliates/:id', adminAuth, async (req, res) => {
         email = COALESCE($3, email),
         phone = COALESCE($4, phone),
         channel = COALESCE($5, channel),
-        commission_rate = COALESCE($6, commission_rate)
-      WHERE id = $7 RETURNING *`,
-      [is_active, name, email, phone, channel, commission_rate ? JSON.stringify(commission_rate) : null, req.params.id]
+        commission_rate = COALESCE($6, commission_rate),
+        pix_key = COALESCE($7, pix_key)
+      WHERE id = $8 RETURNING *`,
+      [is_active, name, email, phone, channel, commission_rate ? JSON.stringify(commission_rate) : null, pix_key !== undefined ? pix_key : null, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Affiliate not found' });
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Admin update affiliate error:', err);
     res.status(500).json({ error: 'Failed to update affiliate' });
+  }
+});
+
+// GET /api/admin/settings - get app-wide settings
+app.get('/api/admin/settings', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM app_settings');
+    const settings = {};
+    result.rows.forEach(r => { settings[r.key] = r.value; });
+    res.json(settings);
+  } catch (err) {
+    console.error('Admin settings error:', err);
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+// PUT /api/admin/settings - update app-wide settings
+app.put('/api/admin/settings', adminAuth, async (req, res) => {
+  try {
+    const { key, value } = req.body;
+    await pool.query(
+      'INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()',
+      [key, JSON.stringify(value)]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Admin update settings error:', err);
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+// POST /api/admin/affiliates/bulk - bulk action on affiliates
+app.post('/api/admin/affiliates/bulk', adminAuth, async (req, res) => {
+  try {
+    const { ids, action, commission_rate } = req.body;
+    if (!ids || !Array.isArray(ids) || !action) return res.status(400).json({ error: 'ids array and action required' });
+
+    if (action === 'activate') {
+      await pool.query('UPDATE affiliates SET is_active = true WHERE id = ANY($1)', [ids]);
+    } else if (action === 'deactivate') {
+      await pool.query('UPDATE affiliates SET is_active = false WHERE id = ANY($1)', [ids]);
+    } else if (action === 'set_commission' && commission_rate) {
+      await pool.query('UPDATE affiliates SET commission_rate = $1 WHERE id = ANY($2)', [JSON.stringify(commission_rate), ids]);
+    } else if (action === 'apply_defaults') {
+      const defaults = await pool.query("SELECT value FROM app_settings WHERE key = 'default_commission_rates'");
+      if (defaults.rows[0]) {
+        await pool.query('UPDATE affiliates SET commission_rate = $1 WHERE id = ANY($2)', [JSON.stringify(defaults.rows[0].value), ids]);
+      }
+    }
+
+    res.json({ ok: true, affected: ids.length });
+  } catch (err) {
+    console.error('Admin bulk affiliates error:', err);
+    res.status(500).json({ error: 'Failed to perform bulk action' });
   }
 });
 
@@ -1461,12 +1806,56 @@ app.get('/api/admin/gamification/leaderboard', adminAuth, async (req, res) => {
   }
 });
 
+// ── Escalation Admin Endpoints ────────────────────────────
+app.get('/api/admin/escalations', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT ea.*, u.name as elder_name, u.phone as elder_phone
+      FROM escalation_alerts ea
+      JOIN users u ON ea.elder_id = u.id
+      ORDER BY ea.created_at DESC LIMIT 100
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin escalations error:', err);
+    res.status(500).json({ error: 'Failed to fetch escalations' });
+  }
+});
+
+app.put('/api/admin/escalations/:id/resolve', adminAuth, async (req, res) => {
+  try {
+    await pool.query(`UPDATE escalation_alerts SET status = 'resolved' WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Resolve escalation error:', err);
+    res.status(500).json({ error: 'Failed to resolve escalation' });
+  }
+});
+
 // ── Static Files ──────────────────────────────────────────
 app.use(express.static(__dirname));
 
 // Admin dashboard
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// Affiliate partner dashboard
+app.get('/affiliate', (req, res) => {
+  res.sendFile(path.join(__dirname, 'affiliate.html'));
+});
+app.get('/parceiro', (req, res) => {
+  res.sendFile(path.join(__dirname, 'affiliate.html'));
+});
+
+// Invite landing page (redirect to app or show download)
+app.get('/invite', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Marketing landing page
+app.get('/landing', (req, res) => {
+  res.sendFile(path.join(__dirname, 'landing.html'));
 });
 
 // SPA fallback
@@ -1479,10 +1868,326 @@ async function start() {
   if (process.env.DATABASE_URL) {
     await initDB();
     console.log('PostgreSQL connected');
+    // Start check-in monitoring cron (every 2 minutes)
+    setInterval(checkMissedCheckins, 2 * 60 * 1000);
+    // Run immediately on startup to catch any missed during downtime
+    setTimeout(checkMissedCheckins, 5000);
+    console.log('Check-in escalation monitor started (every 2 min)');
   } else {
     console.log('No DATABASE_URL — running without database (localStorage only)');
   }
   app.listen(PORT, () => console.log(`Estou Bem server running on port ${PORT}`));
+}
+
+// ── Check-in Escalation Monitor ──────────────────────────
+async function checkMissedCheckins() {
+  try {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    // Get all elder users with their settings
+    const elders = await pool.query(`
+      SELECT u.id, u.name, u.phone,
+             s.checkin_mode, s.checkin_times, s.checkin_interval_hours,
+             s.checkin_window_start, s.checkin_window_end
+      FROM users u
+      LEFT JOIN settings s ON s.user_id = u.id
+      WHERE u.role = 'elder'
+    `);
+
+    for (const elder of elders.rows) {
+      const mode = elder.checkin_mode || 'scheduled';
+      const windowStart = elder.checkin_window_start || '07:00';
+      const windowEnd = elder.checkin_window_end || '22:00';
+      const intervalHours = elder.checkin_interval_hours || 2;
+      const checkinTimes = elder.checkin_times || ['09:00'];
+
+      const windowStartMin = parseInt(windowStart.split(':')[0]) * 60 + parseInt(windowStart.split(':')[1]);
+      const windowEndMin = parseInt(windowEnd.split(':')[0]) * 60 + parseInt(windowEnd.split(':')[1]);
+
+      // Skip if outside active window
+      if (nowMinutes < windowStartMin || nowMinutes > windowEndMin) continue;
+
+      if (mode === 'scheduled') {
+        // Auto-create pending check-ins for today if they don't exist yet
+        for (const time of checkinTimes) {
+          const existing = await pool.query(
+            `SELECT id FROM checkins WHERE user_id = $1 AND date = $2 AND time = $3`,
+            [elder.id, today, time]
+          );
+          if (existing.rows.length === 0) {
+            await pool.query(
+              `INSERT INTO checkins (user_id, date, time, status) VALUES ($1, $2, $3, 'pending')`,
+              [elder.id, today, time]
+            );
+            console.log(`[Escalation] Auto-created pending check-in for ${elder.name} at ${time}`);
+          }
+        }
+
+        // Check for overdue check-ins (scheduled time + 30 min grace)
+        const pendingCheckins = await pool.query(
+          `SELECT id, time FROM checkins WHERE user_id = $1 AND date = $2 AND status = 'pending'`,
+          [elder.id, today]
+        );
+
+        for (const checkin of pendingCheckins.rows) {
+          const [h, m] = checkin.time.split(':').map(Number);
+          const scheduledMin = h * 60 + m;
+          const overdueMin = nowMinutes - scheduledMin;
+
+          if (overdueMin <= 0) continue;
+
+          // Determine escalation level based on how overdue
+          let targetLevel;
+          let pushTitle;
+          let pushBody;
+          if (overdueMin >= 120) {
+            targetLevel = 3;
+            pushTitle = 'EMERGENCIA!';
+            pushBody = `EMERGENCIA: ${elder.name} nao responde ha 2 horas! Acao imediata necessaria.`;
+          } else if (overdueMin >= 60) {
+            targetLevel = 2;
+            pushTitle = 'Check-in urgente perdido!';
+            pushBody = `${elder.name} nao respondeu ao check-in ha mais de 1 hora. Por favor verifique.`;
+          } else if (overdueMin >= 30) {
+            targetLevel = 1;
+            pushTitle = 'Check-in perdido!';
+            pushBody = `${elder.name} nao respondeu ao check-in. Verifique se esta tudo bem.`;
+          } else {
+            continue; // Not yet overdue (within 30 min grace)
+          }
+
+          // Mark as missed
+          await pool.query(`UPDATE checkins SET status = 'missed' WHERE id = $1`, [checkin.id]);
+
+          // Check if alert already exists for this check-in
+          const existingAlert = await pool.query(
+            'SELECT id, level FROM escalation_alerts WHERE checkin_id = $1 AND status = $2',
+            [checkin.id, 'active']
+          );
+
+          const family = await pool.query(
+            `SELECT id, name, phone, email FROM users WHERE linked_elder_id = $1`,
+            [elder.id]
+          );
+          const contacts = await pool.query(
+            `SELECT id, name, phone, relationship, priority FROM contacts WHERE user_id = $1 ORDER BY priority`,
+            [elder.id]
+          );
+
+          const notifiedContacts = [
+            ...family.rows.map(f => ({ type: 'family', name: f.name, phone: f.phone })),
+            ...contacts.rows.map(c => ({ type: 'emergency', name: c.name, phone: c.phone, relationship: c.relationship }))
+          ];
+
+          if (existingAlert.rows.length > 0) {
+            const currentLevel = existingAlert.rows[0].level;
+            if (targetLevel <= currentLevel) continue; // Already at this level or higher
+
+            // Escalate: upgrade level
+            await pool.query(
+              `UPDATE escalation_alerts SET level = $1, notified_contacts = $2 WHERE id = $3`,
+              [targetLevel, JSON.stringify(notifiedContacts), existingAlert.rows[0].id]
+            );
+            console.log(`[Escalation] UPGRADED to level ${targetLevel} for elder ${elder.name} (ID: ${elder.id}) scheduled at ${checkin.time}`);
+          } else {
+            // Create new alert at level 1 (or higher if already very overdue)
+            await pool.query(
+              `INSERT INTO escalation_alerts (elder_id, checkin_id, level, status, notified_contacts)
+               VALUES ($1, $2, $3, 'active', $4)`,
+              [elder.id, checkin.id, targetLevel, JSON.stringify(notifiedContacts)]
+            );
+            console.log(`[Escalation] MISSED check-in for elder ${elder.name} (ID: ${elder.id}) scheduled at ${checkin.time} — level ${targetLevel}`);
+          }
+
+          console.log(`[Escalation]   Family to notify: ${family.rows.map(f => f.name).join(', ') || 'none'}`);
+          console.log(`[Escalation]   Emergency contacts: ${contacts.rows.map(c => `${c.name} (${c.phone})`).join(', ') || 'none'}`);
+
+          // Send push notifications to family members
+          const familyTokens = await pool.query(
+            `SELECT pt.token FROM push_tokens pt
+             JOIN users u ON pt.user_id = u.id
+             WHERE u.linked_elder_id = $1`,
+            [elder.id]
+          );
+
+          if (familyTokens.rows.length > 0) {
+            const tokens = familyTokens.rows.map(r => r.token);
+            await sendPushNotifications(
+              tokens,
+              pushTitle,
+              pushBody,
+              { type: 'missed_checkin', elderId: elder.id, checkinId: checkin.id, level: targetLevel },
+              targetLevel >= 2 // critical for level 2+
+            );
+            console.log(`[Push] Sent ${tokens.length} level-${targetLevel} alerts for ${elder.name}`);
+          }
+
+          // Send reminder to the elder themselves
+          const elderTokens = await pool.query(
+            `SELECT token FROM push_tokens WHERE user_id = $1`,
+            [elder.id]
+          );
+          if (elderTokens.rows.length > 0) {
+            await sendPushNotifications(
+              elderTokens.rows.map(r => r.token),
+              'Voce tem um check-in pendente!',
+              'Toque para confirmar que esta tudo bem.',
+              { type: 'checkin_reminder', screen: 'Home' },
+              false
+            );
+          }
+        }
+
+      } else if (mode === 'interval') {
+        // Interval mode: check if last confirmed check-in is too old
+        const lastConfirmed = await pool.query(
+          `SELECT id, created_at FROM checkins
+           WHERE user_id = $1 AND status = 'confirmed'
+           ORDER BY created_at DESC LIMIT 1`,
+          [elder.id]
+        );
+
+        const graceHours = 0.5;
+        const maxGapMs = (intervalHours + graceHours) * 60 * 60 * 1000;
+        const lastTime = lastConfirmed.rows.length > 0
+          ? new Date(lastConfirmed.rows[0].created_at)
+          : null;
+
+        const isOverdue = !lastTime || (now - lastTime > maxGapMs);
+
+        // Ensure a pending check-in exists for interval mode
+        const pendingExists = await pool.query(
+          `SELECT id FROM checkins WHERE user_id = $1 AND date = $2 AND status = 'pending'`,
+          [elder.id, today]
+        );
+
+        if (pendingExists.rows.length === 0) {
+          // Create a pending check-in for interval mode
+          const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          await pool.query(
+            `INSERT INTO checkins (user_id, date, time, status) VALUES ($1, $2, $3, 'pending')`,
+            [elder.id, today, timeStr]
+          );
+          console.log(`[Escalation] Auto-created interval check-in for ${elder.name} at ${timeStr}`);
+        }
+
+        if (isOverdue) {
+          // Find the pending check-in to associate with the alert
+          const pendingCheckin = await pool.query(
+            `SELECT id FROM checkins WHERE user_id = $1 AND date = $2 AND status = 'pending' ORDER BY created_at DESC LIMIT 1`,
+            [elder.id, today]
+          );
+
+          if (pendingCheckin.rows.length > 0) {
+            const checkinId = pendingCheckin.rows[0].id;
+
+            // Mark as missed
+            await pool.query(`UPDATE checkins SET status = 'missed' WHERE id = $1`, [checkinId]);
+
+            // Determine escalation level based on how long overdue
+            const overdueMs = lastTime ? (now - lastTime) : Infinity;
+            const overdueHours = overdueMs / (60 * 60 * 1000);
+            let targetLevel;
+            let pushTitle;
+            let pushBody;
+            if (overdueHours >= 2 + intervalHours || !lastTime) {
+              targetLevel = 3;
+              pushTitle = 'EMERGENCIA!';
+              pushBody = `EMERGENCIA: ${elder.name} nao responde ha muito tempo! Acao imediata necessaria.`;
+            } else if (overdueHours >= 1 + intervalHours) {
+              targetLevel = 2;
+              pushTitle = 'Check-in urgente perdido!';
+              pushBody = `${elder.name} nao respondeu ao check-in ha mais de 1 hora. Por favor verifique.`;
+            } else {
+              targetLevel = 1;
+              pushTitle = 'Check-in perdido!';
+              pushBody = `${elder.name} nao respondeu ao check-in. Verifique se esta tudo bem.`;
+            }
+
+            // Check if alert already exists
+            const existingAlert = await pool.query(
+              'SELECT id, level FROM escalation_alerts WHERE checkin_id = $1 AND status = $2',
+              [checkinId, 'active']
+            );
+
+            const family = await pool.query(
+              `SELECT id, name, phone, email FROM users WHERE linked_elder_id = $1`,
+              [elder.id]
+            );
+            const contacts = await pool.query(
+              `SELECT id, name, phone, relationship, priority FROM contacts WHERE user_id = $1 ORDER BY priority`,
+              [elder.id]
+            );
+
+            const notifiedContacts = [
+              ...family.rows.map(f => ({ type: 'family', name: f.name, phone: f.phone })),
+              ...contacts.rows.map(c => ({ type: 'emergency', name: c.name, phone: c.phone, relationship: c.relationship }))
+            ];
+
+            if (existingAlert.rows.length > 0) {
+              const currentLevel = existingAlert.rows[0].level;
+              if (targetLevel <= currentLevel) continue; // Already at this level or higher
+
+              await pool.query(
+                `UPDATE escalation_alerts SET level = $1, notified_contacts = $2 WHERE id = $3`,
+                [targetLevel, JSON.stringify(notifiedContacts), existingAlert.rows[0].id]
+              );
+              console.log(`[Escalation] UPGRADED to level ${targetLevel} for elder ${elder.name} (ID: ${elder.id}) — interval mode`);
+            } else {
+              await pool.query(
+                `INSERT INTO escalation_alerts (elder_id, checkin_id, level, status, notified_contacts)
+                 VALUES ($1, $2, $3, 'active', $4)`,
+                [elder.id, checkinId, targetLevel, JSON.stringify(notifiedContacts)]
+              );
+              console.log(`[Escalation] MISSED check-in for elder ${elder.name} (ID: ${elder.id}) — interval mode, last confirmed: ${lastTime ? lastTime.toISOString() : 'never'} — level ${targetLevel}`);
+            }
+
+            console.log(`[Escalation]   Family to notify: ${family.rows.map(f => f.name).join(', ') || 'none'}`);
+            console.log(`[Escalation]   Emergency contacts: ${contacts.rows.map(c => `${c.name} (${c.phone})`).join(', ') || 'none'}`);
+
+            // Send push notifications to family members
+            const familyTokens = await pool.query(
+              `SELECT pt.token FROM push_tokens pt
+               JOIN users u ON pt.user_id = u.id
+               WHERE u.linked_elder_id = $1`,
+              [elder.id]
+            );
+
+            if (familyTokens.rows.length > 0) {
+              const tokens = familyTokens.rows.map(r => r.token);
+              await sendPushNotifications(
+                tokens,
+                pushTitle,
+                pushBody,
+                { type: 'missed_checkin', elderId: elder.id, checkinId: checkinId, level: targetLevel },
+                targetLevel >= 2
+              );
+              console.log(`[Push] Sent ${tokens.length} level-${targetLevel} alerts for ${elder.name}`);
+            }
+
+            // Send reminder to the elder themselves
+            const elderTokens = await pool.query(
+              `SELECT token FROM push_tokens WHERE user_id = $1`,
+              [elder.id]
+            );
+            if (elderTokens.rows.length > 0) {
+              await sendPushNotifications(
+                elderTokens.rows.map(r => r.token),
+                'Voce tem um check-in pendente!',
+                'Toque para confirmar que esta tudo bem.',
+                { type: 'checkin_reminder', screen: 'Home' },
+                false
+              );
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Escalation] Error checking missed check-ins:', err);
+  }
 }
 
 start().catch(err => {

@@ -4,7 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Estou Bem",
   slug: "estou-bem",
-  version: "1.0.0",
+  version: "1.1.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
@@ -12,29 +12,28 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   splash: {
     image: "./assets/splash-icon.png",
     resizeMode: "contain",
-    backgroundColor: "#4A90D9",
+    backgroundColor: "#F5F0EB",
   },
-  assetBundlePatterns: ["**/*"],
   ios: {
-    supportsTablet: true,
+    supportsTablet: false,
     bundleIdentifier: "com.estoubem.app",
     buildNumber: "1",
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
-        "Estou Bem uses your location to notify family members in case of emergency and for geofencing safety zones.",
+        "Estou Bem usa sua localização para notificar familiares em caso de emergência.",
       NSLocationAlwaysAndWhenInUseUsageDescription:
-        "Estou Bem needs background location access to detect when the elderly person leaves safe zones and to share location during emergencies.",
+        "Estou Bem precisa de acesso à localização em segundo plano para detectar quando o idoso sai de zonas seguras.",
       NSMotionUsageDescription:
-        "Estou Bem uses motion sensors to detect falls and monitor activity for the check-in system.",
+        "Estou Bem usa sensores de movimento para detectar quedas e monitorar atividade.",
       NSHealthShareUsageDescription:
-        "Estou Bem reads health data to enrich check-in information shared with family members.",
-      UIBackgroundModes: ["fetch", "remote-notification", "location"],
-      SKAdNetworkItems: [
-        { SKAdNetworkIdentifier: "v9wttpbfk9.skadnetwork" }, // AppsFlyer
-        { SKAdNetworkIdentifier: "2u9pt9hc89.skadnetwork" }, // Facebook
-        { SKAdNetworkIdentifier: "4fzdc2evr5.skadnetwork" }, // Facebook
-        { SKAdNetworkIdentifier: "ydx93a7ass.skadnetwork" }, // Google
-      ],
+        "Estou Bem usa dados de saúde para monitorar o bem-estar do idoso e alertar familiares.",
+      NSHealthUpdateUsageDescription:
+        "Estou Bem registra check-ins de saúde para acompanhamento familiar.",
+      UIBackgroundModes: ["fetch", "remote-notification"],
+    },
+    entitlements: {
+      "com.apple.developer.healthkit": true,
+      "com.apple.developer.healthkit.access": [],
     },
     config: {
       usesNonExemptEncryption: false,
@@ -42,60 +41,55 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: "#4A90D9",
+      foregroundImage: "./assets/android-icon-foreground.png",
+      backgroundImage: "./assets/android-icon-background.png",
+      monochromeImage: "./assets/android-icon-monochrome.png",
+      backgroundColor: "#F5F0EB",
     },
     package: "com.estoubem.app",
-    versionCode: 1,
     permissions: [
-      "ACCESS_FINE_LOCATION",
-      "ACCESS_COARSE_LOCATION",
-      "ACCESS_BACKGROUND_LOCATION",
       "ACTIVITY_RECOGNITION",
       "RECEIVE_BOOT_COMPLETED",
       "VIBRATE",
       "POST_NOTIFICATIONS",
-      "FOREGROUND_SERVICE",
-      "FOREGROUND_SERVICE_HEALTH",
-      "BODY_SENSORS",
-      "HIGH_SAMPLING_RATE_SENSORS",
     ],
-    googleServicesFile: "./google-services.json",
   },
   plugins: [
     [
       "expo-notifications",
       {
-        icon: "./assets/notification-icon.png",
-        color: "#4A90D9",
-        sounds: ["./assets/checkin-alarm.wav"],
+        color: "#2D4A3E",
       },
     ],
     [
       "expo-location",
       {
         locationAlwaysAndWhenInUsePermission:
-          "Allow Estou Bem to use your location for emergency sharing and geofencing.",
-        isAndroidBackgroundLocationEnabled: true,
+          "Estou Bem usa sua localização para compartilhar em emergências.",
       },
     ],
     [
       "expo-sensors",
       {
         motionPermission:
-          "Allow Estou Bem to access motion data for fall detection.",
+          "Estou Bem usa sensores de movimento para detecção de quedas.",
       },
     ],
     ["expo-background-fetch"],
     ["expo-task-manager"],
+    ["@bacons/apple-targets"],
+    ["./plugins/withAsyncStorageRepo"],
   ],
   extra: {
-    revenueCatAppleApiKey: process.env.REVENUECAT_APPLE_API_KEY || "appl_YOUR_KEY_HERE",
-    revenueCatGoogleApiKey: process.env.REVENUECAT_GOOGLE_API_KEY || "goog_YOUR_KEY_HERE",
-    appsflyerDevKey: process.env.APPSFLYER_DEV_KEY || "YOUR_APPSFLYER_DEV_KEY",
-    appsflyerAppId: process.env.APPSFLYER_APP_ID || "YOUR_APP_ID",
+    revenueCatAppleApiKey:
+      process.env.REVENUECAT_APPLE_API_KEY ||
+      "test_cHyaMgQCNfspyCJvEhlgIXqIalw",
+    revenueCatGoogleApiKey:
+      process.env.REVENUECAT_GOOGLE_API_KEY || "placeholder",
+    appsflyerDevKey: process.env.APPSFLYER_DEV_KEY || "placeholder",
+    appsflyerAppId: process.env.APPSFLYER_APP_ID || "placeholder",
     eas: {
-      projectId: "YOUR_EAS_PROJECT_ID",
+      projectId: "2c5b816f-19cf-46ec-bc64-33fc65b47033",
     },
   },
 });

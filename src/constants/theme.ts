@@ -149,8 +149,7 @@ export const CHECKIN_CONFIG = {
   passiveCheckWindowMinutes: 15,
   maxCheckinsPerDay: {
     free: 1,
-    familia: 3,
-    central: 5,
+    pro: 10,
   },
   escalationDelayMinutes: {
     reminder: 0,

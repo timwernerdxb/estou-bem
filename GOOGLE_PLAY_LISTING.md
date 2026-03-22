@@ -173,41 +173,62 @@ Novidades da versão 1.1.0:
 
 ---
 
-## 9. Screenshot Captions (Telefone — 6 imagens)
+## 9. Screenshot Strategy
 
-**Screenshot 1 — Tela de Check-in**
-> Tela principal com o grande botão circular "Estou Bem" em dourado sobre fundo verde floresta. Saudação personalizada ("Bom dia, Dona Maria") e horário do próximo check-in. Design limpo com tipografia ampliada.
+> **Approach:** Marketing-first. Only Screenshot 1 shows the actual app. The rest are designed marketing frames that sell the value — bold headlines, feature highlights, social proof. Same approach as Life360, Noom, and Calm.
 
-**Screenshot 2 — Sistema de Escalonamento**
-> Diagrama visual das etapas: check-in pendente > WhatsApp para a família > ligação automática > alerta de emergência. Linha do tempo vertical com status em tempo real. Fundo creme com destaques em verde e dourado.
+### Telefone (6 imagens)
 
-**Screenshot 3 — Controle de Medicamentos**
-> Lista de medicamentos do dia com horários, dosagens e status (tomado/pendente). Indicador de estoque "Losartana — 8 comprimidos restantes". Cards em creme com ícones dourados.
+**Screenshot 1 — App Real: Tela de Check-in** _(único screenshot do app)_
+> Phone mockup showing the actual check-in screen: big gold button, "Boa tarde, Dona Maria" greeting, dark tab bar. Clean device frame on cream/green gradient background.
+> **Headline:** "Um toque. Toda a tranquilidade."
 
-**Screenshot 4 — Painel da Família**
-> Dashboard mostrando: status confirmado às 08:32, frequência cardíaca 72bpm, 3 de 4 medicamentos tomados, último movimento há 12 min. Gráficos suaves em verde floresta sobre fundo creme.
+**Screenshot 2 — Marketing: Como Funciona**
+> Full-bleed marketing frame on warm cream. 4-step vertical timeline with gold connecting line:
+> 1. 🔔 "Lembrete carinhoso"
+> 2. ✅ "Um toque: Estou Bem"
+> 3. 📱 "Família notificada via WhatsApp"
+> 4. 🚨 "Emergência acionada"
+> **Headline:** "Se a resposta não chegar, nós agimos."
 
-**Screenshot 5 — Marketplace de Saúde**
-> Grade de serviços: Farmácia, Telemedicina, Cuidador, Fisioterapia com ícones elegantes. Card destaque "Consulta por vídeo a partir de R$ 49". Fundo creme com acentos dourados.
+**Screenshot 3 — Marketing: Smartwatch**
+> Lifestyle photo (elderly wrist with smartwatch, warm lighting). Overlaid watch mockup with check-in button.
+> **Headline:** "Cuidado no pulso."
+> **3 pills:** "Check-in com 1 toque" · "Detecção de quedas" · "Monitor cardíaco"
 
-**Screenshot 6 — Relatório Mensal de Saúde**
-> Relatório visual: taxa de check-in 96%, adesão a medicamentos 91%, frequência cardíaca média 74bpm, gráfico semanal. Insights personalizados. Tipografia refinada em verde e dourado.
+**Screenshot 4 — Marketing: Painel da Família**
+> Split composition. Left: family silhouette. Right: floating stat cards — "✅ Check-in às 08:32", "❤️ 72 bpm", "💊 3/4 medicamentos", "🚶 Ativo há 12 min".
+> **Headline:** "Acompanhe quem você ama. Em tempo real."
+
+**Screenshot 5 — Marketing: Proteção Completa**
+> Dark green background. Large gold shield icon with heart. 6 feature icons in circle: Check-in, Medicamentos, SOS, Smartwatch, Escalonamento, Relatórios.
+> **Headline:** "Tudo que sua família precisa."
+
+**Screenshot 6 — Marketing: Social Proof / CTA**
+> Cream background. 5 gold stars. Testimonial in serif italic:
+> _"Minha mãe mora sozinha. Antes eu ligava 3 vezes por dia. Agora recebo um 'Estou Bem' e fico tranquila."_
+> — Ana C., São Paulo
+> "Comece grátis" button. "Planos a partir de R$ 49,90/mês"
 
 ---
 
 ## 10. Screenshot Captions (Smartwatch — 4 imagens)
 
-**Screenshot Watch 1 — Check-in no Pulso**
-> Botão central "Estou Bem" em dourado com texto "Toque para confirmar". Fundo verde floresta. Máxima simplicidade.
+**Screenshot Watch 1 — Check-in no Pulso** _(screenshot real)_
+> Watch mockup on cream background showing green check-in button.
+> **Headline:** "Um toque. No pulso."
 
-**Screenshot Watch 2 — Confirmação de Check-in**
-> Ícone de coração com check-mark em dourado, texto "Tudo certo!" e horário da confirmação. Fundo verde floresta.
+**Screenshot Watch 2 — Marketing: Detecção de Movimento**
+> Watch mockup with movement detection UI. Soft green gradient background.
+> **Headline:** "Detecta quedas automaticamente."
 
-**Screenshot Watch 3 — Monitoramento Cardíaco**
-> Frequência cardíaca atual (72 bpm) com gráfico em tempo real. Status "Normal" em verde claro.
+**Screenshot Watch 3 — Marketing: Monitor Cardíaco**
+> Watch mockup showing 72 bpm with pulse line. Dark green background.
+> **Headline:** "Monitoramento 24h."
 
-**Screenshot Watch 4 — SOS de Emergência**
-> Botão SOS vermelho centralizado com "Segurar para SOS". Contatos de emergência abaixo. Alto contraste para máxima legibilidade.
+**Screenshot Watch 4 — Marketing: SOS**
+> Watch mockup with red SOS button. Cream background with red accent.
+> **Headline:** "Emergência? Um gesto."
 
 ---
 

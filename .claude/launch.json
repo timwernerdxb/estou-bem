@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "web", "-l", "3333"],
+      "port": 3333
+    },
+    {
+      "name": "marketing",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8888", "-d", "web"],
+      "port": 8888
+    }
+  ]
+}

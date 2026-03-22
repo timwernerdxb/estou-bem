@@ -1,7 +1,7 @@
 // ─── User & Roles ───────────────────────────────────────────────
 export type UserRole = "elder" | "family" | "caregiver";
 
-export type SubscriptionTier = "free" | "familia" | "central";
+export type SubscriptionTier = "free" | "pro";
 
 export interface User {
   id: string;
@@ -161,6 +161,7 @@ export type RootStackParamList = {
   ElderTabs: undefined;
   FamilyTabs: undefined;
   Paywall: undefined;
+  CustomerCenter: undefined;
   Settings: undefined;
   MedicationDetail: { medicationId: string };
   AddMedication: undefined;

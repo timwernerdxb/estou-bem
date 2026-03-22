@@ -3,7 +3,9 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as Notifications from "expo-notifications";
+import * as Linking from "expo-linking";
 import { AppProvider } from "./src/store/AppContext";
+import { I18nProvider } from "./src/i18n";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { notificationService } from "./src/services/NotificationService";
 import { revenueCatService } from "./src/services/RevenueCatService";
@@ -21,6 +23,24 @@ export default function App() {
     affiliateService.initialize();
     healthIntegrationService.initialize();
     autoCheckinService.initialize();
+
+    // Handle deep links for affiliate/referral
+    const handleDeepLink = (event: { url: string }) => {
+      const parsed = Linking.parse(event.url);
+      if (parsed.queryParams?.ref) {
+        affiliateService.processAffiliateLink(
+          parsed.queryParams as Record<string, string>
+        );
+      }
+    };
+
+    // Check initial URL (app opened via deep link)
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    });
+
+    // Listen for future deep links while app is running
+    const linkSub = Linking.addEventListener("url", handleDeepLink);
 
     // Handle notification responses (e.g., check-in button tapped)
     const responseSubscription =
@@ -48,6 +68,7 @@ export default function App() {
       });
 
     return () => {
+      linkSub.remove();
       responseSubscription.remove();
     };
   }, []);
@@ -55,10 +76,12 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AppProvider>
-          <StatusBar style="dark" />
-          <AppNavigator />
-        </AppProvider>
+        <I18nProvider>
+          <AppProvider>
+            <StatusBar style="dark" />
+            <AppNavigator />
+          </AppProvider>
+        </I18nProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
