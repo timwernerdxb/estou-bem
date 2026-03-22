@@ -795,6 +795,100 @@ async function makeVoiceCall(to, message) {
   }
 }
 
+// ── Emergency SAMU Call with Conference ──────────────────
+async function callSAMUWithConference(elder, familyPhones) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+
+  if (!accountSid || !authToken || !fromNumber) {
+    console.log(`[SAMU] No Twilio credentials. Would call SAMU 192 for ${elder.name} and patch in ${familyPhones.length} contacts`);
+    return false;
+  }
+
+  try {
+    const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const conferenceName = `samu-${elder.id}-${Date.now()}`;
+
+    // Step 1: Call SAMU 192 with AI context about the emergency
+    const samuTwiml = `<Response>
+      <Say language="pt-BR" voice="Polly.Camila">
+        Ola, aqui e o sistema automatico do Estou Bem, aplicativo de cuidado senior.
+        Temos uma emergencia. O idoso ${elder.name} nao responde a check-ins ha mais de 2 horas.
+        ${elder.phone ? 'O telefone do idoso e ' + elder.phone.split('').join(' ') + '.' : ''}
+        Estamos conectando familiares a esta ligacao agora.
+        Por favor aguarde.
+      </Say>
+      <Dial>
+        <Conference startConferenceOnEnter="true" endConferenceOnExit="false" beep="false">${conferenceName}</Conference>
+      </Dial>
+    </Response>`;
+
+    const samuParams = new URLSearchParams({
+      To: '+55192',
+      From: fromNumber,
+      Twiml: samuTwiml,
+      StatusCallback: `https://estou-bem-web-production.up.railway.app/api/twilio/status`,
+      StatusCallbackEvent: 'completed',
+    });
+
+    const samuRes = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`, {
+      method: 'POST',
+      headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: samuParams.toString(),
+    });
+    const samuResult = await samuRes.json();
+    console.log(`[SAMU] Called 192 for ${elder.name}: ${samuResult.sid || samuResult.message}`);
+
+    // Step 2: Patch in each family contact to the same conference
+    for (const phone of familyPhones) {
+      const familyTwiml = `<Response>
+        <Say language="pt-BR" voice="Polly.Camila">
+          EMERGENCIA do Estou Bem. ${elder.name} nao responde ha 2 horas.
+          Voce esta sendo conectado a uma ligacao com o SAMU 192.
+        </Say>
+        <Dial>
+          <Conference startConferenceOnEnter="true" endConferenceOnExit="false" beep="true">${conferenceName}</Conference>
+        </Dial>
+      </Response>`;
+
+      const familyParams = new URLSearchParams({
+        To: phone,
+        From: fromNumber,
+        Twiml: familyTwiml,
+      });
+
+      await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`, {
+        method: 'POST',
+        headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: familyParams.toString(),
+      }).then(r => r.json()).then(r => {
+        console.log(`[SAMU Conference] Patched in ${phone}: ${r.sid || r.message}`);
+      }).catch(e => {
+        console.error(`[SAMU Conference] Failed to patch ${phone}:`, e.message);
+      });
+    }
+
+    // Log the emergency call
+    await pool.query(
+      `INSERT INTO email_alerts (recipient_email, subject, related_user_id, alert_type)
+       VALUES ($1, $2, $3, $4)`,
+      ['SAMU-192', `EMERGENCY CALL: ${elder.name}`, elder.id, 'samu_call']
+    ).catch(() => {});
+
+    return true;
+  } catch (err) {
+    console.error(`[SAMU] Error calling SAMU for ${elder.name}:`, err.message);
+    return false;
+  }
+}
+
+// Twilio call status callback
+app.post('/api/twilio/status', express.urlencoded({ extended: false }), (req, res) => {
+  console.log(`[Twilio Status] Call ${req.body.CallSid}: ${req.body.CallStatus} (duration: ${req.body.CallDuration}s)`);
+  res.sendStatus(200);
+});
+
 // ── Push Token Routes ────────────────────────────────────
 // Authenticated version (web app users)
 app.post('/api/push-token', authMiddleware, async (req, res) => {
@@ -2602,19 +2696,18 @@ async function checkMissedCheckins() {
             }
           }
           if (targetLevel >= 3) {
-            // Level 3 EMERGENCY: Voice call to ALL contacts + emergency SMS
-            for (const fm of family.rows) {
-              if (fm.phone) {
-                await makeVoiceCall(fm.phone, `EMERGENCIA. ${elder.name} nao responde ao check-in do Estou Bem ha 2 horas. Por favor verifique imediatamente.`);
-                await sendSMS(fm.phone, `EMERGENCIA: ${elder.name} nao responde ha 2 horas. Verifique imediatamente. Se necessario, ligue SAMU 192.`);
-              }
+            // Level 3 EMERGENCY: Call SAMU 192 + conference ALL contacts
+            const allPhones = [
+              ...family.rows.filter(f => f.phone).map(f => f.phone),
+              ...contacts.rows.filter(c => c.phone).map(c => c.phone),
+            ];
+            // Send emergency SMS to everyone first
+            for (const phone of allPhones) {
+              await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde ha 2 horas. O SAMU 192 esta sendo acionado automaticamente. Voce sera conectado a ligacao.`);
             }
-            for (const ct of contacts.rows) {
-              if (ct.phone) {
-                await makeVoiceCall(ct.phone, `EMERGENCIA. ${elder.name} nao responde ao check-in do Estou Bem ha 2 horas. Por favor verifique imediatamente.`);
-                await sendSMS(ct.phone, `EMERGENCIA: ${elder.name} nao responde ha 2 horas. Verifique imediatamente. Se necessario, ligue SAMU 192.`);
-              }
-            }
+            // Call SAMU and conference-patch all contacts
+            await callSAMUWithConference(elder, allPhones);
+            console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);
           }
 
           // Send reminder to the elder themselves
@@ -2792,19 +2885,16 @@ async function checkMissedCheckins() {
               }
             }
             if (targetLevel >= 3) {
-              // Level 3 EMERGENCY: Voice call to ALL contacts + emergency SMS
-              for (const fm of family.rows) {
-                if (fm.phone) {
-                  await makeVoiceCall(fm.phone, `EMERGENCIA. ${elder.name} nao responde ao check-in do Estou Bem ha 2 horas. Por favor verifique imediatamente.`);
-                  await sendSMS(fm.phone, `EMERGENCIA: ${elder.name} nao responde ha 2 horas. Verifique imediatamente. Se necessario, ligue SAMU 192.`);
-                }
+              // Level 3 EMERGENCY: Call SAMU 192 + conference ALL contacts
+              const allPhones = [
+                ...family.rows.filter(f => f.phone).map(f => f.phone),
+                ...contacts.rows.filter(c => c.phone).map(c => c.phone),
+              ];
+              for (const phone of allPhones) {
+                await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde ha 2 horas. O SAMU 192 esta sendo acionado automaticamente. Voce sera conectado a ligacao.`);
               }
-              for (const ct of contacts.rows) {
-                if (ct.phone) {
-                  await makeVoiceCall(ct.phone, `EMERGENCIA. ${elder.name} nao responde ao check-in do Estou Bem ha 2 horas. Por favor verifique imediatamente.`);
-                  await sendSMS(ct.phone, `EMERGENCIA: ${elder.name} nao responde ha 2 horas. Verifique imediatamente. Se necessario, ligue SAMU 192.`);
-                }
-              }
+              await callSAMUWithConference(elder, allPhones);
+              console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);
             }
 
             // Send reminder to the elder themselves
