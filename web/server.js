@@ -1,10 +1,244 @@
 const express = require('express');
-const { Pool } = require('pg');
+const { Pool, Client } = require('pg');
 const crypto = require('crypto');
 const path = require('path');
+const http = require('http');
+
+// WebSocket — graceful fallback if not installed
+let WebSocket;
+try { WebSocket = require('ws'); } catch (e) {
+  console.warn('[WS] ws package not installed. WebSocket support disabled. Run: npm install ws');
+}
 
 const PORT = process.env.PORT || 3000;
 const app = express();
+const server = http.createServer(app);
+
+// ── WebSocket Server ──────────────────────────────────────
+const wsClients = new Map(); // userId (string) -> Set<WebSocket>
+let wss = null;
+
+if (WebSocket) {
+  wss = new WebSocket.Server({ server, path: '/ws' });
+
+  wss.on('connection', (ws, req) => {
+    const url = new URL(req.url, 'http://localhost');
+    const userId = url.searchParams.get('userId');
+    const role = url.searchParams.get('role');
+
+    if (userId) {
+      if (!wsClients.has(userId)) wsClients.set(userId, new Set());
+      wsClients.get(userId).add(ws);
+      console.log(`[WS] Client connected: userId=${userId} role=${role}`);
+    }
+
+    ws.on('close', () => {
+      if (userId && wsClients.has(userId)) {
+        wsClients.get(userId).delete(ws);
+        if (wsClients.get(userId).size === 0) wsClients.delete(userId);
+        console.log(`[WS] Client disconnected: userId=${userId}`);
+      }
+    });
+
+    ws.on('error', (err) => {
+      console.error(`[WS] Client error userId=${userId}:`, err.message);
+    });
+
+    ws.on('message', (data) => {
+      try {
+        const msg = JSON.parse(data);
+        if (msg.type === 'ping') ws.send(JSON.stringify({ type: 'pong' }));
+      } catch (e) { /* ignore malformed */ }
+    });
+  });
+
+  console.log('[WS] WebSocket server initialized on /ws');
+}
+
+// Send alert to a specific user via WebSocket
+function sendWsAlert(userId, alert) {
+  if (!WebSocket) return 0;
+  const clients = wsClients.get(String(userId));
+  if (!clients) return 0;
+  let sent = 0;
+  const payload = JSON.stringify(alert);
+  for (const ws of clients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(payload);
+      sent++;
+    }
+  }
+  return sent;
+}
+
+// Send alert to all family members of an elder via WebSocket
+async function sendWsAlertToFamily(elderId, alert) {
+  if (!WebSocket) return 0;
+  const family = await pool.query('SELECT id FROM users WHERE linked_elder_id = $1', [elderId]);
+  let total = 0;
+  for (const f of family.rows) {
+    total += sendWsAlert(f.id, alert);
+  }
+  return total;
+}
+
+// ── Email Notifications via Resend ────────────────────────
+async function sendEmail(to, subject, html) {
+  const RESEND_API_KEY = process.env.RESEND_API_KEY;
+  if (!RESEND_API_KEY) {
+    console.log(`[Email] No RESEND_API_KEY set. Would send to ${to}: ${subject}`);
+    return false;
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'Estou Bem <alertas@estoubem.com>',
+        to,
+        subject,
+        html,
+      }),
+    });
+    const result = await res.json();
+    if (res.ok) {
+      console.log(`[Email] Sent to ${to}: ${subject} (id: ${result.id})`);
+    } else {
+      console.error(`[Email] Failed to ${to}: ${subject}`, result.error || result);
+    }
+    return res.ok;
+  } catch (err) {
+    console.error(`[Email] Error sending to ${to}:`, err.message);
+    return false;
+  }
+}
+
+// Build escalation email HTML
+function buildEscalationEmailHtml(elderName, alertTitle, alertLevel) {
+  return `
+    <div style="font-family:'Inter',sans-serif;max-width:500px;margin:0 auto;padding:24px;background:#F5F0EB;border-radius:8px">
+      <div style="text-align:center;margin-bottom:20px">
+        <span style="font-family:Georgia,serif;font-size:24px;color:#2D4A3E">Estou Bem</span>
+      </div>
+      <div style="background:white;padding:24px;border-radius:4px;border:1px solid #E5DDD3">
+        <h2 style="color:${alertLevel >= 3 ? '#8B3A3A' : '#C9A96E'};margin:0 0 12px">${alertTitle}</h2>
+        <p style="color:#5C5549;line-height:1.6">${elderName} nao respondeu ao check-in agendado. Por favor verifique se esta tudo bem.</p>
+        <p style="color:#9A9189;font-size:13px;margin-top:16px">Nivel de alerta: ${alertLevel}/3</p>
+      </div>
+      <p style="text-align:center;color:#9A9189;font-size:12px;margin-top:16px">Estou Bem — Cuidado Senior</p>
+    </div>
+  `;
+}
+
+// Send escalation emails + log to email_alerts table
+async function sendEscalationEmails(familyRows, elder, alertTitle, alertLevel) {
+  for (const fm of familyRows) {
+    if (fm.email) {
+      const html = buildEscalationEmailHtml(elder.name, alertTitle, alertLevel);
+      const sent = await sendEmail(fm.email, alertTitle, html);
+      // Log to email_alerts table
+      try {
+        await pool.query(
+          `INSERT INTO email_alerts (recipient_email, subject, related_user_id, alert_type) VALUES ($1, $2, $3, $4)`,
+          [fm.email, alertTitle, elder.id, 'escalation']
+        );
+      } catch (logErr) {
+        console.error('[Email] Failed to log email alert:', logErr.message);
+      }
+    }
+  }
+}
+
+// ── PG LISTEN/NOTIFY — Escalation Check Scheduler ─────────
+const pendingEscalationTimers = new Map(); // checkinId -> timeout handle
+
+function scheduleEscalationCheck(checkinId, userId) {
+  // If already scheduled, skip
+  if (pendingEscalationTimers.has(checkinId)) return;
+
+  // Check after 30 min (the grace period) — if still pending, the main
+  // checkMissedCheckins logic handles escalation levels
+  const timer = setTimeout(async () => {
+    pendingEscalationTimers.delete(checkinId);
+    try {
+      const result = await pool.query(
+        'SELECT id, status FROM checkins WHERE id = $1',
+        [checkinId]
+      );
+      if (result.rows.length > 0 && result.rows[0].status === 'pending') {
+        console.log(`[PG NOTIFY] Check-in ${checkinId} still pending after 30min — triggering escalation check`);
+        await checkMissedCheckins();
+      }
+    } catch (err) {
+      console.error(`[PG NOTIFY] Error checking escalation for checkin ${checkinId}:`, err.message);
+    }
+  }, 30 * 60 * 1000); // 30 minutes
+
+  pendingEscalationTimers.set(checkinId, timer);
+  console.log(`[PG NOTIFY] Scheduled escalation check for checkin ${checkinId} in 30 minutes`);
+}
+
+// Start PG LISTEN/NOTIFY listener (dedicated connection)
+async function startPgListener() {
+  const connStr = process.env.DATABASE_URL;
+  if (!connStr) return;
+
+  const listenerClient = new Client({
+    connectionString: connStr,
+    ssl: connStr.includes('railway') ? { rejectUnauthorized: false } : false,
+  });
+
+  try {
+    await listenerClient.connect();
+    await listenerClient.query('LISTEN checkin_events');
+
+    listenerClient.on('notification', async (msg) => {
+      try {
+        const payload = JSON.parse(msg.payload);
+        console.log('[PG NOTIFY] Check-in event:', payload.action, 'checkin_id:', payload.checkin_id, 'status:', payload.status);
+
+        if (payload.status === 'pending') {
+          scheduleEscalationCheck(payload.checkin_id, payload.user_id);
+        } else if (payload.status === 'confirmed' || payload.status === 'missed') {
+          // Cancel pending escalation timer if check-in was confirmed or already handled
+          const timer = pendingEscalationTimers.get(payload.checkin_id);
+          if (timer) {
+            clearTimeout(timer);
+            pendingEscalationTimers.delete(payload.checkin_id);
+            console.log(`[PG NOTIFY] Cancelled escalation timer for checkin ${payload.checkin_id} (status: ${payload.status})`);
+          }
+
+          // Notify family via WebSocket that check-in was confirmed
+          if (payload.status === 'confirmed') {
+            await sendWsAlertToFamily(payload.user_id, {
+              type: 'checkin_confirmed',
+              userId: payload.user_id,
+              checkinId: payload.checkin_id,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      } catch (parseErr) {
+        console.error('[PG NOTIFY] Error parsing notification:', parseErr.message);
+      }
+    });
+
+    listenerClient.on('error', (err) => {
+      console.error('[PG Listener] Connection error:', err.message);
+      // Reconnect after 5 seconds
+      setTimeout(startPgListener, 5000);
+    });
+
+    console.log('[PG Listener] Listening for checkin_events');
+  } catch (err) {
+    console.error('[PG Listener] Failed to connect:', err.message);
+    setTimeout(startPgListener, 5000);
+  }
+}
 
 // ── Database ──────────────────────────────────────────────
 const pool = new Pool({
@@ -263,6 +497,37 @@ async function initDB() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
       INSERT INTO app_settings (key, value) VALUES ('default_commission_rates', '{"trial_started": 5, "subscription_familia": 15, "subscription_central": 25, "recurring_monthly": 0.10}') ON CONFLICT (key) DO NOTHING;
+
+      -- Email alerts tracking
+      CREATE TABLE IF NOT EXISTS email_alerts (
+        id SERIAL PRIMARY KEY,
+        recipient_email TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        related_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        alert_type TEXT DEFAULT 'escalation',
+        sent_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_email_alerts_user ON email_alerts(related_user_id);
+
+      -- PG LISTEN/NOTIFY trigger for real-time check-in events
+      CREATE OR REPLACE FUNCTION notify_checkin_change() RETURNS trigger AS $$
+      BEGIN
+        PERFORM pg_notify('checkin_events', json_build_object(
+          'action', TG_OP,
+          'checkin_id', NEW.id,
+          'user_id', NEW.user_id,
+          'status', NEW.status,
+          'time', NEW.time,
+          'date', NEW.date
+        )::text);
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      DROP TRIGGER IF EXISTS checkin_change_trigger ON checkins;
+      CREATE TRIGGER checkin_change_trigger
+        AFTER INSERT OR UPDATE ON checkins
+        FOR EACH ROW EXECUTE FUNCTION notify_checkin_change();
     `);
     console.log('Database initialized');
 
@@ -1868,15 +2133,19 @@ async function start() {
   if (process.env.DATABASE_URL) {
     await initDB();
     console.log('PostgreSQL connected');
-    // Start check-in monitoring cron (every 2 minutes)
-    setInterval(checkMissedCheckins, 2 * 60 * 1000);
+
+    // Start PG LISTEN/NOTIFY for real-time event-driven escalation
+    startPgListener().catch(err => console.error('[PG Listener] Startup error:', err.message));
+
+    // Backup safety net: poll every 5 min in case PG notifications are missed
+    setInterval(checkMissedCheckins, 5 * 60 * 1000);
     // Run immediately on startup to catch any missed during downtime
     setTimeout(checkMissedCheckins, 5000);
-    console.log('Check-in escalation monitor started (every 2 min)');
+    console.log('Check-in escalation monitor started (PG NOTIFY primary + 5-min backup)');
   } else {
     console.log('No DATABASE_URL — running without database (localStorage only)');
   }
-  app.listen(PORT, () => console.log(`Estou Bem server running on port ${PORT}`));
+  server.listen(PORT, () => console.log(`Estou Bem server running on port ${PORT}`));
 }
 
 // ── Check-in Escalation Monitor ──────────────────────────
@@ -2024,6 +2293,21 @@ async function checkMissedCheckins() {
             console.log(`[Push] Sent ${tokens.length} level-${targetLevel} alerts for ${elder.name}`);
           }
 
+          // Send real-time WebSocket alert to family
+          const wsSent = await sendWsAlertToFamily(elder.id, {
+            type: 'escalation',
+            level: targetLevel,
+            elder: { id: elder.id, name: elder.name },
+            message: pushTitle,
+            body: pushBody,
+            checkinId: checkin.id,
+            timestamp: new Date().toISOString(),
+          });
+          if (wsSent > 0) console.log(`[WS] Sent ${wsSent} real-time alerts for ${elder.name}`);
+
+          // Send email notifications to family members
+          await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel);
+
           // Send reminder to the elder themselves
           const elderTokens = await pool.query(
             `SELECT token FROM push_tokens WHERE user_id = $1`,
@@ -2167,6 +2451,21 @@ async function checkMissedCheckins() {
               console.log(`[Push] Sent ${tokens.length} level-${targetLevel} alerts for ${elder.name}`);
             }
 
+            // Send real-time WebSocket alert to family
+            const wsSentInterval = await sendWsAlertToFamily(elder.id, {
+              type: 'escalation',
+              level: targetLevel,
+              elder: { id: elder.id, name: elder.name },
+              message: pushTitle,
+              body: pushBody,
+              checkinId: checkinId,
+              timestamp: new Date().toISOString(),
+            });
+            if (wsSentInterval > 0) console.log(`[WS] Sent ${wsSentInterval} real-time alerts for ${elder.name} (interval)`);
+
+            // Send email notifications to family members
+            await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel);
+
             // Send reminder to the elder themselves
             const elderTokens = await pool.query(
               `SELECT token FROM push_tokens WHERE user_id = $1`,
@@ -2193,5 +2492,5 @@ async function checkMissedCheckins() {
 start().catch(err => {
   console.error('Failed to start:', err);
   // Start without DB if connection fails
-  app.listen(PORT, () => console.log(`Estou Bem server running on port ${PORT} (no DB)`));
+  server.listen(PORT, () => console.log(`Estou Bem server running on port ${PORT} (no DB)`));
 });
