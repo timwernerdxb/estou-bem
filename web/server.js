@@ -1155,6 +1155,14 @@ app.post('/api/twilio/sms', express.urlencoded({ extended: false }), async (req,
   }
 });
 
+// Test endpoint: send a WhatsApp check-in reminder to any number
+app.post('/api/twilio/test-whatsapp', async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: 'phone is required' });
+  const sent = await sendWhatsAppBusiness(phone, `✅ *Estou Bem — Check-in*\n\nVoce tem um check-in pendente.\n\nResponda *SIM* se esta tudo bem.\nResponda *SOS* se precisa de ajuda.\n\n— Estou Bem App 💚`);
+  res.json({ success: sent, channel: 'whatsapp', to: phone });
+});
+
 // Twilio WhatsApp incoming message webhook
 // Set this URL in Twilio Console → WhatsApp Senders → +12627472376 → Webhook URL:
 // https://estou-bem-web-production.up.railway.app/api/twilio/whatsapp
@@ -3318,6 +3326,135 @@ async function start() {
   } else {
     console.log('No DATABASE_URL — running without database (localStorage only)');
   }
+  // ── Twilio WhatsApp Webhook (incoming messages) ──────────
+  app.post('/api/whatsapp/webhook', async (req, res) => {
+    try {
+      const { Body, From, To, MessageSid } = req.body;
+      const phone = From ? From.replace('whatsapp:', '') : '';
+      const msg = (Body || '').trim().toUpperCase();
+      console.log(`[WhatsApp IN] From: ${phone} | Body: "${Body}" | SID: ${MessageSid}`);
+
+      // Find user by phone
+      const userResult = await pool.query('SELECT id, name, role FROM users WHERE phone = $1', [phone]);
+      const user = userResult.rows[0];
+
+      let replyBody = '';
+
+      if (msg === 'SIM' || msg === 'ESTOU BEM' || msg === 'YES' || msg === 'OK' || msg === 'BEM') {
+        // ── CHECK-IN CONFIRMED ──
+        if (user) {
+          await pool.query(
+            `INSERT INTO checkins (user_id, status, confirmed_at) VALUES ($1, 'confirmed', NOW())`,
+            [user.id]
+          );
+          // Cancel any pending escalation
+          await pool.query(
+            `UPDATE checkins SET status = 'confirmed', confirmed_at = NOW() WHERE user_id = $1 AND status = 'pending'`,
+            [user.id]
+          );
+          console.log(`[WhatsApp] Check-in confirmed for ${user.name} (${phone})`);
+          replyBody = `✅ Check-in confirmado! Obrigado, ${user.name}. Ate o proximo check-in. 💚`;
+
+          // Notify family via WebSocket
+          if (wss) {
+            wss.clients.forEach(c => {
+              if (c.readyState === 1) c.send(JSON.stringify({ type: 'checkin_confirmed', userId: user.id, name: user.name, timestamp: new Date().toISOString() }));
+            });
+          }
+        } else {
+          replyBody = '✅ Recebemos sua confirmacao. Obrigado!';
+        }
+
+      } else if (msg === 'SOS' || msg === 'SOCORRO' || msg === 'AJUDA' || msg === 'HELP' || msg === 'EMERGENCIA') {
+        // ── SOS TRIGGERED ──
+        if (user) {
+          console.log(`[WhatsApp] 🆘 SOS triggered by ${user.name} (${phone})`);
+          // Trigger full Level 3 escalation
+          const family = await pool.query('SELECT * FROM family_contacts WHERE elder_id = $1', [user.id]);
+          const contacts = await pool.query('SELECT * FROM emergency_contacts WHERE user_id = $1', [user.id]);
+          const allPhones = [
+            ...family.rows.filter(f => f.phone).map(f => f.phone),
+            ...contacts.rows.filter(c => c.phone).map(c => c.phone),
+          ];
+          // SMS all contacts
+          for (const p of allPhones) {
+            await sendWhatsApp(p, `🆘 EMERGENCIA: ${user.name} enviou SOS via WhatsApp. Verifique IMEDIATAMENTE. Ligue 192 se necessario.`);
+          }
+          replyBody = `🆘 SOS acionado! Seus contatos de emergencia estao sendo notificados agora. Aguarde.`;
+        } else {
+          replyBody = '🆘 SOS recebido. Ligue 192 (SAMU) para emergencias.';
+        }
+
+      } else if (msg === 'NAO' || msg === 'NÃO' || msg === 'NO' || msg === 'MAL' || msg === 'RUIM') {
+        // ── NOT OK ──
+        if (user) {
+          console.log(`[WhatsApp] ⚠️ Elder ${user.name} reported NOT OK`);
+          const family = await pool.query('SELECT * FROM family_contacts WHERE elder_id = $1', [user.id]);
+          for (const fm of family.rows) {
+            if (fm.phone) await sendWhatsApp(fm.phone, `⚠️ ATENCAO: ${user.name} respondeu que NAO esta bem. Por favor entre em contato imediatamente.`);
+          }
+          replyBody = `Obrigado por avisar, ${user.name}. Sua familia esta sendo notificada agora. Alguem entrara em contato em breve. 💛`;
+        } else {
+          replyBody = 'Recebemos sua mensagem. Se precisa de ajuda urgente, ligue 192 (SAMU).';
+        }
+
+      } else {
+        // ── UNKNOWN MESSAGE ──
+        replyBody = 'Estou Bem: Responda *SIM* para confirmar seu check-in, ou *SOS* se precisar de ajuda urgente.';
+      }
+
+      // Reply via TwiML
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${replyBody}</Message></Response>`;
+      res.type('text/xml').send(twiml);
+
+    } catch (err) {
+      console.error('[WhatsApp Webhook Error]', err);
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>Estou Bem: Ocorreu um erro. Ligue 192 para emergencias.</Message></Response>`;
+      res.type('text/xml').send(twiml);
+    }
+  });
+
+  // Helper: send WhatsApp via Twilio
+  async function sendWhatsApp(to, body) {
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+      console.log(`[WhatsApp] No Twilio creds. Would send to ${to}: ${body}`);
+      return;
+    }
+    try {
+      const twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+      const waNumber = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER || '+12627472376';
+      await twilioClient.messages.create({
+        from: `whatsapp:${waNumber}`,
+        to: `whatsapp:${to.replace('whatsapp:', '')}`,
+        body
+      });
+      console.log(`[WhatsApp] Sent to ${to}: ${body.substring(0, 50)}...`);
+    } catch (err) {
+      console.error(`[WhatsApp] Failed to send to ${to}:`, err.message);
+    }
+  }
+
+  // ── WhatsApp Test Endpoint ──
+  app.post('/api/whatsapp/test', async (req, res) => {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'phone required' });
+    try {
+      const twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+      const waNumber = process.env.TWILIO_WHATSAPP_NUMBER || '+12627472376';
+      // Send with interactive buttons
+      const msg = await twilioClient.messages.create({
+        from: `whatsapp:${waNumber}`,
+        to: `whatsapp:${phone}`,
+        contentSid: 'HXd0e2ef84c49ec4fc79cc48ba7d3e0759',
+        contentVariables: JSON.stringify({ '1': 'Tim' }),
+      });
+      res.json({ success: true, sid: msg.sid });
+    } catch (err) {
+      console.error('[WhatsApp Test]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   server.listen(PORT, () => console.log(`Estou Bem server running on port ${PORT}`));
 }
 
