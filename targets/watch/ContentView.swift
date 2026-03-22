@@ -15,6 +15,7 @@ struct ContentView: View {
     @EnvironmentObject var connectivity: WatchConnectivityManager
     @EnvironmentObject var motionManager: MotionDetectionManager
     @EnvironmentObject var healthManager: HealthManager
+    @EnvironmentObject var fallDetection: FallDetectionManager
 
     @State private var checkinConfirmed = false
     @State private var showingPulse = false
@@ -34,12 +35,20 @@ struct ContentView: View {
                     statusRow
 
                     // Health vitals (compact)
-                    if healthManager.latestHeartRate > 0 {
+                    if healthManager.latestHeartRate > 0 || healthManager.bloodOxygen > 0 {
                         healthCard
+                    }
+
+                    // Sleep hours
+                    if healthManager.sleepHours > 0 {
+                        sleepCard
                     }
 
                     // Movement indicator
                     movementCard
+
+                    // Fall detection status
+                    fallDetectionStatusCard
                 }
                 .padding(.horizontal, 8)
                 .padding(.bottom, 16)
@@ -47,6 +56,11 @@ struct ContentView: View {
             .background(Color.houseDark)
             .navigationTitle("")
             .toolbar(.hidden, for: .navigationBar)
+            .overlay {
+                if fallDetection.fallDetected {
+                    fallAlertOverlay
+                }
+            }
         }
     }
 
@@ -151,36 +165,124 @@ struct ContentView: View {
 
     // MARK: - Health Card
     private var healthCard: some View {
-        HStack {
-            Image(systemName: "heart.fill")
-                .font(.system(size: 12))
-                .foregroundColor(.houseDanger)
+        VStack(spacing: 8) {
+            // Heart rate row
+            if healthManager.latestHeartRate > 0 {
+                HStack {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.houseDanger)
 
-            Text("\(Int(healthManager.latestHeartRate))")
+                    Text("\(Int(healthManager.latestHeartRate))")
+                        .font(.system(size: 18, design: .serif))
+                        .foregroundColor(.houseCream)
+
+                    Text("BPM")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(Color.houseWarm)
+                        .tracking(1)
+
+                    Spacer()
+
+                    if healthManager.latestHeartRate > 100 {
+                        Text("ALTO")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(.houseDanger)
+                            .tracking(1)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.houseDanger.opacity(0.15))
+                            .cornerRadius(2)
+                    }
+                }
+            }
+
+            // SpO2 row
+            if healthManager.bloodOxygen > 0 {
+                HStack {
+                    Image(systemName: "lungs.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(spo2Color)
+
+                    Text("\(Int(healthManager.bloodOxygen))")
+                        .font(.system(size: 18, design: .serif))
+                        .foregroundColor(.houseCream)
+
+                    Text("% SpO2")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(Color.houseWarm)
+                        .tracking(1)
+
+                    Spacer()
+
+                    Text(spo2Label)
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundColor(spo2Color)
+                        .tracking(1)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(spo2Color.opacity(0.15))
+                        .cornerRadius(2)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.06))
+        .cornerRadius(4)
+    }
+
+    // MARK: - SpO2 Helpers
+    private var spo2Color: Color {
+        if healthManager.bloodOxygen > 95 {
+            return .houseGreen
+        } else if healthManager.bloodOxygen >= 90 {
+            return .houseGold
+        } else {
+            return .houseDanger
+        }
+    }
+
+    private var spo2Label: String {
+        if healthManager.bloodOxygen > 95 {
+            return "NORMAL"
+        } else if healthManager.bloodOxygen >= 90 {
+            return "BAIXO"
+        } else {
+            return "CRITICO"
+        }
+    }
+
+    // MARK: - Sleep Card
+    private var sleepCard: some View {
+        HStack {
+            Image(systemName: "moon.zzz.fill")
+                .font(.system(size: 12))
+                .foregroundColor(Color(red: 156/255, green: 39/255, blue: 176/255)) // Purple
+
+            Text(String(format: "%.1f", healthManager.sleepHours))
                 .font(.system(size: 18, design: .serif))
                 .foregroundColor(.houseCream)
 
-            Text("BPM")
+            Text("HORAS")
                 .font(.system(size: 9, weight: .medium))
                 .foregroundColor(Color.houseWarm)
                 .tracking(1)
 
             Spacer()
 
-            if healthManager.latestHeartRate > 100 {
-                Text("ALTO")
-                    .font(.system(size: 8, weight: .medium))
-                    .foregroundColor(.houseDanger)
-                    .tracking(1)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.houseDanger.opacity(0.15))
-                    .cornerRadius(2)
-            }
+            Text(healthManager.sleepHours >= 7 ? "BOM" : healthManager.sleepHours >= 5 ? "POUCO" : "ALERTA")
+                .font(.system(size: 8, weight: .medium))
+                .foregroundColor(healthManager.sleepHours >= 7 ? .houseGreen : healthManager.sleepHours >= 5 ? .houseGold : .houseDanger)
+                .tracking(1)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background((healthManager.sleepHours >= 7 ? Color.houseGreen : healthManager.sleepHours >= 5 ? Color.houseGold : Color.houseDanger).opacity(0.15))
+                .cornerRadius(2)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color.white.opacity(0.06))
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.04))
         .cornerRadius(4)
     }
 
@@ -201,6 +303,87 @@ struct ContentView: View {
         .padding(.vertical, 8)
         .background(Color.white.opacity(0.04))
         .cornerRadius(4)
+    }
+
+    // MARK: - Fall Detection Status Card
+    private var fallDetectionStatusCard: some View {
+        HStack {
+            Image(systemName: "figure.fall")
+                .font(.system(size: 12))
+                .foregroundColor(fallDetection.fallDetectionAvailable ? .houseGreen : Color.houseWarm.opacity(0.3))
+
+            Text(fallDetection.fallDetectionAvailable ? "Deteccao de queda ativa" : "Deteccao indisponivel")
+                .font(.system(size: 11))
+                .foregroundColor(Color.houseWarm)
+
+            Spacer()
+
+            Circle()
+                .fill(fallDetection.fallDetectionAvailable ? Color.houseGreen : Color.houseWarm.opacity(0.3))
+                .frame(width: 6, height: 6)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(4)
+    }
+
+    // MARK: - Fall Alert Overlay
+    private var fallAlertOverlay: some View {
+        ZStack {
+            // Full-screen dim background
+            Color.houseDark.opacity(0.95)
+                .ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                // Warning icon
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(.houseDanger)
+
+                Text("QUEDA DETECTADA")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.houseDanger)
+                    .tracking(2)
+
+                // Countdown circle
+                ZStack {
+                    Circle()
+                        .stroke(Color.houseDanger.opacity(0.3), lineWidth: 4)
+
+                    Circle()
+                        .trim(from: 0, to: CGFloat(fallDetection.countdownSeconds) / 30.0)
+                        .stroke(Color.houseDanger, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 1), value: fallDetection.countdownSeconds)
+
+                    Text("\(fallDetection.countdownSeconds)")
+                        .font(.system(size: 32, weight: .light, design: .serif))
+                        .foregroundColor(.houseCream)
+                }
+                .frame(width: 70, height: 70)
+
+                Text("Toque para cancelar\nse voce esta bem")
+                    .font(.system(size: 10))
+                    .foregroundColor(Color.houseWarm)
+                    .multilineTextAlignment(.center)
+
+                // Cancel button
+                Button(action: {
+                    fallDetection.cancelFallAlert()
+                }) {
+                    Text("ESTOU BEM")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white)
+                        .tracking(1.5)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color.houseGreen)
+                        .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     // MARK: - Helpers

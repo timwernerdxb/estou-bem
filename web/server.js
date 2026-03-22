@@ -511,6 +511,28 @@ async function initDB() {
       );
       INSERT INTO app_settings (key, value) VALUES ('default_commission_rates', '{"trial_started": 5, "subscription_familia": 15, "subscription_central": 25, "recurring_monthly": 0.10}') ON CONFLICT (key) DO NOTHING;
 
+      -- Health readings (SpO2, heart rate, sleep, steps, movement from watch)
+      CREATE TABLE IF NOT EXISTS health_readings (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        reading_type VARCHAR(20) NOT NULL,
+        value DECIMAL NOT NULL,
+        recorded_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_health_readings_user ON health_readings(user_id);
+      CREATE INDEX IF NOT EXISTS idx_health_readings_type ON health_readings(user_id, reading_type);
+
+      -- Activity logs for inactivity detection
+      CREATE TABLE IF NOT EXISTS activity_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        last_movement_at TIMESTAMPTZ DEFAULT NOW(),
+        movement_count_1h INTEGER DEFAULT 0,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_user ON activity_logs(user_id);
+
       -- Email alerts tracking
       CREATE TABLE IF NOT EXISTS email_alerts (
         id SERIAL PRIMARY KEY,
@@ -521,6 +543,42 @@ async function initDB() {
         sent_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_email_alerts_user ON email_alerts(related_user_id);
+
+      -- Fall detection events
+      CREATE TABLE IF NOT EXISTS fall_events (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        detected_at TIMESTAMPTZ DEFAULT NOW(),
+        confirmed_fall BOOLEAN DEFAULT true,
+        cancelled_by_user BOOLEAN DEFAULT false,
+        location_lat DECIMAL,
+        location_lng DECIMAL,
+        heart_rate INTEGER,
+        escalation_level INTEGER DEFAULT 0,
+        resolved_at TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_fall_events_user ON fall_events(user_id);
+
+      -- Medical profiles for emergency info
+      CREATE TABLE IF NOT EXISTS medical_profiles (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) UNIQUE,
+        full_name VARCHAR(200),
+        date_of_birth DATE,
+        blood_type VARCHAR(10),
+        allergies TEXT,
+        chronic_conditions TEXT,
+        current_medications TEXT,
+        emergency_notes TEXT,
+        cpf VARCHAR(14),
+        health_plan VARCHAR(100),
+        health_plan_number VARCHAR(50),
+        primary_doctor VARCHAR(200),
+        doctor_phone VARCHAR(20),
+        address TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_medical_profiles_user ON medical_profiles(user_id);
 
       -- PG LISTEN/NOTIFY trigger for real-time check-in events
       CREATE OR REPLACE FUNCTION notify_checkin_change() RETURNS trigger AS $$
@@ -810,12 +868,35 @@ async function callSAMUWithConference(elder, familyPhones) {
     const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
     const conferenceName = `samu-${elder.id}-${Date.now()}`;
 
+    // Fetch medical profile for enhanced SAMU call
+    let medInfo = '';
+    try {
+      const medProfile = await pool.query('SELECT * FROM medical_profiles WHERE user_id = $1', [elder.id]);
+      if (medProfile.rows.length > 0) {
+        const mp = medProfile.rows[0];
+        const dob = mp.date_of_birth ? new Date(mp.date_of_birth) : null;
+        const age = dob ? Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
+        const parts = [];
+        if (mp.full_name || elder.name) parts.push(`Paciente: ${mp.full_name || elder.name}`);
+        if (age) parts.push(`${age} anos`);
+        if (mp.blood_type) parts.push(`Tipo sanguineo: ${mp.blood_type}`);
+        if (mp.allergies) parts.push(`Alergias: ${mp.allergies}`);
+        if (mp.chronic_conditions) parts.push(`Condicoes cronicas: ${mp.chronic_conditions}`);
+        if (mp.current_medications) parts.push(`Medicamentos em uso: ${mp.current_medications}`);
+        if (mp.address) parts.push(`Endereco: ${mp.address}`);
+        if (parts.length > 0) medInfo = parts.join('. ') + '.';
+      }
+    } catch (medErr) {
+      console.error('[SAMU] Error fetching medical profile:', medErr.message);
+    }
+
     // Step 1: Call SAMU 192 with AI context about the emergency
     const samuTwiml = `<Response>
       <Say language="pt-BR" voice="Polly.Camila">
         Ola, aqui e o sistema automatico do Estou Bem, aplicativo de cuidado senior.
         Temos uma emergencia. O idoso ${elder.name} nao responde a check-ins ha mais de 2 horas.
         ${elder.phone ? 'O telefone do idoso e ' + elder.phone.split('').join(' ') + '.' : ''}
+        ${medInfo ? medInfo : ''}
         Estamos conectando familiares a esta ligacao agora.
         Por favor aguarde.
       </Say>
@@ -1099,6 +1180,78 @@ app.get('/api/checkins/elder', authMiddleware, async (req, res) => {
   res.json(result.rows);
 });
 
+// ── Client-triggered escalation endpoint ──
+app.post('/api/escalation/trigger', authMiddleware, async (req, res) => {
+  const { user_id, level, action } = req.body;
+  const uid = user_id || req.userId;
+  try {
+    const user = await pool.query('SELECT * FROM users WHERE id = $1', [uid]);
+    if (!user.rows[0]) return res.status(404).json({ error: 'User not found' });
+    const elder = user.rows[0];
+    const family = await pool.query('SELECT * FROM users WHERE family_code = $1 AND role = $2', [elder.family_code, 'family']);
+    const contacts = await pool.query('SELECT * FROM emergency_contacts WHERE user_id = $1', [uid]);
+
+    let samuTriggered = false;
+
+    if (action === 'test_sms') {
+      if (elder.phone) await sendSMS(elder.phone, `Estou Bem: Este é um teste do sistema de notificação. Tudo funcionando!`);
+      return res.json({ success: true, message: 'Test SMS sent' });
+    }
+    if (action === 'resolved') {
+      // Notify family that elder confirmed OK
+      const allPhones = [
+        ...family.rows.filter(f => f.phone).map(f => f.phone),
+        ...contacts.rows.filter(c => c.phone).map(c => c.phone),
+      ];
+      for (const phone of allPhones) {
+        await sendSMS(phone, `✅ ESTOU BEM: ${elder.name} confirmou o check-in. Tudo OK!`);
+      }
+      return res.json({ success: true });
+    }
+    if (action === 'sms_elder' && elder.phone) {
+      await sendSMS(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
+    }
+    if (action === 'sms_family') {
+      for (const fm of family.rows) {
+        if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in. Por favor verifique.`);
+      }
+      for (const ct of contacts.rows) {
+        if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in. Por favor verifique.`);
+      }
+    }
+    if (action === 'call_elder' && elder.phone) {
+      const answered = await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente. Pressione 1 se esta bem.`);
+      if (!answered) {
+        // Immediate SAMU escalation
+        const allPhones = [
+          ...family.rows.filter(f => f.phone).map(f => f.phone),
+          ...contacts.rows.filter(c => c.phone).map(c => c.phone),
+        ];
+        for (const phone of allPhones) {
+          await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA.`);
+        }
+        await callSAMUWithConference(elder, allPhones);
+        samuTriggered = true;
+      }
+    }
+    if (action === 'samu') {
+      const allPhones = [
+        ...family.rows.filter(f => f.phone).map(f => f.phone),
+        ...contacts.rows.filter(c => c.phone).map(c => c.phone),
+      ];
+      for (const phone of allPhones) {
+        await sendSMS(phone, `🆘 EMERGENCIA: ${elder.name} nao responde. SAMU 192 sendo acionado AGORA. Voce sera conectado.`);
+      }
+      await callSAMUWithConference(elder, allPhones);
+      samuTriggered = true;
+    }
+    res.json({ success: true, samu_triggered: samuTriggered });
+  } catch(err) {
+    console.error('[Escalation Trigger]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/checkins', authMiddleware, async (req, res) => {
   const { time, status, date } = req.body;
   const result = await pool.query(
@@ -1219,6 +1372,422 @@ app.post('/api/health', authMiddleware, async (req, res) => {
   res.json(result.rows[0]);
 });
 
+// ── Activity & Health Readings from Watch ─────────────────
+
+// POST /api/activity-update — receives movement + health data from Apple Watch
+app.post('/api/activity-update', async (req, res) => {
+  const { user_id, movement_detected, heart_rate, spo2, sleep_hours } = req.body;
+  if (!user_id) return res.status(400).json({ error: 'user_id is required' });
+
+  try {
+    // Update activity log (upsert)
+    if (movement_detected) {
+      await pool.query(`
+        INSERT INTO activity_logs (user_id, last_movement_at, movement_count_1h, updated_at)
+        VALUES ($1, NOW(), 1, NOW())
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+          last_movement_at = NOW(),
+          movement_count_1h = activity_logs.movement_count_1h + 1,
+          updated_at = NOW()
+      `, [user_id]);
+    } else {
+      // Still update the timestamp so we know the watch is connected
+      await pool.query(`
+        INSERT INTO activity_logs (user_id, updated_at)
+        VALUES ($1, NOW())
+        ON CONFLICT (user_id)
+        DO UPDATE SET updated_at = NOW()
+      `, [user_id]);
+    }
+
+    // Log health readings
+    if (heart_rate) {
+      await pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'heart_rate', $2)`,
+        [user_id, heart_rate]
+      );
+    }
+    if (spo2) {
+      await pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'spo2', $2)`,
+        [user_id, spo2]
+      );
+
+      // SpO2 Alert Logic
+      if (spo2 < 85) {
+        // CRITICAL: SpO2 < 85% → Level 2 escalation (voice call)
+        console.log(`[SpO2 CRITICAL] User ${user_id} SpO2=${spo2}% — triggering Level 2 escalation`);
+        const elder = await pool.query(`SELECT id, name, phone FROM users WHERE id = $1`, [user_id]);
+        if (elder.rows[0]) {
+          const family = await pool.query(
+            `SELECT id, name, phone, email FROM users WHERE linked_elder_id = $1`,
+            [user_id]
+          );
+          const contacts = await pool.query(
+            `SELECT name, phone FROM contacts WHERE user_id = $1 ORDER BY priority`,
+            [user_id]
+          );
+
+          // Push notification to family
+          const familyTokens = await pool.query(
+            `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`,
+            [user_id]
+          );
+          if (familyTokens.rows.length > 0) {
+            await sendPushNotifications(
+              familyTokens.rows.map(r => r.token),
+              'EMERGENCIA: Oxigenio CRITICO!',
+              `${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Procure ajuda medica IMEDIATAMENTE.`,
+              { type: 'spo2_critical', elderId: user_id, spo2 },
+              true
+            );
+          }
+
+          // WebSocket alert
+          await sendWsAlertToFamily(user_id, {
+            type: 'spo2_critical',
+            level: 2,
+            elder: { id: user_id, name: elder.rows[0].name },
+            spo2,
+            message: `EMERGENCIA: SpO2 em ${spo2}%`,
+            timestamp: new Date().toISOString(),
+          });
+
+          // SMS + Voice call to elder
+          if (elder.rows[0].phone) {
+            await sendSMS(elder.rows[0].phone, `ALERTA Estou Bem: Seu nivel de oxigenio esta em ${spo2}%. Procure ajuda medica.`);
+            await makeVoiceCall(elder.rows[0].phone, `Alerta de saude. Seu nivel de oxigenio esta muito baixo, em ${spo2} por cento. Procure ajuda medica imediatamente.`);
+          }
+          // SMS to family
+          for (const fm of family.rows) {
+            if (fm.phone) await sendSMS(fm.phone, `EMERGENCIA: ${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Procure ajuda medica IMEDIATAMENTE.`);
+          }
+          for (const ct of contacts.rows) {
+            if (ct.phone) await sendSMS(ct.phone, `EMERGENCIA: ${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Procure ajuda medica IMEDIATAMENTE.`);
+          }
+
+          // Email to family
+          await sendEscalationEmails(family.rows, elder.rows[0], `EMERGENCIA: Oxigenio CRITICO - ${elder.rows[0].name}`, 2);
+
+          // Log escalation
+          await pool.query(
+            `INSERT INTO escalation_alerts (elder_id, level, status, notified_contacts)
+             VALUES ($1, 2, 'active', $2)`,
+            [user_id, JSON.stringify(family.rows.map(f => ({ name: f.name, phone: f.phone })))]
+          );
+        }
+      } else if (spo2 < 90) {
+        // WARNING: SpO2 < 90% → IMMEDIATE alert to family + push notification
+        console.log(`[SpO2 LOW] User ${user_id} SpO2=${spo2}% — alerting family`);
+        const elder = await pool.query(`SELECT id, name, phone FROM users WHERE id = $1`, [user_id]);
+        if (elder.rows[0]) {
+          const family = await pool.query(
+            `SELECT id, name, phone, email FROM users WHERE linked_elder_id = $1`,
+            [user_id]
+          );
+
+          // Push notification to family
+          const familyTokens = await pool.query(
+            `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`,
+            [user_id]
+          );
+          if (familyTokens.rows.length > 0) {
+            await sendPushNotifications(
+              familyTokens.rows.map(r => r.token),
+              'ALERTA: Oxigenio baixo!',
+              `${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Monitore de perto.`,
+              { type: 'spo2_low', elderId: user_id, spo2 },
+              true
+            );
+          }
+
+          // WebSocket alert
+          await sendWsAlertToFamily(user_id, {
+            type: 'spo2_low',
+            level: 1,
+            elder: { id: user_id, name: elder.rows[0].name },
+            spo2,
+            message: `ALERTA: SpO2 em ${spo2}%`,
+            timestamp: new Date().toISOString(),
+          });
+
+          // SMS to family
+          for (const fm of family.rows) {
+            if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Monitore de perto.`);
+          }
+
+          // Email to family
+          await sendEscalationEmails(family.rows, elder.rows[0], `ALERTA: Oxigenio baixo - ${elder.rows[0].name}`, 1);
+        }
+      }
+    }
+
+    if (sleep_hours !== undefined && sleep_hours !== null) {
+      await pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'sleep', $2)`,
+        [user_id, sleep_hours]
+      );
+    }
+
+    if (movement_detected) {
+      await pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'movement', 1)`,
+        [user_id]
+      );
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Activity Update] Error:', err);
+    res.status(500).json({ error: 'Failed to update activity' });
+  }
+});
+
+// ── Fall Detection ────────────────────────────────────────
+
+// POST /api/fall-detected — Apple Watch detected a fall
+// Immediately escalates: Level 2 (voice call to elder), then Level 3 (SAMU) if no response in 60s
+app.post('/api/fall-detected', async (req, res) => {
+  const { user_id, timestamp, location, heart_rate } = req.body;
+  if (!user_id) return res.status(400).json({ error: 'user_id is required' });
+
+  try {
+    console.log(`[FALL DETECTED] User ${user_id} — fall detected at ${timestamp || 'now'}`);
+
+    // 1. Log fall event
+    const fallResult = await pool.query(
+      `INSERT INTO fall_events (user_id, detected_at, heart_rate, location_lat, location_lng, escalation_level)
+       VALUES ($1, $2, $3, $4, $5, 2) RETURNING *`,
+      [
+        user_id,
+        timestamp || new Date().toISOString(),
+        heart_rate || null,
+        location?.lat || null,
+        location?.lng || null,
+      ]
+    );
+    const fallEvent = fallResult.rows[0];
+
+    // 2. Get elder info
+    const elderResult = await pool.query(`SELECT id, name, phone FROM users WHERE id = $1`, [user_id]);
+    if (!elderResult.rows[0]) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const elder = elderResult.rows[0];
+
+    // 3. Get family contacts
+    const family = await pool.query(
+      `SELECT id, name, phone, email FROM users WHERE linked_elder_id = $1`,
+      [user_id]
+    );
+    const contactsResult = await pool.query(
+      `SELECT name, phone FROM contacts WHERE user_id = $1 ORDER BY priority`,
+      [user_id]
+    );
+
+    // 4. Push notification to ALL family contacts immediately
+    const familyTokens = await pool.query(
+      `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`,
+      [user_id]
+    );
+    if (familyTokens.rows.length > 0) {
+      await sendPushNotifications(
+        familyTokens.rows.map(r => r.token),
+        'ALERTA: Queda detectada!',
+        `ALERTA: ${elder.name} pode ter sofrido uma queda!`,
+        { type: 'fall_detected', elderId: user_id, fallEventId: fallEvent.id, heart_rate },
+        true
+      );
+    }
+
+    // 5. WebSocket alert to connected family clients
+    await sendWsAlertToFamily(user_id, {
+      type: 'fall_detected',
+      level: 2,
+      elder: { id: user_id, name: elder.name },
+      fallEventId: fallEvent.id,
+      heart_rate,
+      location,
+      message: `ALERTA: ${elder.name} pode ter sofrido uma queda!`,
+      timestamp: new Date().toISOString(),
+    });
+
+    // 6. Email to family
+    for (const fm of family.rows) {
+      if (fm.email) {
+        const html = buildEscalationEmailHtml(elder.name, `QUEDA DETECTADA — ${elder.name}`, 2);
+        await sendEmail(fm.email, `ALERTA: ${elder.name} pode ter sofrido uma queda!`, html);
+        try {
+          await pool.query(
+            `INSERT INTO email_alerts (recipient_email, subject, related_user_id, alert_type) VALUES ($1, $2, $3, $4)`,
+            [fm.email, `ALERTA: Queda detectada - ${elder.name}`, user_id, 'fall_detected']
+          );
+        } catch (logErr) {
+          console.error('[Email] Failed to log fall email alert:', logErr.message);
+        }
+      }
+    }
+
+    // 7. SMS to family contacts
+    for (const fm of family.rows) {
+      if (fm.phone) await sendSMS(fm.phone, `ALERTA Estou Bem: ${elder.name} pode ter sofrido uma queda! Verifique imediatamente.`);
+    }
+    for (const ct of contactsResult.rows) {
+      if (ct.phone) await sendSMS(ct.phone, `ALERTA Estou Bem: ${elder.name} pode ter sofrido uma queda! Verifique imediatamente.`);
+    }
+
+    // 8. IMMEDIATELY escalate to Level 2: Voice call to elder
+    if (elder.phone) {
+      console.log(`[FALL] Level 2: Calling ${elder.name} at ${elder.phone}`);
+      await makeVoiceCall(
+        elder.phone,
+        `Alerta de queda detectada pelo seu relogio. Se voce esta bem, pressione 1. Se precisa de ajuda, pressione 2.`
+      );
+
+      // 9. If elder doesn't confirm OK within 60 seconds -> Level 3 SAMU
+      setTimeout(async () => {
+        try {
+          const checkFall = await pool.query(
+            `SELECT confirmed_fall, cancelled_by_user, resolved_at FROM fall_events WHERE id = $1`,
+            [fallEvent.id]
+          );
+          const fall = checkFall.rows[0];
+
+          if (fall && !fall.resolved_at && fall.confirmed_fall && !fall.cancelled_by_user) {
+            console.log(`[FALL] Level 3: ${elder.name} did NOT respond in 60s — calling SAMU`);
+
+            await pool.query(`UPDATE fall_events SET escalation_level = 3 WHERE id = $1`, [fallEvent.id]);
+
+            const familyPhones = [
+              ...family.rows.filter(f => f.phone).map(f => f.phone),
+              ...contactsResult.rows.filter(c => c.phone).map(c => c.phone),
+            ];
+            await callSAMUWithConference(elder, familyPhones);
+
+            if (familyTokens.rows.length > 0) {
+              await sendPushNotifications(
+                familyTokens.rows.map(r => r.token),
+                'EMERGENCIA: SAMU acionado!',
+                `${elder.name} nao respondeu apos queda detectada. SAMU (192) foi acionado automaticamente.`,
+                { type: 'fall_samu_escalation', elderId: user_id, fallEventId: fallEvent.id },
+                true
+              );
+            }
+
+            await sendWsAlertToFamily(user_id, {
+              type: 'fall_samu_escalation',
+              level: 3,
+              elder: { id: user_id, name: elder.name },
+              fallEventId: fallEvent.id,
+              message: `EMERGENCIA: SAMU acionado para ${elder.name}`,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        } catch (err) {
+          console.error(`[FALL] Error in SAMU escalation timeout:`, err.message);
+        }
+      }, 60 * 1000);
+    }
+
+    // Log escalation alert
+    await pool.query(
+      `INSERT INTO escalation_alerts (elder_id, level, status, notified_contacts) VALUES ($1, 2, 'active', $2)`,
+      [user_id, JSON.stringify([
+        ...family.rows.map(f => ({ name: f.name, phone: f.phone })),
+        ...contactsResult.rows.map(c => ({ name: c.name, phone: c.phone })),
+      ])]
+    );
+
+    res.json({ ok: true, fallEventId: fallEvent.id, escalation: 'level_2_voice_call' });
+  } catch (err) {
+    console.error('[Fall Detection] Error:', err);
+    res.status(500).json({ error: 'Failed to process fall event' });
+  }
+});
+
+// POST /api/fall-cancelled — Elder cancelled the fall alert (false alarm)
+app.post('/api/fall-cancelled', async (req, res) => {
+  const { user_id } = req.body;
+  if (!user_id) return res.status(400).json({ error: 'user_id is required' });
+
+  try {
+    await pool.query(
+      `UPDATE fall_events SET cancelled_by_user = true, confirmed_fall = false, resolved_at = NOW()
+       WHERE user_id = $1 AND resolved_at IS NULL`,
+      [user_id]
+    );
+    await pool.query(
+      `UPDATE escalation_alerts SET status = 'resolved' WHERE elder_id = $1 AND status = 'active'`,
+      [user_id]
+    );
+
+    const elder = await pool.query(`SELECT name FROM users WHERE id = $1`, [user_id]);
+    if (elder.rows[0]) {
+      const familyTokens = await pool.query(
+        `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`,
+        [user_id]
+      );
+      if (familyTokens.rows.length > 0) {
+        await sendPushNotifications(
+          familyTokens.rows.map(r => r.token),
+          'Queda cancelada',
+          `${elder.rows[0].name} cancelou o alerta de queda. Falso alarme.`,
+          { type: 'fall_cancelled', elderId: user_id },
+          false
+        );
+      }
+      await sendWsAlertToFamily(user_id, {
+        type: 'fall_cancelled',
+        elder: { id: user_id, name: elder.rows[0].name },
+        message: `${elder.rows[0].name} cancelou o alerta de queda`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    console.log(`[FALL] Alert cancelled by user ${user_id}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Fall Cancelled] Error:', err);
+    res.status(500).json({ error: 'Failed to cancel fall event' });
+  }
+});
+
+// GET /api/activity-log/:userId — get activity log for an elder
+app.get('/api/activity-log/:userId', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM activity_logs WHERE user_id = $1`,
+      [req.params.userId]
+    );
+    res.json(result.rows[0] || null);
+  } catch (err) {
+    console.error('[Activity Log] Error:', err);
+    res.status(500).json({ error: 'Failed to fetch activity log' });
+  }
+});
+
+// GET /api/health-readings/:userId — get recent health readings for an elder
+app.get('/api/health-readings/:userId', authMiddleware, async (req, res) => {
+  try {
+    const { type, limit } = req.query;
+    let query = `SELECT * FROM health_readings WHERE user_id = $1`;
+    const params = [req.params.userId];
+    if (type) {
+      query += ` AND reading_type = $2`;
+      params.push(type);
+    }
+    query += ` ORDER BY recorded_at DESC LIMIT $${params.length + 1}`;
+    params.push(parseInt(limit) || 50);
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[Health Readings] Error:', err);
+    res.status(500).json({ error: 'Failed to fetch health readings' });
+  }
+});
+
 // ── Subscription Routes ───────────────────────────────────
 app.put('/api/subscription', authMiddleware, async (req, res) => {
   const { plan } = req.body;
@@ -1234,12 +1803,15 @@ app.get('/api/elder-dashboard', authMiddleware, async (req, res) => {
   if (!elderId) return res.status(404).json({ error: 'No linked elder' });
 
   const today = new Date().toISOString().slice(0, 10);
-  const [elder, checkins, meds, health, contacts] = await Promise.all([
+  const [elder, checkins, meds, health, contacts, activityLog, latestSpo2, latestSleep] = await Promise.all([
     pool.query(`SELECT name, phone, subscription, trial_start FROM users WHERE id = $1`, [elderId]),
     pool.query(`SELECT * FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [elderId]),
     pool.query(`SELECT * FROM medications WHERE user_id = $1`, [elderId]),
     pool.query(`SELECT * FROM health_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`, [elderId]),
     pool.query(`SELECT * FROM contacts WHERE user_id = $1 ORDER BY priority`, [elderId]),
+    pool.query(`SELECT * FROM activity_logs WHERE user_id = $1`, [elderId]),
+    pool.query(`SELECT value, recorded_at FROM health_readings WHERE user_id = $1 AND reading_type = 'spo2' ORDER BY recorded_at DESC LIMIT 1`, [elderId]),
+    pool.query(`SELECT value, recorded_at FROM health_readings WHERE user_id = $1 AND reading_type = 'sleep' ORDER BY recorded_at DESC LIMIT 1`, [elderId]),
   ]);
 
   res.json({
@@ -1249,6 +1821,9 @@ app.get('/api/elder-dashboard', authMiddleware, async (req, res) => {
     healthEntries: health.rows,
     contacts: contacts.rows,
     todayCheckins: checkins.rows.filter(c => c.date === today),
+    activityLog: activityLog.rows[0] || null,
+    latestSpo2: latestSpo2.rows[0] || null,
+    latestSleep: latestSleep.rows[0] || null,
   });
 });
 
@@ -1689,6 +2264,89 @@ app.get('/api/consent', authMiddleware, async (req, res) => {
     [req.userId]
   );
   res.json(result.rows);
+});
+
+// ── Medical Profile Routes ────────────────────────────────
+app.get('/api/medical-profile/:userId', authMiddleware, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const result = await pool.query('SELECT * FROM medical_profiles WHERE user_id = $1', [userId]);
+    if (result.rows.length === 0) {
+      return res.json({ user_id: userId });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Medical profile fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch medical profile' });
+  }
+});
+
+app.put('/api/medical-profile/:userId', authMiddleware, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const { full_name, date_of_birth, blood_type, allergies, chronic_conditions, current_medications, emergency_notes, cpf, health_plan, health_plan_number, primary_doctor, doctor_phone, address } = req.body;
+    const result = await pool.query(
+      `INSERT INTO medical_profiles (user_id, full_name, date_of_birth, blood_type, allergies, chronic_conditions, current_medications, emergency_notes, cpf, health_plan, health_plan_number, primary_doctor, doctor_phone, address, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+         full_name = EXCLUDED.full_name,
+         date_of_birth = EXCLUDED.date_of_birth,
+         blood_type = EXCLUDED.blood_type,
+         allergies = EXCLUDED.allergies,
+         chronic_conditions = EXCLUDED.chronic_conditions,
+         current_medications = EXCLUDED.current_medications,
+         emergency_notes = EXCLUDED.emergency_notes,
+         cpf = EXCLUDED.cpf,
+         health_plan = EXCLUDED.health_plan,
+         health_plan_number = EXCLUDED.health_plan_number,
+         primary_doctor = EXCLUDED.primary_doctor,
+         doctor_phone = EXCLUDED.doctor_phone,
+         address = EXCLUDED.address,
+         updated_at = NOW()
+       RETURNING *`,
+      [userId, full_name || null, date_of_birth || null, blood_type || null, allergies || null, chronic_conditions || null, current_medications || null, emergency_notes || null, cpf || null, health_plan || null, health_plan_number || null, primary_doctor || null, doctor_phone || null, address || null]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Medical profile update error:', err);
+    res.status(500).json({ error: 'Failed to update medical profile' });
+  }
+});
+
+app.get('/api/medical-profile/:userId/emergency-card', authMiddleware, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const [profile, user] = await Promise.all([
+      pool.query('SELECT * FROM medical_profiles WHERE user_id = $1', [userId]),
+      pool.query('SELECT name, phone FROM users WHERE id = $1', [userId]),
+    ]);
+    const p = profile.rows[0] || {};
+    const u = user.rows[0] || {};
+    const dob = p.date_of_birth ? new Date(p.date_of_birth) : null;
+    const age = dob ? Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
+    const contacts = await pool.query('SELECT name, phone, relationship FROM contacts WHERE user_id = $1 ORDER BY priority', [userId]);
+    res.json({
+      name: p.full_name || u.name || 'N/A',
+      age,
+      date_of_birth: p.date_of_birth || null,
+      phone: u.phone || null,
+      blood_type: p.blood_type || null,
+      allergies: p.allergies || null,
+      chronic_conditions: p.chronic_conditions || null,
+      current_medications: p.current_medications || null,
+      emergency_notes: p.emergency_notes || null,
+      cpf: p.cpf || null,
+      health_plan: p.health_plan || null,
+      health_plan_number: p.health_plan_number || null,
+      primary_doctor: p.primary_doctor || null,
+      doctor_phone: p.doctor_phone || null,
+      address: p.address || null,
+      emergency_contacts: contacts.rows,
+    });
+  } catch (err) {
+    console.error('Emergency card fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch emergency card' });
+  }
 });
 
 // ── Gamification Routes ──────────────────────────────────
@@ -2926,6 +3584,119 @@ async function checkMissedCheckins() {
         }
       }
     }
+    // ── Inactivity Alert System ──────────────────────────────
+    // Check for elders with no movement detected in 3+ hours during daytime
+    const nowHour = now.getHours();
+    const isDaytime = nowHour >= 7 && nowHour < 22;
+
+    if (isDaytime) {
+      const inactiveElders = await pool.query(`
+        SELECT al.user_id, al.last_movement_at, u.name, u.phone
+        FROM activity_logs al
+        JOIN users u ON u.id = al.user_id
+        WHERE u.role = 'elder'
+          AND al.last_movement_at < NOW() - INTERVAL '3 hours'
+          AND al.updated_at > NOW() - INTERVAL '24 hours'
+      `);
+
+      for (const inactive of inactiveElders.rows) {
+        const inactiveHours = Math.round((now - new Date(inactive.last_movement_at)) / (1000 * 60 * 60) * 10) / 10;
+        console.log(`[Inactivity] ${inactive.name} inactive for ${inactiveHours}h`);
+
+        // Check if we already sent an inactivity alert recently (within last hour)
+        const recentAlert = await pool.query(
+          `SELECT id FROM escalation_alerts
+           WHERE elder_id = $1 AND status = 'active'
+             AND created_at > NOW() - INTERVAL '1 hour'
+             AND notified_contacts::text LIKE '%inactivity%'`,
+          [inactive.user_id]
+        );
+        if (recentAlert.rows.length > 0) continue; // Already alerted recently
+
+        // Step 1: Push notification to elder
+        const elderTokens = await pool.query(
+          `SELECT token FROM push_tokens WHERE user_id = $1`,
+          [inactive.user_id]
+        );
+        if (elderTokens.rows.length > 0) {
+          await sendPushNotifications(
+            elderTokens.rows.map(r => r.token),
+            'Voce esta bem?',
+            'Nao detectamos movimento ha 3 horas. Toque para confirmar que esta tudo bem.',
+            { type: 'inactivity_check', screen: 'Home' },
+            false
+          );
+          console.log(`[Inactivity] Sent push to ${inactive.name}`);
+        }
+
+        // Step 2: SMS to elder
+        if (inactive.phone) {
+          await sendSMS(inactive.phone, `Estou Bem: Voce esta bem? Nao detectamos movimento ha 3 horas. Responda SIM se esta tudo bem.`);
+          console.log(`[Inactivity] Sent SMS to ${inactive.name}`);
+        }
+
+        // Step 3: Alert family contacts
+        const inactFamily = await pool.query(
+          `SELECT id, name, phone, email FROM users WHERE linked_elder_id = $1`,
+          [inactive.user_id]
+        );
+        const inactContacts = await pool.query(
+          `SELECT name, phone FROM contacts WHERE user_id = $1 ORDER BY priority`,
+          [inactive.user_id]
+        );
+
+        // Push to family
+        const inactFamilyTokens = await pool.query(
+          `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`,
+          [inactive.user_id]
+        );
+        if (inactFamilyTokens.rows.length > 0) {
+          await sendPushNotifications(
+            inactFamilyTokens.rows.map(r => r.token),
+            'Alerta de inatividade',
+            `${inactive.name} nao apresenta movimento ha ${inactiveHours} horas. Verifique se esta tudo bem.`,
+            { type: 'inactivity_alert', elderId: inactive.user_id },
+            true
+          );
+        }
+
+        // WebSocket alert to family
+        await sendWsAlertToFamily(inactive.user_id, {
+          type: 'inactivity_alert',
+          elder: { id: inactive.user_id, name: inactive.name },
+          inactiveHours,
+          lastMovement: inactive.last_movement_at,
+          message: `${inactive.name} sem movimento ha ${inactiveHours}h`,
+          timestamp: new Date().toISOString(),
+        });
+
+        // SMS to family
+        for (const fm of inactFamily.rows) {
+          if (fm.phone) await sendSMS(fm.phone, `ALERTA: ${inactive.name} nao apresenta movimento ha ${inactiveHours} horas. Verifique se esta tudo bem.`);
+        }
+        for (const ct of inactContacts.rows) {
+          if (ct.phone) await sendSMS(ct.phone, `ALERTA: ${inactive.name} nao apresenta movimento ha ${inactiveHours} horas. Verifique se esta tudo bem.`);
+        }
+
+        // Email to family
+        await sendEscalationEmails(inactFamily.rows, inactive, `Alerta de Inatividade - ${inactive.name}`, 1);
+
+        // Log the inactivity alert
+        await pool.query(
+          `INSERT INTO escalation_alerts (elder_id, level, status, notified_contacts)
+           VALUES ($1, 1, 'active', $2)`,
+          [inactive.user_id, JSON.stringify({ type: 'inactivity', inactiveHours, contacts: inactFamily.rows.map(f => f.name) })]
+        );
+      }
+    }
+
+    // Reset hourly movement counts
+    await pool.query(`
+      UPDATE activity_logs
+      SET movement_count_1h = GREATEST(0, movement_count_1h - 1)
+      WHERE updated_at < NOW() - INTERVAL '1 hour'
+    `);
+
   } catch (err) {
     console.error('[Escalation] Error checking missed check-ins:', err);
   }

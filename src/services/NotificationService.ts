@@ -205,6 +205,84 @@ class NotificationService {
       trigger: null,
     });
   }
+
+  // Send fall detected notification (for family members)
+  async sendFallDetectedNotification(
+    elderName: string,
+    heartRate?: number
+  ): Promise<void> {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "ALERTA: Queda detectada!",
+        body: `${elderName} pode ter sofrido uma queda!${
+          heartRate ? ` FC: ${heartRate} BPM` : ""
+        }`,
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        data: { type: "fall_detected" },
+        categoryIdentifier: "fall_detected",
+        ...(Platform.OS === "android" && { channelId: "critical-alerts" }),
+      },
+      trigger: null,
+    });
+  }
+
+  // Send fall cancelled notification (false alarm)
+  async sendFallCancelledNotification(elderName: string): Promise<void> {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Queda cancelada",
+        body: `${elderName} cancelou o alerta de queda. Falso alarme.`,
+        data: { type: "fall_cancelled" },
+        ...(Platform.OS === "android" && { channelId: "checkin" }),
+      },
+      trigger: null,
+    });
+  }
+
+  // Send SAMU escalation notification (fall not responded)
+  async sendFallSAMUEscalationNotification(elderName: string): Promise<void> {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "EMERGENCIA: SAMU acionado!",
+        body: `${elderName} nao respondeu apos queda detectada. SAMU (192) foi acionado automaticamente.`,
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        data: { type: "fall_samu_escalation" },
+        ...(Platform.OS === "android" && { channelId: "critical-alerts" }),
+      },
+      trigger: null,
+    });
+  }
+
+  // Handle incoming fall-related notification responses
+  async handleFallNotificationResponse(
+    response: Notifications.NotificationResponse,
+    userId: number
+  ): Promise<void> {
+    const actionId = response.actionIdentifier;
+    const data = response.notification.request.content.data;
+
+    if (data?.type !== "fall_detected") return;
+
+    if (actionId === "im_ok") {
+      // Elder confirmed they're OK — cancel the fall alert
+      try {
+        await fetch(
+          "https://estou-bem-web-production.up.railway.app/api/fall-cancelled",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: userId }),
+          }
+        );
+        console.log("[Notifications] Fall alert cancelled via notification action");
+      } catch (err) {
+        console.warn("[Notifications] Failed to cancel fall alert:", err);
+      }
+    } else if (actionId === "need_help") {
+      // Elder needs help — this is handled by the server escalation flow
+      console.log("[Notifications] Elder confirmed they need help after fall");
+    }
+  }
 }
 
 export const notificationService = new NotificationService();

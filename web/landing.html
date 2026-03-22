@@ -1857,7 +1857,31 @@ const translations = {
   }
 };
 
-let currentLang = localStorage.getItem('estoubem_lang') || 'pt-BR';
+let currentLang = localStorage.getItem('estoubem_lang') || null;
+
+// Auto-detect language from IP on first visit
+if (!currentLang) {
+  currentLang = 'pt-BR';
+  fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) })
+    .then(r => r.json())
+    .then(geo => {
+      const country = (geo.country_code || '').toUpperCase();
+      const langMap = {
+        BR:'pt-BR',PT:'pt-BR',AO:'pt-BR',MZ:'pt-BR',
+        US:'en',GB:'en',AU:'en',CA:'en',IN:'en',IE:'en',NZ:'en',
+        ES:'es',MX:'es',AR:'es',CO:'es',CL:'es',PE:'es',VE:'es',
+        DE:'de',AT:'de',CH:'de',LI:'de',LU:'de',
+        AE:'en',SA:'en',QA:'en',KW:'en',BH:'en',OM:'en',
+      };
+      const detected = langMap[country] || 'en';
+      if (detected !== currentLang) {
+        currentLang = detected;
+        localStorage.setItem('estoubem_lang', detected);
+        applyTranslations();
+      }
+    })
+    .catch(() => {});
+}
 
 function t(key) {
   return translations[currentLang]?.[key] || translations['pt-BR'][key] || key;

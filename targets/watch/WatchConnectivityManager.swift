@@ -82,6 +82,45 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         WKInterfaceDevice.current().play(.notification)
     }
 
+    // MARK: - Send fall alert to iPhone
+    func sendFallAlert(timestamp: Date, heartRate: Double) {
+        guard let session = session else { return }
+
+        let message: [String: Any] = [
+            "type": "fall_detected",
+            "timestamp": ISO8601DateFormatter().string(from: timestamp),
+            "heartRate": heartRate,
+        ]
+
+        // Fall is critical — try both channels for guaranteed delivery
+        if session.isReachable {
+            session.sendMessage(message, replyHandler: nil) { error in
+                print("[Watch] Fall alert sendMessage error: \(error.localizedDescription)")
+            }
+        }
+        // Always also transfer for guaranteed delivery
+        session.transferUserInfo(message)
+
+        WKInterfaceDevice.current().play(.notification)
+    }
+
+    // MARK: - Send fall cancellation to iPhone
+    func sendFallCancelled() {
+        guard let session = session else { return }
+
+        let message: [String: Any] = [
+            "type": "fall_cancelled",
+            "timestamp": ISO8601DateFormatter().string(from: Date()),
+        ]
+
+        if session.isReachable {
+            session.sendMessage(message, replyHandler: nil) { error in
+                print("[Watch] Fall cancelled sendMessage error: \(error.localizedDescription)")
+            }
+        }
+        session.transferUserInfo(message)
+    }
+
     // MARK: - Send movement status to iPhone
     func sendMovementUpdate(isMoving: Bool, magnitude: Double) {
         guard let session = session else { return }

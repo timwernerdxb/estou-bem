@@ -2,28 +2,36 @@ import Foundation
 import HealthKit
 
 /// Manages HealthKit integration on Apple Watch.
-/// Reads heart rate and step count data to monitor elderly well-being.
+/// Reads heart rate, step count, SpO2, and sleep data to monitor elderly well-being.
 class HealthManager: NSObject, ObservableObject {
+
+    // MARK: - Shared reference (for FallDetectionManager access)
+    static weak var shared: HealthManager?
 
     // MARK: - Published state
     @Published var latestHeartRate: Double = 0
     @Published var todaySteps: Int = 0
+    @Published var bloodOxygen: Double = 0
+    @Published var sleepHours: Double = 0
     @Published var isAuthorized: Bool = false
 
     // MARK: - Private
     private let healthStore = HKHealthStore()
     private var heartRateQuery: HKAnchoredObjectQuery?
     private var stepsQuery: HKStatisticsCollectionQuery?
+    private var spo2Query: HKAnchoredObjectQuery?
 
     // MARK: - Health data types
     private let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
     private let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
+    private let spo2Type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation)!
+    private let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!
 
     // MARK: - Authorization
     func requestAuthorization() {
         guard HKHealthStore.isHealthDataAvailable() else { return }
 
-        let readTypes: Set<HKObjectType> = [heartRateType, stepsType]
+        let readTypes: Set<HKObjectType> = [heartRateType, stepsType, spo2Type, sleepType]
 
         healthStore.requestAuthorization(toShare: nil, read: readTypes) { [weak self] success, error in
             DispatchQueue.main.async {
@@ -31,6 +39,8 @@ class HealthManager: NSObject, ObservableObject {
                 if success {
                     self?.startHeartRateObserver()
                     self?.fetchTodaySteps()
+                    self?.startSpO2Observer()
+                    self?.fetchTodaySleep()
                 }
             }
             if let error = error {
@@ -85,6 +95,99 @@ class HealthManager: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - SpO2 (Blood Oxygen) Observer
+    /// Uses HKAnchoredObjectQuery for real-time SpO2 updates.
+    /// Apple Watch measures blood oxygen periodically in the background
+    /// and on-demand via the Blood Oxygen app.
+    private func startSpO2Observer() {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: Date())
+        let predicate = HKQuery.predicateForSamples(
+            withStart: startOfDay,
+            end: nil,
+            options: .strictEndDate
+        )
+
+        spo2Query = HKAnchoredObjectQuery(
+            type: spo2Type,
+            predicate: predicate,
+            anchor: nil,
+            limit: HKObjectQueryNoLimit
+        ) { [weak self] _, samples, _, _, error in
+            self?.processSpO2Samples(samples)
+        }
+
+        spo2Query?.updateHandler = { [weak self] _, samples, _, _, error in
+            self?.processSpO2Samples(samples)
+        }
+
+        if let query = spo2Query {
+            healthStore.execute(query)
+        }
+    }
+
+    private func processSpO2Samples(_ samples: [HKSample]?) {
+        guard let quantitySamples = samples as? [HKQuantitySample],
+              let latest = quantitySamples.last else { return }
+
+        // SpO2 is stored as a fraction (0.0–1.0), convert to percentage
+        let spo2 = latest.quantity.doubleValue(for: HKUnit.percent()) * 100.0
+
+        DispatchQueue.main.async {
+            self.bloodOxygen = spo2
+            // Send to iPhone
+            WatchConnectivityManager.shared.sendHealthData(type: "spo2", value: spo2)
+
+            // Alert if SpO2 drops below 90%
+            if spo2 < 90.0 {
+                WatchConnectivityManager.shared.sendLowSpO2Alert(spo2)
+            }
+        }
+    }
+
+    // MARK: - Sleep Analysis
+    /// Queries sleep data for the last 24 hours and calculates total sleep duration.
+    private func fetchTodaySleep() {
+        let calendar = Calendar.current
+        let now = Date()
+        // Look back 24 hours to capture overnight sleep
+        let startOfYesterday = calendar.date(byAdding: .hour, value: -24, to: now)!
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: startOfYesterday,
+            end: now,
+            options: .strictStartDate
+        )
+
+        let query = HKSampleQuery(
+            sampleType: sleepType,
+            predicate: predicate,
+            limit: HKObjectQueryNoLimit,
+            sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+        ) { [weak self] _, samples, error in
+            guard let categorySamples = samples as? [HKCategorySample] else { return }
+
+            // Sum up all asleep intervals (InBed is excluded, only count actual sleep)
+            var totalSleepSeconds: TimeInterval = 0
+            for sample in categorySamples {
+                // Include asleepCore, asleepDeep, asleepREM, and legacy asleep
+                let value = HKCategoryValueSleepAnalysis(rawValue: sample.value)
+                if value == .asleepCore || value == .asleepDeep || value == .asleepREM || value == .asleep {
+                    totalSleepSeconds += sample.endDate.timeIntervalSince(sample.startDate)
+                }
+            }
+
+            let hours = totalSleepSeconds / 3600.0
+
+            DispatchQueue.main.async {
+                self?.sleepHours = hours
+                WatchConnectivityManager.shared.sendHealthData(type: "sleep", value: hours)
+            }
+        }
+
+        healthStore.execute(query)
+    }
+
     // MARK: - Steps
     private func fetchTodaySteps() {
         let calendar = Calendar.current
@@ -114,6 +217,9 @@ class HealthManager: NSObject, ObservableObject {
     // MARK: - Cleanup
     func stopObserving() {
         if let query = heartRateQuery {
+            healthStore.stop(query)
+        }
+        if let query = spo2Query {
             healthStore.stop(query)
         }
     }
