@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -64,6 +65,9 @@ export function OnboardingScreen() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [referralCode, setReferralCode] = useState("");
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
 
   const handleNext = () => {
     if (currentSlide < ONBOARDING_SLIDES.length - 1) {
@@ -132,13 +136,105 @@ export function OnboardingScreen() {
     dispatch({ type: "SET_ONBOARDED", payload: true });
   };
 
+  const handleLogin = async () => {
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      Alert.alert("Erro", "Digite e-mail e senha");
+      return;
+    }
+    try {
+      const API_URL = "https://estou-bem-web-production.up.railway.app";
+      const res = await fetch(`${API_URL}/api/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok && data.user) {
+        const profile = {
+          id: String(data.user.id),
+          name: data.user.name,
+          phone: data.user.phone || "",
+          role: data.user.role || "elder",
+          createdAt: new Date().toISOString(),
+        };
+        dispatch({ type: "SET_USER", payload: profile as any });
+        dispatch({ type: "SET_ONBOARDED", payload: true });
+      } else {
+        Alert.alert("Erro", data.error || "E-mail ou senha incorretos");
+      }
+    } catch (e) {
+      Alert.alert("Erro", "Não foi possível conectar ao servidor");
+    }
+  };
+
+  if (showLogin) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView
+          style={styles.setupContainer}
+          contentContainerStyle={{ paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.setupTitle}>Entrar</Text>
+          <Text style={styles.setupSubtitle}>
+            Acesse sua conta Estou Bem
+          </Text>
+
+          <Text style={styles.label}>E-mail</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="seu@email.com"
+            value={loginEmail}
+            onChangeText={setLoginEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            placeholderTextColor={COLORS.textLight}
+          />
+
+          <Text style={styles.label}>Senha</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Sua senha"
+            value={loginPassword}
+            onChangeText={setLoginPassword}
+            secureTextEntry
+            placeholderTextColor={COLORS.textLight}
+          />
+
+          <Button
+            title="Entrar"
+            onPress={handleLogin}
+            size="elder"
+            style={{ marginTop: SPACING.xl, width: "100%" }}
+          />
+
+          <TouchableOpacity
+            onPress={() => setShowLogin(false)}
+            style={{ marginTop: SPACING.lg, alignItems: "center" }}
+          >
+            <Text style={{ color: COLORS.textSecondary, fontSize: 14 }}>
+              Não tem conta?{" "}
+              <Text style={{ color: COLORS.accent, fontWeight: "500" }}>Criar conta</Text>
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   if (showSetup) {
     return (
       <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.setupContainer}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
         >
+          <ScrollView
+            style={styles.setupContainer}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
           <Text style={styles.setupTitle}>Vamos começar</Text>
           <Text style={styles.setupSubtitle}>
             Configure seu perfil para usar o Estou Bem
@@ -248,6 +344,17 @@ export function OnboardingScreen() {
             size="elder"
             style={{ marginTop: SPACING.xl, width: "100%" }}
           />
+
+          <TouchableOpacity
+            onPress={() => setShowLogin(true)}
+            style={{ marginTop: SPACING.lg, alignItems: "center" }}
+          >
+            <Text style={{ color: COLORS.textSecondary, fontSize: 14 }}>
+              Já tem conta?{" "}
+              <Text style={{ color: COLORS.accent, fontWeight: "500" }}>Entrar</Text>
+            </Text>
+          </TouchableOpacity>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     );

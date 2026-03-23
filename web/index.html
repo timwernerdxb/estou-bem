@@ -110,11 +110,17 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:none}
 .greeting{font-family:var(--serif);font-size:34px;font-weight:300;text-align:center;margin-top:8px;letter-spacing:0;color:var(--text);-webkit-text-fill-color:var(--text);background:none;-webkit-background-clip:unset;background-clip:unset}
 .date-text{font-size:12px;color:var(--text3);text-align:center;text-transform:uppercase;margin-bottom:12px;font-weight:500;letter-spacing:.12em}
 .checkin-container{display:flex;flex-direction:column;align-items:center;margin:36px 0}
-.checkin-btn{width:200px;height:200px;border-radius:100px;background:var(--primary);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#FFF;font-size:14px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 8px 40px rgba(45,74,62,.3);transition:transform .3s cubic-bezier(.34,1.56,.64,1),box-shadow .3s;border:none;animation:pulse 3s ease-in-out infinite}
+.checkin-btn{width:200px;height:200px;border-radius:100px;background:var(--primary);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#FFF;font-size:14px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 8px 40px rgba(45,74,62,.3);transition:transform .3s cubic-bezier(.34,1.56,.64,1),box-shadow .3s,background .3s,opacity .3s;border:none;animation:pulse 3s ease-in-out infinite}
 .checkin-btn.pending{background:var(--gold);box-shadow:0 8px 40px rgba(201,169,110,.3)}
 .checkin-btn.confirmed{background:var(--primary-dark);animation:none;transform:scale(.95)}
+.checkin-btn.waiting{background:#9A9189;box-shadow:0 4px 20px rgba(154,145,137,.2);animation:none;pointer-events:none;opacity:.85}
 .checkin-btn svg{width:56px;height:56px;fill:#FFF}
 @keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 8px 40px rgba(45,74,62,.3)}50%{transform:scale(1.04);box-shadow:0 12px 48px rgba(45,74,62,.4)}}
+.checkin-completed-card{background:var(--success-light);border:1px solid var(--primary);border-radius:4px;padding:24px;text-align:center;width:200px}
+.checkin-completed-card .checkmark{font-size:48px;margin-bottom:8px}
+.checkin-completed-card .confirmed-text{font-size:15px;font-weight:600;color:var(--primary);letter-spacing:.03em}
+.checkin-completed-card .confirmed-time{font-size:13px;color:var(--text2);margin-top:4px}
+.checkin-completed-card .streak-text{font-size:12px;color:var(--gold-dark);margin-top:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}
 .info-card{text-align:center;padding:24px 16px}
 .info-card .value{font-family:var(--serif);font-size:32px;font-weight:400;color:var(--primary)}
@@ -1272,11 +1278,75 @@ function getNextCheckinTime() {
   return null; // all done for today
 }
 
-function renderElderHome() {
+function getCheckinState() {
   const pending = todayCheckins().find(c => c.status === 'pending');
-  const conf = confirmedToday();
-  const btnClass = pending ? 'pending' : '';
+  const confirmed = todayCheckins().filter(c => c.status === 'confirmed' || c.status === 'auto_confirmed');
   const nextTime = getNextCheckinTime();
+  const times = getEffectiveCheckinTimes();
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+
+  if (pending) {
+    return { state: 'pending', pending, nextTime };
+  }
+
+  // Check if any past scheduled time had a confirmed checkin
+  const pastTimes = times.filter(t => { const [h,m] = t.split(':').map(Number); return h*60+m <= nowMins; });
+  if (pastTimes.length > 0 && confirmed.length > 0) {
+    const lastConfirmed = confirmed[confirmed.length - 1];
+    return { state: 'completed', confirmedTime: lastConfirmed.time, nextTime };
+  }
+
+  // If no schedule is set (default), show as pending for backwards compat
+  if (!times || times.length === 0) {
+    return { state: 'pending', pending: null, nextTime: null };
+  }
+
+  // Future checkin — waiting
+  if (nextTime) {
+    return { state: 'waiting', nextTime };
+  }
+
+  // All times passed, none confirmed, none pending — waiting for tomorrow
+  return { state: 'waiting', nextTime: times[0] || '09:00' };
+}
+
+function renderElderHome() {
+  const checkinState = getCheckinState();
+  const conf = confirmedToday();
+  const nextTime = getNextCheckinTime();
+  const streak = state.gamification?.streak || 0;
+
+  let checkinHTML = '';
+  if (checkinState.state === 'pending') {
+    checkinHTML = `
+      <button class="checkin-btn pending" data-action="do-checkin">
+        ${icons.hand}
+        <span>${t('checkin_touch')}</span>
+      </button>
+      <p style="color:var(--gold-dark);font-size:14px;font-weight:500;margin-top:16px;letter-spacing:.04em;text-transform:uppercase">${t('checkin_pending')}</p>
+      ${checkinState.nextTime ? `<p style="color:var(--text3);font-size:13px;margin-top:4px;letter-spacing:.03em">${t('checkin_next',{time:checkinState.nextTime})}</p>` : ''}
+    `;
+  } else if (checkinState.state === 'completed') {
+    checkinHTML = `
+      <div class="checkin-completed-card">
+        <div class="checkmark">\u2714\uFE0F</div>
+        <div class="confirmed-text">Check-in confirmado</div>
+        <div class="confirmed-time">\u00E0s ${checkinState.confirmedTime}</div>
+        ${streak > 0 ? `<div class="streak-text">${streak} dias seguidos</div>` : ''}
+      </div>
+      ${checkinState.nextTime ? `<p style="color:var(--text3);font-size:13px;margin-top:16px;letter-spacing:.03em">Pr\u00F3ximo check-in \u00E0s ${checkinState.nextTime}</p>` : `<p style="color:var(--primary);font-size:13px;margin-top:16px;letter-spacing:.03em">${t('checkin_all_done')}</p>`}
+    `;
+  } else {
+    // waiting state
+    checkinHTML = `
+      <button class="checkin-btn waiting" disabled>
+        ${icons.hand}
+        <span>Pr\u00F3ximo check-in</span>
+      </button>
+      <p style="color:var(--text3);font-size:14px;font-weight:500;margin-top:16px;letter-spacing:.04em">\u00C0s ${checkinState.nextTime}</p>
+    `;
+  }
 
   return `
     <div class="screen active screen-padtop">
@@ -1285,12 +1355,7 @@ function renderElderHome() {
       <div class="gold-divider"></div>
 
       <div class="checkin-container">
-        <button class="checkin-btn ${btnClass}" data-action="do-checkin">
-          ${icons.hand}
-          <span>${pending ? t('checkin_touch') : t('checkin_done')}</span>
-        </button>
-        ${pending ? `<p style="color:var(--gold-dark);font-size:14px;font-weight:500;margin-top:16px;letter-spacing:.04em;text-transform:uppercase">${t('checkin_pending')}</p>` : ''}
-        ${nextTime ? `<p style="color:var(--text3);font-size:13px;margin-top:${pending ? '4' : '16'}px;letter-spacing:.03em">${t('checkin_next',{time:nextTime})}</p>` : `<p style="color:var(--primary);font-size:13px;margin-top:16px;letter-spacing:.03em">${t('checkin_all_done')}</p>`}
+        ${checkinHTML}
       </div>
 
       <div class="card">

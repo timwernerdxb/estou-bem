@@ -1476,6 +1476,107 @@ app.post('/api/escalation/trigger', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Check-in Status (3-state: pending / completed / waiting) ──
+app.get('/api/checkin-status/:userId', async (req, res) => {
+  const userId = parseInt(req.params.userId);
+  if (!userId) return res.status(400).json({ error: 'Invalid userId' });
+
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    // Get user's checkin schedule
+    const settingsResult = await pool.query('SELECT * FROM settings WHERE user_id = $1', [userId]);
+    const settings = settingsResult.rows[0] || { checkin_times: ['09:00'], checkin_mode: 'scheduled' };
+    const checkinTimes = settings.checkin_times || ['09:00'];
+
+    // Get today's checkins
+    const checkinsResult = await pool.query(
+      'SELECT * FROM checkins WHERE user_id = $1 AND date = $2 ORDER BY time ASC',
+      [userId, todayStr]
+    );
+    const todayCheckins = checkinsResult.rows;
+
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+
+    // Check for a pending (unconfirmed) checkin
+    const pendingCheckin = todayCheckins.find(c => c.status === 'pending');
+    if (pendingCheckin) {
+      // Find the deadline: next scheduled time, or end of day
+      const scheduledMins = (() => {
+        const [h, m] = (pendingCheckin.time || '09:00').split(':').map(Number);
+        return h * 60 + m;
+      })();
+      // Deadline is 60 minutes after scheduled time
+      const deadlineMins = scheduledMins + 60;
+      const deadlineH = String(Math.floor(deadlineMins / 60)).padStart(2, '0');
+      const deadlineM = String(deadlineMins % 60).padStart(2, '0');
+
+      return res.json({
+        status: 'pending',
+        scheduled_at: pendingCheckin.time,
+        deadline: `${deadlineH}:${deadlineM}`,
+        checkin_id: pendingCheckin.id
+      });
+    }
+
+    // Check if all scheduled checkins for past times are confirmed
+    const pastTimes = checkinTimes.filter(t => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m <= nowMins;
+    });
+
+    // If there are past times, check if the latest one was confirmed
+    if (pastTimes.length > 0) {
+      const latestPastTime = pastTimes[pastTimes.length - 1];
+      const confirmedForLatest = todayCheckins.find(
+        c => (c.status === 'confirmed' || c.status === 'auto_confirmed') && c.time === latestPastTime
+      );
+      // Also check if there's any confirmed checkin at all for today
+      const anyConfirmed = todayCheckins.find(
+        c => c.status === 'confirmed' || c.status === 'auto_confirmed'
+      );
+
+      if (anyConfirmed) {
+        // Find next scheduled time
+        const nextTime = checkinTimes.find(t => {
+          const [h, m] = t.split(':').map(Number);
+          return h * 60 + m > nowMins;
+        });
+
+        return res.json({
+          status: 'completed',
+          confirmed_at: anyConfirmed.confirmed_at || anyConfirmed.time,
+          next_at: nextTime || null
+        });
+      }
+    }
+
+    // Find next scheduled time
+    const nextTime = checkinTimes.find(t => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m > nowMins;
+    });
+
+    if (nextTime) {
+      return res.json({
+        status: 'waiting',
+        next_at: nextTime
+      });
+    }
+
+    // All checkin times passed, no pending, no confirmed — treat as waiting for tomorrow
+    return res.json({
+      status: 'waiting',
+      next_at: checkinTimes[0] || '09:00'
+    });
+
+  } catch (err) {
+    console.error('[Checkin Status]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/checkins', authMiddleware, async (req, res) => {
   const { time, status, date } = req.body;
   const result = await pool.query(
@@ -1487,9 +1588,10 @@ app.post('/api/checkins', authMiddleware, async (req, res) => {
 
 app.put('/api/checkins/:id', authMiddleware, async (req, res) => {
   const { status, time } = req.body;
+  const confirmedAt = (status === 'confirmed' || status === 'auto_confirmed') ? new Date().toISOString() : null;
   const result = await pool.query(
-    `UPDATE checkins SET status = COALESCE($1, status), time = COALESCE($2, time) WHERE id = $3 AND user_id = $4 RETURNING *`,
-    [status, time, req.params.id, req.userId]
+    `UPDATE checkins SET status = COALESCE($1, status), time = COALESCE($2, time), confirmed_at = COALESCE($3, confirmed_at) WHERE id = $4 AND user_id = $5 RETURNING *`,
+    [status, time, confirmedAt, req.params.id, req.userId]
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'Check-in not found' });
   res.json(result.rows[0]);

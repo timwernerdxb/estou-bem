@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Play Store Screenshots</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1A1A1A;font-family:'Inter',sans-serif}
+.screenshot{
+  width:1080px;height:1920px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+  margin:20px auto;
+}
+.bg-cream{background:#F5F0EB}
+.bg-green{background:#2D4A3E}
+.bg-white{background:#FFFFFF}
+
+/* Phone frame inside screenshot */
+.phone{
+  width:380px;height:780px;
+  background:#F5F0EB;border-radius:44px;
+  border:4px solid #1A1A1A;
+  overflow:hidden;position:relative;
+  box-shadow:0 30px 80px rgba(0,0,0,0.15);
+}
+.phone-inner{padding:60px 24px 24px;height:100%;overflow:hidden}
+.notch{width:140px;height:32px;background:#1A1A1A;border-radius:0 0 18px 18px;position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:10}
+.status{display:flex;justify-content:space-between;padding:12px 24px 0;font-size:14px;font-weight:600;color:#1A1A1A;position:absolute;top:0;left:0;right:0;z-index:5}
+
+/* Typography */
+.headline{font-family:'Playfair Display',serif;color:#1A1A1A;text-align:center;margin-bottom:12px}
+.subhead{font-family:'Inter',sans-serif;color:#5C5549;text-align:center;line-height:1.6}
+.gold{color:#C9A96E}
+.green{color:#2D4A3E}
+.badge{display:inline-block;background:#C9A96E;color:#fff;font-size:12px;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;border-radius:3px;font-weight:600}
+.badge-green{background:#2D4A3E}
+
+/* Top text area */
+.top-text{padding:80px 60px 40px;text-align:center}
+.top-text h2{font-family:'Playfair Display',serif;font-size:48px;color:#1A1A1A;margin-bottom:16px;line-height:1.2}
+.top-text p{font-size:20px;color:#5C5549;line-height:1.6}
+.top-text-dark h2{color:#F5F0EB}
+.top-text-dark p{color:rgba(245,240,235,0.7)}
+
+/* Check-in button */
+.checkin-btn{
+  width:200px;height:200px;border-radius:50%;
+  background:linear-gradient(135deg,#2D4A3E,#3B5E4F);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  margin:24px auto;
+  box-shadow:0 8px 40px rgba(45,74,62,0.3);
+}
+.checkin-btn .check{font-size:48px;color:#fff}
+.checkin-btn .label{color:#C9A96E;font-size:16px;letter-spacing:3px;text-transform:uppercase;font-weight:500;margin-top:4px}
+
+/* Cards */
+.card{background:#fff;border:1px solid #E5DDD3;border-radius:4px;padding:16px;margin-bottom:10px}
+.card-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.elder-name{font-family:'Playfair Display',serif;font-size:18px;color:#1A1A1A}
+.status-badge{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:4px 12px;border-radius:2px;font-weight:600}
+.status-ok{background:#E8F0EC;color:#2D4A3E}
+.status-pending{background:#FAF5EB;color:#A68B4B}
+.stats{display:flex;gap:20px}
+.stat{text-align:center}
+.stat-val{font-family:'Playfair Display',serif;font-size:22px;color:#2D4A3E}
+.stat-label{font-size:10px;color:#9A9189;letter-spacing:1px;text-transform:uppercase}
+.divider{width:40px;height:2px;background:#C9A96E;margin:16px auto}
+
+/* SOS */
+.sos-btn{
+  width:160px;height:160px;border-radius:50%;
+  background:#8B3A3A;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  margin:20px auto;
+  box-shadow:0 8px 32px rgba(139,58,58,0.3);
+}
+
+/* Feature list */
+.feat-list{list-style:none;padding:0;width:100%}
+.feat-list li{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #E5DDD3;font-size:15px;color:#5C5549}
+.feat-list li .icon{width:32px;height:32px;border-radius:8px;background:#E8F0EC;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+
+/* Tab bar */
+.tabbar{position:absolute;bottom:0;left:0;right:0;height:60px;background:rgba(26,26,26,0.95);display:flex;align-items:center;justify-content:space-around;border-radius:0 0 40px 40px}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px}
+.tab-dot{width:20px;height:20px;border-radius:4px;background:rgba(255,255,255,0.3)}
+.tab-dot.active{background:#C9A96E}
+.tab-label{font-size:9px;color:rgba(255,255,255,0.5);letter-spacing:0.5px}
+.tab-label.active{color:#C9A96E}
+</style>
+</head>
+<body>
+
+<!-- Screenshot 1: Check-in -->
+<div class="screenshot bg-cream" id="ss1">
+  <div class="top-text">
+    <span class="badge">CHECK-IN DIÁRIO</span>
+    <h2 style="margin-top:20px">Um toque.<br>Paz para toda a família.</h2>
+    <p>O idoso toca o botão ou responde<br>SIM no WhatsApp. Simples assim.</p>
+  </div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="status"><span>9:41</span><span>100%</span></div>
+    <div class="phone-inner">
+      <div style="font-family:'Playfair Display',serif;font-size:26px;color:#1A1A1A;margin-bottom:4px">Bom dia, Maria</div>
+      <div style="font-size:13px;color:#9A9189;letter-spacing:1px;text-transform:uppercase;margin-bottom:16px">Quinta-feira, 20 de março</div>
+      <div class="checkin-btn">
+        <span class="check">✓</span>
+        <span class="label">Estou Bem</span>
+      </div>
+      <div class="card" style="display:flex;align-items:center;gap:12px;margin-top:16px">
+        <span style="font-family:'Playfair Display',serif;font-size:32px;color:#2D4A3E">14</span>
+        <div>
+          <div style="font-size:12px;color:#5C5549;letter-spacing:1px;text-transform:uppercase">Dias seguidos</div>
+          <div style="font-size:11px;color:#9A9189">Sequência ativa 🔥</div>
+        </div>
+      </div>
+    </div>
+    <div class="tabbar">
+      <div class="tab"><div class="tab-dot active"></div><span class="tab-label active">Início</span></div>
+      <div class="tab"><div class="tab-dot"></div><span class="tab-label">Saúde</span></div>
+      <div class="tab"><div class="tab-dot"></div><span class="tab-label">SOS</span></div>
+      <div class="tab"><div class="tab-dot"></div><span class="tab-label">Config</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Screenshot 2: Family Dashboard -->
+<div class="screenshot bg-cream" id="ss2">
+  <div class="top-text">
+    <span class="badge">PAINEL FAMILIAR</span>
+    <h2 style="margin-top:20px">Acompanhe em<br>tempo real</h2>
+    <p>SpO2, frequência cardíaca, sono<br>e último movimento. Tudo na palma.</p>
+  </div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="status"><span>9:41</span><span>100%</span></div>
+    <div class="phone-inner">
+      <div style="font-family:'Playfair Display',serif;font-size:22px;color:#1A1A1A;margin-bottom:14px">Minha Família</div>
+      <div class="card">
+        <div class="card-row">
+          <span class="elder-name">Maria, 78</span>
+          <span class="status-badge status-ok">BEM ✓</span>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="stat-val">97%</div><div class="stat-label">SpO2</div></div>
+          <div class="stat"><div class="stat-val">72</div><div class="stat-label">BPM</div></div>
+          <div class="stat"><div class="stat-val">7.2h</div><div class="stat-label">Sono</div></div>
+          <div class="stat"><div class="stat-val">14</div><div class="stat-label">Dias</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-row">
+          <span class="elder-name">José, 82</span>
+          <span class="status-badge status-pending">PENDENTE</span>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="stat-val">94%</div><div class="stat-label">SpO2</div></div>
+          <div class="stat"><div class="stat-val">68</div><div class="stat-label">BPM</div></div>
+          <div class="stat"><div class="stat-val">6.1h</div><div class="stat-label">Sono</div></div>
+          <div class="stat"><div class="stat-val">7</div><div class="stat-label">Dias</div></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div style="font-size:10px;color:#9A9189;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Atividade recente</div>
+      <div style="font-size:13px;color:#5C5549;padding:6px 0;border-bottom:1px solid #E5DDD3">✅ Maria fez check-in às 08:30</div>
+      <div style="font-size:13px;color:#5C5549;padding:6px 0">⏳ José — aguardando check-in</div>
+    </div>
+    <div class="tabbar">
+      <div class="tab"><div class="tab-dot active"></div><span class="tab-label active">Família</span></div>
+      <div class="tab"><div class="tab-dot"></div><span class="tab-label">Alertas</span></div>
+      <div class="tab"><div class="tab-dot"></div><span class="tab-label">Config</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Screenshot 3: WhatsApp Flow -->
+<div class="screenshot bg-green" id="ss3">
+  <div class="top-text top-text-dark">
+    <span class="badge" style="background:#C9A96E">VIA WHATSAPP</span>
+    <h2 style="margin-top:20px;color:#F5F0EB">Funciona sem app.<br>Sem relógio.</h2>
+    <p style="color:rgba(245,240,235,0.7)">O idoso só precisa do WhatsApp.<br>Responde SIM e pronto.</p>
+  </div>
+  <div style="width:380px;background:#ECE5DD;border-radius:20px;padding:20px;margin:0 auto">
+    <div style="background:#DCF8C6;border-radius:8px;padding:12px;margin-bottom:8px;max-width:300px;float:right;clear:both">
+      <div style="font-size:14px;color:#303030">Estou Bem: Olá Maria, você tem um check-in pendente. Como você está?</div>
+      <div style="font-size:11px;color:#999;text-align:right;margin-top:4px">09:00 ✓✓</div>
+    </div>
+    <div style="clear:both"></div>
+    <div style="display:flex;gap:8px;margin:8px 0;justify-content:flex-end">
+      <div style="background:#fff;border:1px solid #25D366;border-radius:20px;padding:8px 20px;font-size:14px;color:#25D366;font-weight:500">✅ Estou Bem</div>
+      <div style="background:#fff;border:1px solid #dc3545;border-radius:20px;padding:8px 20px;font-size:14px;color:#dc3545;font-weight:500">🆘 Ajuda</div>
+    </div>
+    <div style="background:#fff;border-radius:8px;padding:12px;margin-top:8px;max-width:250px;clear:both">
+      <div style="font-size:14px;color:#303030">Estou Bem</div>
+      <div style="font-size:11px;color:#999;text-align:right;margin-top:4px">09:01 ✓✓</div>
+    </div>
+    <div style="clear:both"></div>
+    <div style="background:#DCF8C6;border-radius:8px;padding:12px;margin-top:8px;max-width:300px;float:right">
+      <div style="font-size:14px;color:#303030">✅ Check-in confirmado! Sua família foi notificada. Sequência: 14 dias 🔥</div>
+      <div style="font-size:11px;color:#999;text-align:right;margin-top:4px">09:01 ✓✓</div>
+    </div>
+    <div style="clear:both"></div>
+  </div>
+  <div style="text-align:center;margin-top:32px;color:rgba(245,240,235,0.5);font-size:14px;letter-spacing:2px;text-transform:uppercase">Funciona em qualquer celular</div>
+</div>
+
+<!-- Screenshot 4: SOS + SAMU -->
+<div class="screenshot bg-cream" id="ss4">
+  <div class="top-text">
+    <span class="badge" style="background:#8B3A3A">EMERGÊNCIA</span>
+    <h2 style="margin-top:20px">SAMU 192<br>automático</h2>
+    <p>Único app no Brasil com despacho<br>automático do SAMU e conferência familiar.</p>
+  </div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="status"><span>9:41</span><span>100%</span></div>
+    <div class="phone-inner" style="text-align:center;padding-top:70px">
+      <div style="font-family:'Playfair Display',serif;font-size:22px;color:#1A1A1A;margin-bottom:8px">Emergência</div>
+      <div style="font-size:13px;color:#9A9189;margin-bottom:20px">Pressione e segure por 3 segundos</div>
+      <div class="sos-btn">
+        <span style="font-size:40px">🆘</span>
+        <span style="font-size:11px;color:#F5E8E8;letter-spacing:2px;text-transform:uppercase;margin-top:2px">SOS</span>
+      </div>
+      <ul class="feat-list" style="text-align:left;margin-top:20px">
+        <li><span class="icon">📱</span>WhatsApp + SMS para família</li>
+        <li><span class="icon">📞</span>Ligação para SAMU 192</li>
+        <li><span class="icon">📋</span>Ficha médica compartilhada</li>
+        <li><span class="icon">📍</span>Localização GPS enviada</li>
+        <li><span class="icon">👥</span>Conferência com familiares</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Screenshot 5: Features -->
+<div class="screenshot bg-green" id="ss5">
+  <div class="top-text top-text-dark">
+    <span class="badge" style="background:#C9A96E">RECURSOS</span>
+    <h2 style="margin-top:20px;color:#F5F0EB">Proteção completa<br>24 horas por dia</h2>
+  </div>
+  <div style="width:380px;margin:0 auto">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.15);border-radius:4px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">💬</div>
+        <div style="font-size:13px;color:#F5F0EB;font-weight:500">WhatsApp<br>Check-in</div>
+      </div>
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.15);border-radius:4px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🫁</div>
+        <div style="font-size:13px;color:#F5F0EB;font-weight:500">SpO2<br>Oxigênio</div>
+      </div>
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.15);border-radius:4px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🤸</div>
+        <div style="font-size:13px;color:#F5F0EB;font-weight:500">Detecção<br>de Quedas</div>
+      </div>
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.15);border-radius:4px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">❤️</div>
+        <div style="font-size:13px;color:#F5F0EB;font-weight:500">Frequência<br>Cardíaca</div>
+      </div>
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.15);border-radius:4px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🌙</div>
+        <div style="font-size:13px;color:#F5F0EB;font-weight:500">Monitoramento<br>de Sono</div>
+      </div>
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.15);border-radius:4px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🚶</div>
+        <div style="font-size:13px;color:#F5F0EB;font-weight:500">Alerta de<br>Inatividade</div>
+      </div>
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.15);border-radius:4px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">💊</div>
+        <div style="font-size:13px;color:#F5F0EB;font-weight:500">Lembretes de<br>Medicamento</div>
+      </div>
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.15);border-radius:4px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">⌚</div>
+        <div style="font-size:13px;color:#F5F0EB;font-weight:500">Apple Watch<br>Galaxy Watch</div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:32px">
+    <div style="color:#C9A96E;font-size:14px;letter-spacing:2px;text-transform:uppercase">4 idiomas • PT • EN • ES • DE</div>
+  </div>
+</div>
+
+<!-- Screenshot 6: Feature Graphic (1024x500) -->
+<div id="ss-feature" style="width:1024px;height:500px;background:linear-gradient(135deg,#2D4A3E 0%,#1E352B 100%);display:flex;align-items:center;justify-content:center;margin:40px auto;position:relative;overflow:hidden">
+  <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle at 70% 50%,rgba(201,169,110,0.1) 0%,transparent 60%)"></div>
+  <div style="text-align:center;z-index:1">
+    <div style="font-size:16px;letter-spacing:4px;text-transform:uppercase;color:#C9A96E;margin-bottom:16px">Cuidado Inteligente para Idosos</div>
+    <div style="font-family:'Playfair Display',serif;font-size:64px;color:#F5F0EB;margin-bottom:12px">Estou Bem</div>
+    <div style="font-size:20px;color:rgba(245,240,235,0.6);margin-bottom:24px">Check-in via WhatsApp • SAMU 192 automático • Apple Watch + Galaxy Watch</div>
+    <div style="display:flex;gap:16px;justify-content:center">
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.2);border-radius:4px;padding:12px 24px;color:#F5F0EB;font-size:14px">💬 WhatsApp</div>
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.2);border-radius:4px;padding:12px 24px;color:#F5F0EB;font-size:14px">🆘 SAMU 192</div>
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.2);border-radius:4px;padding:12px 24px;color:#F5F0EB;font-size:14px">⌚ Smartwatch</div>
+      <div style="background:rgba(245,240,235,0.1);border:1px solid rgba(245,240,235,0.2);border-radius:4px;padding:12px 24px;color:#F5F0EB;font-size:14px">🫁 SpO2</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
