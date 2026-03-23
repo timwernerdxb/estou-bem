@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Declare as Wear OS app -->
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <!-- Sensor permissions -->
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+
+    <!-- Health Services permissions -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+
+    <!-- Communication & system -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:name=".EstouBemWatchApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Estou Bem"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault">
+
+        <!-- Standalone Wear OS app (no phone app required to install) -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="true" />
+
+        <!-- Main Activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.DeviceDefault">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Health Monitoring Foreground Service -->
+        <service
+            android:name=".services.HealthService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- Fall Detection Service -->
+        <service
+            android:name=".services.FallDetectionService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- Motion Detection Service -->
+        <service
+            android:name=".services.MotionDetectionService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- Wearable Message Listener (receives messages from phone) -->
+        <service
+            android:name=".services.PhoneConnectionService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/estoubem"
+                    android:scheme="wear" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/estoubem"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
+
+    </application>
+
+</manifest>

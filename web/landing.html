@@ -365,6 +365,16 @@ p { color: #4A4A4A; font-size: 1.05rem; }
   color: rgba(245, 240, 235, 0.7);
   margin-top: 4px;
 }
+/* Demo interactive screens */
+.demo-view { display:none; height:100%; }
+.demo-view.demo-active { display:block; }
+.demo-dot { width:8px; height:8px; border-radius:50%; background:#E5DDD3; cursor:pointer; transition:all .2s; }
+.demo-dot.demo-dot-active { background:#C9A96E; width:20px; border-radius:4px; }
+@keyframes demo-pop { 0%{transform:scale(0)} 50%{transform:scale(1.2)} 100%{transform:scale(1)} }
+@keyframes demo-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+@keyframes demo-label-pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+@keyframes demo-btn-glow { 0%,100%{box-shadow:0 0 0 0 rgba(45,74,62,0.4)} 50%{box-shadow:0 0 0 12px rgba(45,74,62,0)} }
+#demo-btn { animation: demo-btn-glow 2.5s ease-in-out infinite; }
 .phone-streak {
   margin-top: 32px;
   display: flex;
@@ -1042,26 +1052,137 @@ p { color: #4A4A4A; font-size: 1.05rem; }
       <div class="phone-mockup fade-in fade-in-delay-2">
         <div class="phone-frame">
           <div class="phone-notch"></div>
-          <div class="phone-screen">
+          <div class="phone-screen" id="demo-screen">
             <div class="phone-status-bar">
               <span>9:41</span>
               <span>100%</span>
             </div>
-            <div class="phone-app-content">
-              <div class="phone-greeting" data-i18n="phone_greeting">Bom dia, Maria</div>
-              <div class="phone-date" data-i18n="phone_date">Sexta, 21 de março</div>
-              <div class="phone-check-btn">
-                <div style="text-align:center">
-                  <div class="phone-check-text">Estou<br>Bem</div>
+            <!-- Demo Screen 1: Check-in -->
+            <div class="demo-view demo-active" id="demo-checkin">
+              <div class="phone-app-content">
+                <div class="phone-greeting">Bom dia, Maria</div>
+                <div class="phone-date">Sexta, 21 de março</div>
+                <div class="phone-check-btn" id="demo-btn" style="cursor:pointer" onclick="demoCheckin()">
+                  <div style="text-align:center">
+                    <div class="phone-check-text">Estou<br>Bem</div>
+                  </div>
+                </div>
+                <div class="phone-streak">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="#C9A96E" stroke="none"><path d="M12 2c.5 3.5 4 6 4 10a6 6 0 01-12 0c0-4 3.5-6.5 4-10 .5 2 2 3.5 4 3.5S11.5 4 12 2z"/></svg>
+                  <span>12 dias seguidos</span>
+                </div>
+                <div style="display:flex;gap:6px;justify-content:center;margin-top:12px">
+                  <div class="demo-dot demo-dot-active"></div>
+                  <div class="demo-dot" onclick="demoGoTo(1)"></div>
+                  <div class="demo-dot" onclick="demoGoTo(2)"></div>
+                  <div class="demo-dot" onclick="demoGoTo(3)"></div>
+                </div>
+                <div style="text-align:center;margin-top:16px;padding:10px 20px;background:rgba(45,74,62,0.08);border-radius:8px">
+                  <span style="color:#2D4A3E;font-size:13px;font-weight:500;letter-spacing:1px;animation:demo-label-pulse 2s infinite;display:inline-block">▶ Experimente — toque no botão</span>
                 </div>
               </div>
-              <div class="phone-streak">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="#C9A96E" stroke="none"><path d="M12 2c.5 3.5 4 6 4 10a6 6 0 01-12 0c0-4 3.5-6.5 4-10 .5 2 2 3.5 4 3.5S11.5 4 12 2z"/></svg>
-                <span data-i18n="phone_streak">12 dias seguidos</span>
+            </div>
+            <!-- Demo Screen 2: Confirmed -->
+            <div class="demo-view" id="demo-confirmed">
+              <div class="phone-app-content" style="text-align:center;padding-top:40px">
+                <div style="width:80px;height:80px;border-radius:50%;background:#2D4A3E;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;animation:demo-pop .4s ease">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div style="font-family:var(--serif);font-size:22px;color:#1A1A1A;margin-bottom:4px">Check-in confirmado!</div>
+                <div style="font-size:13px;color:#9A9189;margin-bottom:24px">Sua família foi notificada</div>
+                <div style="background:#fff;border:1px solid #E5DDD3;border-radius:4px;padding:14px;text-align:left;margin-bottom:12px">
+                  <div style="font-size:11px;color:#9A9189;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Sequência</div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-family:var(--serif);font-size:32px;color:#2D4A3E">13</span>
+                    <span style="font-size:12px;color:#5C5549">dias seguidos 🔥</span>
+                  </div>
+                </div>
+                <div style="background:#fff;border:1px solid #E5DDD3;border-radius:4px;padding:14px;text-align:left">
+                  <div style="font-size:11px;color:#9A9189;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Próximo check-in</div>
+                  <div style="font-size:14px;color:#1A1A1A">Amanhã às 08:00</div>
+                </div>
+                <div style="display:flex;gap:6px;justify-content:center;margin-top:16px">
+                  <div class="demo-dot" onclick="demoGoTo(0)"></div>
+                  <div class="demo-dot demo-dot-active"></div>
+                  <div class="demo-dot" onclick="demoGoTo(2)"></div>
+                  <div class="demo-dot" onclick="demoGoTo(3)"></div>
+                </div>
+                <div style="margin-top:8px;font-size:10px;color:#C9A96E;cursor:pointer" onclick="demoGoTo(2)">VER PAINEL FAMILIAR →</div>
+              </div>
+            </div>
+            <!-- Demo Screen 3: Family Dashboard -->
+            <div class="demo-view" id="demo-family">
+              <div class="phone-app-content" style="padding-top:8px">
+                <div style="font-family:var(--serif);font-size:18px;color:#1A1A1A;margin-bottom:12px">Minha Família</div>
+                <div style="background:#fff;border:1px solid #E5DDD3;border-radius:4px;padding:12px;margin-bottom:8px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <span style="font-family:var(--serif);font-size:15px">Maria, 78</span>
+                    <span style="background:#E8F0EC;color:#2D4A3E;font-size:9px;letter-spacing:1px;padding:3px 8px;border-radius:2px;font-weight:600">BEM ✓</span>
+                  </div>
+                  <div style="display:flex;gap:16px;font-size:11px;color:#5C5549">
+                    <div style="text-align:center"><div style="font-family:var(--serif);font-size:18px;color:#2D4A3E">97%</div><div style="font-size:9px;color:#9A9189">SpO2</div></div>
+                    <div style="text-align:center"><div style="font-family:var(--serif);font-size:18px;color:#2D4A3E">72</div><div style="font-size:9px;color:#9A9189">BPM</div></div>
+                    <div style="text-align:center"><div style="font-family:var(--serif);font-size:18px;color:#2D4A3E">7.2h</div><div style="font-size:9px;color:#9A9189">Sono</div></div>
+                    <div style="text-align:center"><div style="font-family:var(--serif);font-size:18px;color:#2D4A3E">13</div><div style="font-size:9px;color:#9A9189">Dias</div></div>
+                  </div>
+                </div>
+                <div style="background:#fff;border:1px solid #E5DDD3;border-radius:4px;padding:12px;margin-bottom:8px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <span style="font-family:var(--serif);font-size:15px">José, 82</span>
+                    <span style="background:#FAF5EB;color:#A68B4B;font-size:9px;letter-spacing:1px;padding:3px 8px;border-radius:2px;font-weight:600">PENDENTE</span>
+                  </div>
+                  <div style="display:flex;gap:16px;font-size:11px;color:#5C5549">
+                    <div style="text-align:center"><div style="font-family:var(--serif);font-size:18px;color:#2D4A3E">94%</div><div style="font-size:9px;color:#9A9189">SpO2</div></div>
+                    <div style="text-align:center"><div style="font-family:var(--serif);font-size:18px;color:#2D4A3E">68</div><div style="font-size:9px;color:#9A9189">BPM</div></div>
+                    <div style="text-align:center"><div style="font-family:var(--serif);font-size:18px;color:#2D4A3E">6.1h</div><div style="font-size:9px;color:#9A9189">Sono</div></div>
+                    <div style="text-align:center"><div style="font-family:var(--serif);font-size:18px;color:#2D4A3E">7</div><div style="font-size:9px;color:#9A9189">Dias</div></div>
+                  </div>
+                </div>
+                <div style="width:40px;height:2px;background:#C9A96E;margin:10px auto"></div>
+                <div style="font-size:10px;color:#9A9189;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Atividade recente</div>
+                <div style="font-size:11px;color:#5C5549;padding:4px 0;border-bottom:1px solid #E5DDD3">✅ Maria fez check-in às 08:30</div>
+                <div style="font-size:11px;color:#5C5549;padding:4px 0">⏳ José — aguardando check-in</div>
+                <div style="display:flex;gap:6px;justify-content:center;margin-top:10px">
+                  <div class="demo-dot" onclick="demoGoTo(0)"></div>
+                  <div class="demo-dot" onclick="demoGoTo(1)"></div>
+                  <div class="demo-dot demo-dot-active"></div>
+                  <div class="demo-dot" onclick="demoGoTo(3)"></div>
+                </div>
+                <div style="margin-top:6px;font-size:10px;color:#C9A96E;cursor:pointer;text-align:center" onclick="demoGoTo(3)">VER EMERGÊNCIA →</div>
+              </div>
+            </div>
+            <!-- Demo Screen 4: SOS -->
+            <div class="demo-view" id="demo-sos">
+              <div class="phone-app-content" style="text-align:center;padding-top:20px">
+                <div style="font-family:var(--serif);font-size:18px;color:#1A1A1A;margin-bottom:4px">Emergência</div>
+                <div style="font-size:11px;color:#9A9189;margin-bottom:16px">Pressione e segure por 3 segundos</div>
+                <div id="demo-sos-btn" style="width:120px;height:120px;border-radius:50%;background:#8B3A3A;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;transition:transform .2s;box-shadow:0 6px 24px rgba(139,58,58,0.3)" onmousedown="demoSOSStart()" onmouseup="demoSOSEnd()" ontouchstart="demoSOSStart()" ontouchend="demoSOSEnd()">
+                  <span style="font-size:28px">🆘</span>
+                  <span style="font-size:10px;color:#F5E8E8;letter-spacing:2px;text-transform:uppercase;margin-top:2px">SOS</span>
+                </div>
+                <div id="demo-sos-progress" style="width:120px;height:4px;background:#E5DDD3;border-radius:2px;margin:0 auto 12px;overflow:hidden"><div id="demo-sos-bar" style="width:0%;height:100%;background:#8B3A3A;transition:width 3s linear;border-radius:2px"></div></div>
+                <div style="background:#fff;border:1px solid #E5DDD3;border-radius:4px;padding:10px;text-align:left;margin-bottom:6px">
+                  <div style="font-size:10px;color:#9A9189;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">O que acontece</div>
+                  <div style="font-size:11px;color:#5C5549;line-height:1.8">
+                    📱 SMS + WhatsApp para família<br>
+                    📞 Ligação para SAMU 192<br>
+                    📋 Ficha médica compartilhada<br>
+                    📍 Localização GPS enviada<br>
+                    👥 Conferência com familiares
+                  </div>
+                </div>
+                <div style="display:flex;gap:6px;justify-content:center;margin-top:8px">
+                  <div class="demo-dot" onclick="demoGoTo(0)"></div>
+                  <div class="demo-dot" onclick="demoGoTo(1)"></div>
+                  <div class="demo-dot" onclick="demoGoTo(2)"></div>
+                  <div class="demo-dot demo-dot-active"></div>
+                </div>
+                <div style="margin-top:6px;font-size:10px;color:#C9A96E;cursor:pointer" onclick="demoGoTo(0)">← VOLTAR AO INÍCIO</div>
               </div>
             </div>
           </div>
         </div>
+        <div style="text-align:center;margin-top:0"></div>
       </div>
     </div>
   </div>
@@ -1137,7 +1258,7 @@ p { color: #4A4A4A; font-size: 1.05rem; }
           <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         </div>
         <h3>Detecção de Quedas</h3>
-        <p>Apple Watch detecta quedas automaticamente. Contagem regressiva de 30 segundos. Sem resposta? SAMU acionado.</p>
+        <p>Smartwatch detecta quedas automaticamente. Contagem regressiva de 30 segundos. Sem resposta? SAMU acionado.</p>
         <span class="feature-badge" data-i18n="feat_badge_new">Novo</span>
       </div>
       <div class="feature-card fade-in fade-in-delay-4">
@@ -1145,7 +1266,7 @@ p { color: #4A4A4A; font-size: 1.05rem; }
           <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
         </div>
         <h3>SpO2 e Frequência Cardíaca</h3>
-        <p>Oxigênio no sangue abaixo de 90%? Alerta imediato. Monitoramento cardíaco contínuo via Apple Watch.</p>
+        <p>Oxigênio no sangue abaixo de 90%? Alerta imediato. Monitoramento cardíaco contínuo via smartwatch.</p>
         <span class="feature-badge">Premium</span>
       </div>
     </div>
@@ -1158,7 +1279,7 @@ p { color: #4A4A4A; font-size: 1.05rem; }
     <div class="text-center fade-in">
       <p class="section-label" data-i18n="watch_label">Flexível</p>
       <h2 class="section-title" data-i18n="watch_title">Funciona com ou sem smartwatch</h2>
-      <p class="section-subtitle mx-auto" data-i18n="watch_subtitle">O WhatsApp é o canal principal. Apple Watch adiciona monitoramento avançado, mas não é obrigatório.</p>
+      <p class="section-subtitle mx-auto" data-i18n="watch_subtitle">O WhatsApp é o canal principal. Smartwatch adiciona monitoramento avançado, mas não é obrigatório.</p>
       <div class="divider"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;max-width:800px;margin:0 auto">
@@ -1179,7 +1300,7 @@ p { color: #4A4A4A; font-size: 1.05rem; }
       <div class="fade-in fade-in-delay-2" style="background:var(--cream);border:2px solid #C9A96E;border-radius:4px;padding:32px;text-align:center;position:relative">
         <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#C9A96E;color:#fff;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:2px;font-weight:600" data-i18n="watch_aw_badge_top">Recomendado</div>
         <div style="font-size:48px;margin-bottom:16px">⌚</div>
-        <h3 style="font-family:var(--serif);font-size:20px;margin-bottom:12px;color:#1A1A1A" data-i18n="watch_aw_title">WhatsApp + Apple Watch</h3>
+        <h3 style="font-family:var(--serif);font-size:20px;margin-bottom:12px;color:#1A1A1A" data-i18n="watch_aw_title">WhatsApp + Smartwatch</h3>
         <ul style="list-style:none;text-align:left;font-size:14px;color:#5C5549;line-height:2">
           <li data-i18n="watch_aw_1">✅ Tudo do plano WhatsApp</li>
           <li data-i18n="watch_aw_2">✅ Check-in com um toque no pulso</li>
@@ -1267,7 +1388,7 @@ p { color: #4A4A4A; font-size: 1.05rem; }
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan1_f1">1 idoso monitorado</span></li>
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan1_f2">Check-ins diários com alarme</span></li>
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan1_f3">Alertas para a família</span></li>
-          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Apple Watch</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Apple Watch + Galaxy Watch</li>
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="feat3_title">Emergência SOS</span></li>
         </ul>
         <a href="#baixar" class="btn btn-outline" data-i18n="pricing_cta">Começar grátis</a>
@@ -1353,7 +1474,7 @@ p { color: #4A4A4A; font-size: 1.05rem; }
           <span class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
         </button>
         <div class="faq-answer">
-          <div class="faq-answer-inner" data-i18n="faq1_a">Todo dia, no horário configurado, o idoso recebe um alarme no celular ou Apple Watch. Basta tocar no botão "Estou Bem" para confirmar que está tudo certo. Se não responder dentro do prazo, os familiares cadastrados recebem uma notificação imediata.</div>
+          <div class="faq-answer-inner" data-i18n="faq1_a">Todo dia, no horário configurado, o idoso recebe um alarme no celular ou smartwatch. Basta tocar no botão "Estou Bem" para confirmar que está tudo certo. Se não responder dentro do prazo, os familiares cadastrados recebem uma notificação imediata.</div>
         </div>
       </div>
       <div class="faq-item fade-in fade-in-delay-1">
@@ -1367,11 +1488,11 @@ p { color: #4A4A4A; font-size: 1.05rem; }
       </div>
       <div class="faq-item fade-in fade-in-delay-2">
         <button class="faq-question" onclick="toggleFaq(this)">
-          <span data-i18n="faq3_q">Funciona com Apple Watch?</span>
+          <span data-i18n="faq3_q">Funciona com smartwatch?</span>
           <span class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
         </button>
         <div class="faq-answer">
-          <div class="faq-answer-inner" data-i18n="faq3_a">Sim! O Estou Bem tem um app completo para Apple Watch. O idoso pode fazer o check-in direto do pulso, receber lembretes hápticos e até usar a detecção de movimento para segurança extra.</div>
+          <div class="faq-answer-inner" data-i18n="faq3_a">Sim! O Estou Bem tem apps completos para Apple Watch e Samsung Galaxy Watch. O idoso pode fazer o check-in direto do pulso, receber lembretes hápticos e até usar a detecção de movimento para segurança extra.</div>
         </div>
       </div>
       <div class="faq-item fade-in fade-in-delay-3">
@@ -1556,8 +1677,8 @@ const translations = {
     test3_name: 'Dr. Silva, geriatra',
     test3_role: 'Belo Horizonte',
     watch_label: 'Flexível', watch_title: 'Funciona com ou sem smartwatch',
-    watch_subtitle: 'O WhatsApp é o canal principal. Apple Watch adiciona monitoramento avançado, mas não é obrigatório.',
-    watch_wa_title: 'Apenas WhatsApp', watch_aw_title: 'WhatsApp + Apple Watch',
+    watch_subtitle: 'O WhatsApp é o canal principal. Smartwatch adiciona monitoramento avançado, mas não é obrigatório.',
+    watch_wa_title: 'Apenas WhatsApp', watch_aw_title: 'WhatsApp + Smartwatch',
     watch_wa_1: '✅ Check-in diário via mensagem', watch_wa_2: '✅ Responde SIM para confirmar',
     watch_wa_3: '✅ Ligação automática se não responder', watch_wa_4: '✅ SAMU 192 automático',
     watch_wa_5: '✅ Ficha médica compartilhada', watch_wa_6: '✅ Alertas para toda a família',
@@ -1570,11 +1691,11 @@ const translations = {
     faq_label: 'Dúvidas',
     faq_title: 'Perguntas frequentes',
     faq1_q: 'Como funciona o check-in?',
-    faq1_a: 'Todo dia, no horário configurado, o idoso recebe um alarme no celular ou Apple Watch. Basta tocar no botão "Estou Bem" para confirmar que está tudo certo. Se não responder dentro do prazo, os familiares cadastrados recebem uma notificação imediata.',
+    faq1_a: 'Todo dia, no horário configurado, o idoso recebe um alarme no celular ou smartwatch. Basta tocar no botão "Estou Bem" para confirmar que está tudo certo. Se não responder dentro do prazo, os familiares cadastrados recebem uma notificação imediata.',
     faq2_q: 'Preciso de internet?',
     faq2_a: 'Sim, é necessária uma conexão com internet (Wi-Fi ou dados móveis) para enviar o check-in e receber alertas. O alarme local toca mesmo sem internet, e o check-in será enviado assim que a conexão for restabelecida.',
-    faq3_q: 'Funciona com Apple Watch?',
-    faq3_a: 'Sim! O Estou Bem tem um app completo para Apple Watch. O idoso pode fazer o check-in direto do pulso, receber lembretes hápticos e até usar a detecção de movimento para segurança extra.',
+    faq3_q: 'Funciona com smartwatch?',
+    faq3_a: 'Sim! O Estou Bem tem apps completos para Apple Watch e Samsung Galaxy Watch. O idoso pode fazer o check-in direto do pulso, receber lembretes hápticos e até usar a detecção de movimento para segurança extra.',
     faq4_q: 'E se o idoso não responder?',
     faq4_a: 'Se o check-in não for concluído dentro do tempo configurado, todos os familiares cadastrados recebem uma notificação push e por e-mail. Você pode ligar diretamente pelo app ou verificar a última localização conhecida.',
     faq5_q: 'Como cancelar?',
@@ -1673,8 +1794,8 @@ const translations = {
     test3_name: 'Dr. Silva, geriatrician',
     test3_role: 'Belo Horizonte',
     watch_label: 'Flexible', watch_title: 'Works with or without a smartwatch',
-    watch_subtitle: 'WhatsApp is the main channel. Apple Watch adds advanced monitoring, but is optional.',
-    watch_wa_title: 'WhatsApp Only', watch_aw_title: 'WhatsApp + Apple Watch',
+    watch_subtitle: 'WhatsApp is the main channel. Smartwatch adds advanced monitoring, but is optional.',
+    watch_wa_title: 'WhatsApp Only', watch_aw_title: 'WhatsApp + Smartwatch',
     watch_wa_1: '✅ Daily check-in via message', watch_wa_2: '✅ Reply YES to confirm',
     watch_wa_3: '✅ Auto voice call if no response', watch_wa_4: '✅ Automatic SAMU 192 dispatch',
     watch_wa_5: '✅ Medical info shared with responders', watch_wa_6: '✅ Alerts to all family members',
@@ -1687,11 +1808,11 @@ const translations = {
     faq_label: 'Questions',
     faq_title: 'Frequently asked questions',
     faq1_q: 'How does the check-in work?',
-    faq1_a: 'Every day, at the configured time, the senior receives an alarm on their phone or Apple Watch. They simply tap the "I\'m Fine" button to confirm everything is okay. If they don\'t respond within the deadline, registered family members receive an immediate notification.',
+    faq1_a: 'Every day, at the configured time, the senior receives an alarm on their phone or smartwatch. They simply tap the "I\'m Fine" button to confirm everything is okay. If they don\'t respond within the deadline, registered family members receive an immediate notification.',
     faq2_q: 'Do I need internet?',
     faq2_a: 'Yes, an internet connection (Wi-Fi or mobile data) is required to send the check-in and receive alerts. The local alarm still rings without internet, and the check-in will be sent once the connection is restored.',
-    faq3_q: 'Does it work with Apple Watch?',
-    faq3_a: 'Yes! Estou Bem has a full Apple Watch app. Seniors can check in from their wrist, receive haptic reminders and even use motion detection for extra safety.',
+    faq3_q: 'Does it work with smartwatches?',
+    faq3_a: 'Yes! Estou Bem has full apps for both Apple Watch and Samsung Galaxy Watch. Seniors can check in from their wrist, receive haptic reminders and even use motion detection for extra safety.',
     faq4_q: 'What if the senior doesn\'t respond?',
     faq4_a: 'If the check-in is not completed within the configured time, all registered family members receive a push notification and email. You can call directly through the app or check the last known location.',
     faq5_q: 'How do I cancel?',
@@ -1790,8 +1911,8 @@ const translations = {
     test3_name: 'Dr. Silva, geriatra',
     test3_role: 'Belo Horizonte',
     watch_label: 'Flexible', watch_title: 'Funciona con o sin smartwatch',
-    watch_subtitle: 'WhatsApp es el canal principal. Apple Watch agrega monitoreo avanzado, pero es opcional.',
-    watch_wa_title: 'Solo WhatsApp', watch_aw_title: 'WhatsApp + Apple Watch',
+    watch_subtitle: 'WhatsApp es el canal principal. Smartwatch agrega monitoreo avanzado, pero es opcional.',
+    watch_wa_title: 'Solo WhatsApp', watch_aw_title: 'WhatsApp + Smartwatch',
     watch_wa_1: '✅ Check-in diario via mensaje', watch_wa_2: '✅ Responde SI para confirmar',
     watch_wa_3: '✅ Llamada automatica si no responde', watch_wa_4: '✅ SAMU 192 automático',
     watch_wa_5: '✅ Ficha medica compartida', watch_wa_6: '✅ Alertas para toda la familia',
@@ -1804,11 +1925,11 @@ const translations = {
     faq_label: 'Dudas',
     faq_title: 'Preguntas frecuentes',
     faq1_q: 'Como funciona el check-in?',
-    faq1_a: 'Cada dia, a la hora configurada, el adulto mayor recibe una alarma en su celular o Apple Watch. Solo debe tocar el boton "Estoy Bien" para confirmar que todo esta bien. Si no responde a tiempo, los familiares registrados reciben una notificacion inmediata.',
+    faq1_a: 'Cada dia, a la hora configurada, el adulto mayor recibe una alarma en su celular o smartwatch. Solo debe tocar el boton "Estoy Bien" para confirmar que todo esta bien. Si no responde a tiempo, los familiares registrados reciben una notificacion inmediata.',
     faq2_q: 'Necesito internet?',
     faq2_a: 'Si, se necesita conexion a internet (Wi-Fi o datos moviles) para enviar el check-in y recibir alertas. La alarma local suena incluso sin internet, y el check-in se enviara cuando se restablezca la conexion.',
-    faq3_q: 'Funciona con Apple Watch?',
-    faq3_a: 'Si! Estou Bem tiene una app completa para Apple Watch. El adulto mayor puede hacer el check-in desde su muneca, recibir recordatorios hapticos y usar la deteccion de movimiento para mayor seguridad.',
+    faq3_q: 'Funciona con smartwatch?',
+    faq3_a: 'Si! Estou Bem tiene apps completas para Apple Watch y Samsung Galaxy Watch. El adulto mayor puede hacer el check-in desde su muneca, recibir recordatorios hapticos y usar la deteccion de movimiento para mayor seguridad.',
     faq4_q: 'Que pasa si el adulto mayor no responde?',
     faq4_a: 'Si el check-in no se completa en el tiempo configurado, todos los familiares registrados reciben una notificacion push y por correo electronico. Puedes llamar directamente desde la app o verificar la ultima ubicacion conocida.',
     faq5_q: 'Como cancelo?',
@@ -1907,8 +2028,8 @@ const translations = {
     test3_name: 'Dr. Silva, Geriater',
     test3_role: 'Belo Horizonte',
     watch_label: 'Flexibel', watch_title: 'Funktioniert mit oder ohne Smartwatch',
-    watch_subtitle: 'WhatsApp ist der Hauptkanal. Apple Watch bietet erweiterte Ueberwachung, ist aber optional.',
-    watch_wa_title: 'Nur WhatsApp', watch_aw_title: 'WhatsApp + Apple Watch',
+    watch_subtitle: 'WhatsApp ist der Hauptkanal. Smartwatch bietet erweiterte Ueberwachung, ist aber optional.',
+    watch_wa_title: 'Nur WhatsApp', watch_aw_title: 'WhatsApp + Smartwatch',
     watch_wa_1: '✅ Taeglicher Check-in per Nachricht', watch_wa_2: '✅ Mit JA antworten zur Bestaetigung',
     watch_wa_3: '✅ Automatischer Anruf bei keiner Antwort', watch_wa_4: '✅ Automatischer SAMU 192 Notruf',
     watch_wa_5: '✅ Medizinische Daten fuer Rettungskraefte', watch_wa_6: '✅ Benachrichtigung aller Familienmitglieder',
@@ -1921,11 +2042,11 @@ const translations = {
     faq_label: 'Fragen',
     faq_title: 'Haeufig gestellte Fragen',
     faq1_q: 'Wie funktioniert der Check-in?',
-    faq1_a: 'Jeden Tag, zur konfigurierten Zeit, erhaelt der Senior einen Alarm auf seinem Handy oder seiner Apple Watch. Er tippt einfach auf "Mir geht es gut", um zu bestaetigen, dass alles in Ordnung ist. Wenn er nicht rechtzeitig antwortet, erhalten die registrierten Familienmitglieder eine sofortige Benachrichtigung.',
+    faq1_a: 'Jeden Tag, zur konfigurierten Zeit, erhaelt der Senior einen Alarm auf seinem Handy oder seiner Smartwatch. Er tippt einfach auf "Mir geht es gut", um zu bestaetigen, dass alles in Ordnung ist. Wenn er nicht rechtzeitig antwortet, erhalten die registrierten Familienmitglieder eine sofortige Benachrichtigung.',
     faq2_q: 'Brauche ich Internet?',
     faq2_a: 'Ja, eine Internetverbindung (WLAN oder mobile Daten) ist erforderlich, um den Check-in zu senden und Benachrichtigungen zu erhalten. Der lokale Alarm klingelt auch ohne Internet, und der Check-in wird gesendet, sobald die Verbindung wiederhergestellt ist.',
-    faq3_q: 'Funktioniert es mit der Apple Watch?',
-    faq3_a: 'Ja! Estou Bem hat eine vollstaendige Apple Watch App. Senioren koennen den Check-in vom Handgelenk aus machen, haptische Erinnerungen erhalten und sogar die Bewegungserkennung fuer zusaetzliche Sicherheit nutzen.',
+    faq3_q: 'Funktioniert es mit Smartwatches?',
+    faq3_a: 'Ja! Estou Bem hat vollstaendige Apps fuer Apple Watch und Samsung Galaxy Watch. Senioren koennen den Check-in vom Handgelenk aus machen, haptische Erinnerungen erhalten und sogar die Bewegungserkennung fuer zusaetzliche Sicherheit nutzen.',
     faq4_q: 'Was passiert, wenn der Senior nicht antwortet?',
     faq4_a: 'Wenn der Check-in nicht innerhalb der konfigurierten Zeit abgeschlossen wird, erhalten alle registrierten Familienmitglieder eine Push-Benachrichtigung und E-Mail. Sie koennen direkt ueber die App anrufen oder den letzten bekannten Standort ueberpruefen.',
     faq5_q: 'Wie kuendige ich?',
@@ -2051,6 +2172,59 @@ function toggleFaq(btn) {
   // Toggle current
   if (!wasOpen) item.classList.add('open');
 }
+
+// ── Interactive Phone Demo ──
+const demoScreens = ['demo-checkin','demo-confirmed','demo-family','demo-sos'];
+let demoIdx = 0;
+let sosTimer = null;
+
+function demoGoTo(idx) {
+  demoScreens.forEach(s => document.getElementById(s).classList.remove('demo-active'));
+  document.getElementById(demoScreens[idx]).classList.add('demo-active');
+  demoIdx = idx;
+}
+
+function demoCheckin() {
+  const btn = document.getElementById('demo-btn');
+  btn.style.transform = 'scale(0.9)';
+  setTimeout(() => { btn.style.transform = 'scale(1)'; }, 150);
+  setTimeout(() => demoGoTo(1), 400);
+}
+
+function demoSOSStart() {
+  const bar = document.getElementById('demo-sos-bar');
+  const btn = document.getElementById('demo-sos-btn');
+  bar.style.transition = 'width 3s linear';
+  bar.style.width = '100%';
+  btn.style.transform = 'scale(0.95)';
+  sosTimer = setTimeout(() => {
+    btn.style.animation = 'demo-shake .3s';
+    setTimeout(() => { btn.style.animation = ''; }, 300);
+    bar.style.background = '#2D4A3E';
+    // Show SOS activated message
+    const content = document.getElementById('demo-sos').querySelector('.phone-app-content');
+    const origHTML = content.innerHTML;
+    content.innerHTML = '<div style="text-align:center;padding-top:60px"><div style="width:80px;height:80px;border-radius:50%;background:#8B3A3A;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;animation:demo-pop .4s ease"><span style="font-size:36px">🚨</span></div><div style="font-family:var(--serif);font-size:20px;color:#8B3A3A;margin-bottom:8px">SOS ATIVADO</div><div style="font-size:12px;color:#5C5549;line-height:1.8;margin-bottom:16px">SAMU 192 sendo acionado...<br>Família notificada<br>Localização compartilhada</div><div style="padding:10px 20px;background:#2D4A3E;color:#F5F0EB;border-radius:4px;font-size:11px;letter-spacing:1px;cursor:pointer" onclick="demoGoTo(0)">VOLTAR À DEMO</div></div>';
+    setTimeout(() => { content.innerHTML = origHTML; bar.style.width = '0%'; bar.style.background = '#8B3A3A'; }, 5000);
+  }, 3000);
+}
+
+function demoSOSEnd() {
+  if (sosTimer) { clearTimeout(sosTimer); sosTimer = null; }
+  const bar = document.getElementById('demo-sos-bar');
+  const btn = document.getElementById('demo-sos-btn');
+  bar.style.transition = 'width .2s';
+  bar.style.width = '0%';
+  btn.style.transform = 'scale(1)';
+}
+
+// Auto-advance demo every 8 seconds if user hasn't interacted
+let demoAuto = setInterval(() => {
+  demoGoTo((demoIdx + 1) % demoScreens.length);
+}, 8000);
+document.getElementById('demo-screen').addEventListener('click', () => {
+  clearInterval(demoAuto); // Stop auto-advance on any interaction
+});
 </script>
 
 </body>
