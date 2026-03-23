@@ -28,27 +28,27 @@ const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 const ONBOARDING_SLIDES = [
   {
     icon: "shield-checkmark",
-    title: "Bem-vindo ao Estou Bem",
+    title: "Bem-vindo",
     description:
-      "O app que cuida de quem voce ama. Check-ins diarios para garantir que seu familiar idoso esta seguro.",
+      "Cuide de quem você ama. Check-ins diários via WhatsApp para garantir que seu familiar está seguro.",
   },
   {
     icon: "notifications",
     title: "Check-in Simples",
     description:
-      "O idoso recebe um alarme e toca um botao. Se nao responder, voce e avisado imediatamente.",
+      "O idoso recebe uma mensagem e responde SIM. Sem app, sem relógio. Se não responder, SAMU é acionado.",
   },
   {
     icon: "medical",
-    title: "Medicamentos e Saude",
+    title: "Saúde Completa",
     description:
-      "Controle de medicamentos com estoque, lembretes e diario de saude completo.",
+      "Medicamentos, SpO2, frequência cardíaca e sono. Tudo em um só lugar.",
   },
   {
     icon: "people",
-    title: "Protecao em Familia",
+    title: "Proteção Familiar",
     description:
-      "Conecte toda a familia. Todos acompanham, todos cuidam. Juntos.",
+      "Conecte toda a família. Alertas via WhatsApp, push, SMS e e-mail.",
   },
 ];
 
@@ -139,13 +139,13 @@ export function OnboardingScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.setupContainer}
         >
-          <Text style={styles.setupTitle}>Vamos comecar</Text>
+          <Text style={styles.setupTitle}>Vamos começar</Text>
           <Text style={styles.setupSubtitle}>
             Configure seu perfil para usar o Estou Bem
           </Text>
 
           {/* Role Selection */}
-          <Text style={styles.label}>Quem e voce?</Text>
+          <Text style={styles.label}>Quem é você?</Text>
           <View style={styles.roleRow}>
             <TouchableOpacity
               style={[styles.roleCard, role === "elder" && styles.roleCardActive]}
@@ -231,7 +231,7 @@ export function OnboardingScreen() {
           />
 
           {/* Referral Code */}
-          <Text style={styles.label}>Codigo de indicacao (opcional)</Text>
+          <Text style={styles.label}>Código de indicação (opcional)</Text>
           <TextInput
             style={styles.input}
             placeholder="Ex: EB4K2A"
@@ -243,7 +243,7 @@ export function OnboardingScreen() {
           />
 
           <Button
-            title="Comecar"
+            title="Começar"
             onPress={handleComplete}
             size="elder"
             style={{ marginTop: SPACING.xl, width: "100%" }}
@@ -273,7 +273,7 @@ export function OnboardingScreen() {
             <View style={styles.iconCircle}>
               <Ionicons
                 name={item.icon as any}
-                size={64}
+                size={Math.min(48, SCREEN.height * 0.06)}
                 color={COLORS.primary}
               />
             </View>
@@ -299,11 +299,11 @@ export function OnboardingScreen() {
             <TouchableOpacity onPress={() => setShowSetup(true)}>
               <Text style={styles.skipText}>Pular</Text>
             </TouchableOpacity>
-            <Button title="Proximo" onPress={handleNext} size="large" />
+            <Button title="Próximo" onPress={handleNext} size="large" />
           </>
         ) : (
           <Button
-            title="Comecar"
+            title="Começar"
             onPress={handleNext}
             size="elder"
             style={{ width: "100%" }}
@@ -321,29 +321,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
   },
   iconCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: Math.min(120, SCREEN.height * 0.14),
+    height: Math.min(120, SCREEN.height * 0.14),
+    borderRadius: Math.min(60, SCREEN.height * 0.07),
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.border,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
   slideTitle: {
     ...FONTS.elderTitle,
+    fontSize: Math.min(32, SCREEN.height * 0.04),
     textAlign: "center",
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   slideDesc: {
     ...FONTS.body,
-    fontSize: 18,
+    fontSize: Math.min(16, SCREEN.height * 0.02),
     textAlign: "center",
     color: COLORS.textSecondary,
-    lineHeight: 28,
+    lineHeight: Math.min(24, SCREEN.height * 0.03),
+    paddingHorizontal: SPACING.md,
   },
   dots: {
     flexDirection: "row",
@@ -389,21 +392,24 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     fontWeight: "500",
   },
-  roleRow: { flexDirection: "row", gap: SPACING.sm },
+  roleRow: { flexDirection: "row", gap: SPACING.sm, paddingHorizontal: 2 },
   roleCard: {
     flex: 1,
     alignItems: "center",
-    padding: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xs,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.white,
+    minHeight: 90,
+    justifyContent: "center",
   },
   roleCardActive: {
     borderColor: COLORS.primary,
     backgroundColor: COLORS.primary,
   },
-  roleText: { ...FONTS.caption, marginTop: SPACING.xs, textAlign: "center" },
+  roleText: { ...FONTS.caption, marginTop: SPACING.xs, textAlign: "center", fontSize: 12, lineHeight: 16 },
   roleTextActive: { color: COLORS.white, fontWeight: "500" },
   input: {
     borderWidth: 1,

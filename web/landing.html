@@ -368,8 +368,17 @@ p { color: #4A4A4A; font-size: 1.05rem; }
 /* Demo interactive screens */
 .demo-view { display:none; height:100%; }
 .demo-view.demo-active { display:block; }
-.demo-dot { width:8px; height:8px; border-radius:50%; background:#E5DDD3; cursor:pointer; transition:all .2s; }
-.demo-dot.demo-dot-active { background:#C9A96E; width:20px; border-radius:4px; }
+.demo-dot { width:10px; height:10px; border-radius:50%; background:#E5DDD3; cursor:pointer; transition:all .2s; padding:0; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+.demo-dot.demo-dot-active { background:#C9A96E; width:24px; border-radius:5px; }
+.demo-dots { display:flex; gap:8px; justify-content:center; align-items:center; padding:8px 0; }
+.demo-nav-btn { padding:10px 20px; background:#2D4A3E; color:#F5F0EB; border-radius:4px; font-size:11px; letter-spacing:1px; cursor:pointer; text-align:center; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+.demo-swipe-hint { text-align:center; font-size:11px; color:#9A9189; margin-top:4px; }
+@media(max-width:768px) {
+  .demo-dot { width:12px; height:12px; min-width:12px; min-height:12px; }
+  .demo-dot.demo-dot-active { width:28px; }
+  .demo-swipe-hint { display:block; }
+}
+@media(min-width:769px) { .demo-swipe-hint { display:none; } }
 @keyframes demo-pop { 0%{transform:scale(0)} 50%{transform:scale(1.2)} 100%{transform:scale(1)} }
 @keyframes demo-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
 @keyframes demo-label-pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
@@ -1071,11 +1080,11 @@ p { color: #4A4A4A; font-size: 1.05rem; }
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="#C9A96E" stroke="none"><path d="M12 2c.5 3.5 4 6 4 10a6 6 0 01-12 0c0-4 3.5-6.5 4-10 .5 2 2 3.5 4 3.5S11.5 4 12 2z"/></svg>
                   <span>12 dias seguidos</span>
                 </div>
-                <div style="display:flex;gap:6px;justify-content:center;margin-top:12px">
+                <div class="demo-dots">
                   <div class="demo-dot demo-dot-active"></div>
-                  <div class="demo-dot" onclick="demoGoTo(1)"></div>
-                  <div class="demo-dot" onclick="demoGoTo(2)"></div>
-                  <div class="demo-dot" onclick="demoGoTo(3)"></div>
+                  <div class="demo-dot" ontouchend="demoGoTo(1)" onclick="demoGoTo(1)"></div>
+                  <div class="demo-dot" ontouchend="demoGoTo(2)" onclick="demoGoTo(2)"></div>
+                  <div class="demo-dot" ontouchend="demoGoTo(3)" onclick="demoGoTo(3)"></div>
                 </div>
                 <div style="text-align:center;margin-top:16px;padding:10px 20px;background:rgba(45,74,62,0.08);border-radius:8px">
                   <span style="color:#2D4A3E;font-size:13px;font-weight:500;letter-spacing:1px;animation:demo-label-pulse 2s infinite;display:inline-block">▶ Experimente — toque no botão</span>
@@ -1101,13 +1110,13 @@ p { color: #4A4A4A; font-size: 1.05rem; }
                   <div style="font-size:11px;color:#9A9189;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Próximo check-in</div>
                   <div style="font-size:14px;color:#1A1A1A">Amanhã às 08:00</div>
                 </div>
-                <div style="display:flex;gap:6px;justify-content:center;margin-top:16px">
-                  <div class="demo-dot" onclick="demoGoTo(0)"></div>
+                <div class="demo-dots">
+                  <div class="demo-dot" ontouchend="demoGoTo(0)" onclick="demoGoTo(0)"></div>
                   <div class="demo-dot demo-dot-active"></div>
-                  <div class="demo-dot" onclick="demoGoTo(2)"></div>
-                  <div class="demo-dot" onclick="demoGoTo(3)"></div>
+                  <div class="demo-dot" ontouchend="demoGoTo(2)" onclick="demoGoTo(2)"></div>
+                  <div class="demo-dot" ontouchend="demoGoTo(3)" onclick="demoGoTo(3)"></div>
                 </div>
-                <div style="margin-top:8px;font-size:10px;color:#C9A96E;cursor:pointer" onclick="demoGoTo(2)">VER PAINEL FAMILIAR →</div>
+                <div class="demo-nav-btn" style="margin-top:8px;background:transparent;color:#C9A96E;padding:6px;font-size:10px" ontouchend="demoGoTo(2)" onclick="demoGoTo(2)">VER PAINEL FAMILIAR →</div>
               </div>
             </div>
             <!-- Demo Screen 3: Family Dashboard -->
@@ -1142,13 +1151,13 @@ p { color: #4A4A4A; font-size: 1.05rem; }
                 <div style="font-size:10px;color:#9A9189;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Atividade recente</div>
                 <div style="font-size:11px;color:#5C5549;padding:4px 0;border-bottom:1px solid #E5DDD3">✅ Maria fez check-in às 08:30</div>
                 <div style="font-size:11px;color:#5C5549;padding:4px 0">⏳ José — aguardando check-in</div>
-                <div style="display:flex;gap:6px;justify-content:center;margin-top:10px">
-                  <div class="demo-dot" onclick="demoGoTo(0)"></div>
-                  <div class="demo-dot" onclick="demoGoTo(1)"></div>
+                <div class="demo-dots">
+                  <div class="demo-dot" ontouchend="demoGoTo(0)" onclick="demoGoTo(0)"></div>
+                  <div class="demo-dot" ontouchend="demoGoTo(1)" onclick="demoGoTo(1)"></div>
                   <div class="demo-dot demo-dot-active"></div>
-                  <div class="demo-dot" onclick="demoGoTo(3)"></div>
+                  <div class="demo-dot" ontouchend="demoGoTo(3)" onclick="demoGoTo(3)"></div>
                 </div>
-                <div style="margin-top:6px;font-size:10px;color:#C9A96E;cursor:pointer;text-align:center" onclick="demoGoTo(3)">VER EMERGÊNCIA →</div>
+                <div class="demo-nav-btn" style="margin-top:6px;background:transparent;color:#C9A96E;padding:6px;font-size:10px" ontouchend="demoGoTo(3)" onclick="demoGoTo(3)">VER EMERGÊNCIA →</div>
               </div>
             </div>
             <!-- Demo Screen 4: SOS -->
@@ -1171,18 +1180,18 @@ p { color: #4A4A4A; font-size: 1.05rem; }
                     👥 Conferência com familiares
                   </div>
                 </div>
-                <div style="display:flex;gap:6px;justify-content:center;margin-top:8px">
-                  <div class="demo-dot" onclick="demoGoTo(0)"></div>
-                  <div class="demo-dot" onclick="demoGoTo(1)"></div>
-                  <div class="demo-dot" onclick="demoGoTo(2)"></div>
+                <div class="demo-dots">
+                  <div class="demo-dot" ontouchend="demoGoTo(0)" onclick="demoGoTo(0)"></div>
+                  <div class="demo-dot" ontouchend="demoGoTo(1)" onclick="demoGoTo(1)"></div>
+                  <div class="demo-dot" ontouchend="demoGoTo(2)" onclick="demoGoTo(2)"></div>
                   <div class="demo-dot demo-dot-active"></div>
                 </div>
-                <div style="margin-top:6px;font-size:10px;color:#C9A96E;cursor:pointer" onclick="demoGoTo(0)">← VOLTAR AO INÍCIO</div>
+                <div class="demo-nav-btn" style="margin-top:6px;background:transparent;color:#C9A96E;padding:6px;font-size:10px" ontouchend="demoGoTo(0)" onclick="demoGoTo(0)">← VOLTAR AO INÍCIO</div>
               </div>
             </div>
           </div>
         </div>
-        <div style="text-align:center;margin-top:0"></div>
+        <div class="demo-swipe-hint">← Deslize para navegar →</div>
       </div>
     </div>
   </div>
@@ -2173,15 +2182,29 @@ function toggleFaq(btn) {
   if (!wasOpen) item.classList.add('open');
 }
 
-// ── Interactive Phone Demo ──
+// ── Interactive Phone Demo (mobile-optimized) ──
 const demoScreens = ['demo-checkin','demo-confirmed','demo-family','demo-sos'];
 let demoIdx = 0;
 let sosTimer = null;
+let demoTouchStartX = 0;
+let demoTouchStartY = 0;
+let demoUserInteracted = false;
 
 function demoGoTo(idx) {
+  if (idx < 0) idx = demoScreens.length - 1;
+  if (idx >= demoScreens.length) idx = 0;
   demoScreens.forEach(s => document.getElementById(s).classList.remove('demo-active'));
   document.getElementById(demoScreens[idx]).classList.add('demo-active');
   demoIdx = idx;
+  // Update all dot sets
+  document.querySelectorAll('.demo-dots').forEach(dotSet => {
+    dotSet.querySelectorAll('.demo-dot').forEach((dot, i) => {
+      dot.classList.toggle('demo-dot-active', i === idx);
+    });
+  });
+  demoUserInteracted = true;
+  clearInterval(demoAuto);
+  demoAuto = setInterval(() => { if (!demoUserInteracted) demoGoTo(demoIdx + 1); demoUserInteracted = false; }, 8000);
 }
 
 function demoCheckin() {
@@ -2191,7 +2214,8 @@ function demoCheckin() {
   setTimeout(() => demoGoTo(1), 400);
 }
 
-function demoSOSStart() {
+function demoSOSStart(e) {
+  if (e) e.preventDefault();
   const bar = document.getElementById('demo-sos-bar');
   const btn = document.getElementById('demo-sos-btn');
   bar.style.transition = 'width 3s linear';
@@ -2201,15 +2225,15 @@ function demoSOSStart() {
     btn.style.animation = 'demo-shake .3s';
     setTimeout(() => { btn.style.animation = ''; }, 300);
     bar.style.background = '#2D4A3E';
-    // Show SOS activated message
     const content = document.getElementById('demo-sos').querySelector('.phone-app-content');
     const origHTML = content.innerHTML;
-    content.innerHTML = '<div style="text-align:center;padding-top:60px"><div style="width:80px;height:80px;border-radius:50%;background:#8B3A3A;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;animation:demo-pop .4s ease"><span style="font-size:36px">🚨</span></div><div style="font-family:var(--serif);font-size:20px;color:#8B3A3A;margin-bottom:8px">SOS ATIVADO</div><div style="font-size:12px;color:#5C5549;line-height:1.8;margin-bottom:16px">SAMU 192 sendo acionado...<br>Família notificada<br>Localização compartilhada</div><div style="padding:10px 20px;background:#2D4A3E;color:#F5F0EB;border-radius:4px;font-size:11px;letter-spacing:1px;cursor:pointer" onclick="demoGoTo(0)">VOLTAR À DEMO</div></div>';
+    content.innerHTML = '<div style="text-align:center;padding-top:60px"><div style="width:80px;height:80px;border-radius:50%;background:#8B3A3A;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;animation:demo-pop .4s ease"><span style="font-size:36px">🚨</span></div><div style="font-family:var(--serif);font-size:20px;color:#8B3A3A;margin-bottom:8px">SOS ATIVADO</div><div style="font-size:12px;color:#5C5549;line-height:1.8;margin-bottom:16px">SAMU 192 sendo acionado...<br>Família notificada<br>Localização compartilhada</div><div class="demo-nav-btn" ontouchend="demoGoTo(0)" onclick="demoGoTo(0)">VOLTAR À DEMO</div></div>';
     setTimeout(() => { content.innerHTML = origHTML; bar.style.width = '0%'; bar.style.background = '#8B3A3A'; }, 5000);
   }, 3000);
 }
 
-function demoSOSEnd() {
+function demoSOSEnd(e) {
+  if (e) e.preventDefault();
   if (sosTimer) { clearTimeout(sosTimer); sosTimer = null; }
   const bar = document.getElementById('demo-sos-bar');
   const btn = document.getElementById('demo-sos-btn');
@@ -2218,9 +2242,27 @@ function demoSOSEnd() {
   btn.style.transform = 'scale(1)';
 }
 
-// Auto-advance demo every 8 seconds if user hasn't interacted
+// Swipe support for mobile
+const demoScreen = document.getElementById('demo-screen');
+if (demoScreen) {
+  demoScreen.addEventListener('touchstart', e => {
+    demoTouchStartX = e.touches[0].clientX;
+    demoTouchStartY = e.touches[0].clientY;
+  }, {passive: true});
+  demoScreen.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - demoTouchStartX;
+    const dy = e.changedTouches[0].clientY - demoTouchStartY;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) demoGoTo(demoIdx + 1); // swipe left = next
+      else demoGoTo(demoIdx - 1); // swipe right = prev
+    }
+  }, {passive: true});
+}
+
+// Auto-advance every 8 seconds
 let demoAuto = setInterval(() => {
-  demoGoTo((demoIdx + 1) % demoScreens.length);
+  if (!demoUserInteracted) demoGoTo(demoIdx + 1);
+  demoUserInteracted = false;
 }, 8000);
 document.getElementById('demo-screen').addEventListener('click', () => {
   clearInterval(demoAuto); // Stop auto-advance on any interaction
