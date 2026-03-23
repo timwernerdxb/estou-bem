@@ -807,6 +807,56 @@ async function sendPushNotifications(tokens, title, body, data = {}, critical = 
 
 // ── Twilio SMS & Voice ──────────────────────────────────
 // ── WhatsApp Business API (via Twilio) ────────────────────
+// Approved WhatsApp Business Template SIDs
+const WA_TEMPLATES = {
+  checkin_buttons: 'HX12975dc4706173c775b50ee98d697ee5',    // Check-in with Estou Bem / Preciso de Ajuda buttons
+  checkin_confirmed: 'HX36ede86655d6ae9f0051ca42de84ee5f',  // Confirmation sent to family
+  emergency_alert: 'HXfedb892e7284dbd087edd67b62509ff5',    // Emergency alert to family
+  checkin_reminder: 'HXe92b1815ad963c134b65415c817e9324',   // Check-in reminder text
+};
+
+// Send WhatsApp using approved template (works outside 24h window)
+async function sendWhatsAppTemplate(to, templateSid, variables = {}) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const waNumber = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+12627472376';
+
+  if (!accountSid || !authToken) {
+    console.log(`[WhatsApp Template] No credentials. Would send ${templateSid} to ${to}`);
+    return false;
+  }
+
+  let cleanPhone = to.replace(/\D/g, '');
+  if (/^[1-9]{2}9\d{8}$/.test(cleanPhone)) cleanPhone = '55' + cleanPhone;
+  if (!cleanPhone.startsWith('+')) cleanPhone = '+' + cleanPhone;
+
+  try {
+    const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const params = new URLSearchParams({
+      To: `whatsapp:${cleanPhone}`,
+      From: waNumber,
+      ContentSid: templateSid,
+      ContentVariables: JSON.stringify(variables),
+    });
+
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+      method: 'POST',
+      headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+    const data = await res.json();
+    if (data.error_code) {
+      console.log(`[WhatsApp Template] Error ${data.error_code}: ${data.error_message}. Falling back to free-form.`);
+      return await sendWhatsAppBusiness(to, `Estou Bem: ${JSON.stringify(variables)}`);
+    }
+    console.log(`[WhatsApp Template] Sent ${templateSid} to ${cleanPhone}: ${data.sid}`);
+    return true;
+  } catch (e) {
+    console.error(`[WhatsApp Template] Error:`, e.message);
+    return false;
+  }
+}
+
 async function sendWhatsAppBusiness(to, body) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -1184,7 +1234,8 @@ app.post('/api/twilio/sms', express.urlencoded({ extended: false }), async (req,
 app.post('/api/twilio/test-whatsapp', async (req, res) => {
   const { phone } = req.body;
   if (!phone) return res.status(400).json({ error: 'phone is required' });
-  const sent = await sendWhatsAppBusiness(phone, `✅ *Estou Bem — Check-in*\n\nVoce tem um check-in pendente.\n\nResponda *SIM* se esta tudo bem.\nResponda *SOS* se precisa de ajuda.\n\n— Estou Bem App 💚`);
+  // Use approved template with buttons (works outside 24h window)
+  const sent = await sendWhatsAppTemplate(phone, WA_TEMPLATES.checkin_buttons, { '1': elderName || 'Amigo(a)' });
   res.json({ success: sent, channel: 'whatsapp', to: phone });
 });
 
@@ -1222,7 +1273,7 @@ app.post('/api/twilio/whatsapp', express.urlencoded({ extended: false }), async 
         ...contacts.rows.filter(c => c.phone).map(c => c.phone),
       ];
       for (const phone of allPhones) {
-        await sendWhatsAppBusiness(phone, `✅ ESTOU BEM: ${elder.rows[0].name} confirmou o check-in via WhatsApp. Tudo OK!`);
+        await sendWhatsAppTemplate(phone, WA_TEMPLATES.checkin_confirmed, { '1': elder.rows[0].name });
       }
       console.log(`[WhatsApp] ${elder.rows[0].name} confirmed check-in via WhatsApp`);
       res.type('text/xml').send('<Response><Message>✅ Check-in confirmado! Obrigado por responder. Sua família foi notificada. Cuide-se bem! 💚</Message></Response>');
