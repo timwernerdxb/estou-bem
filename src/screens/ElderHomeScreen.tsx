@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -21,12 +21,25 @@ import { CheckIn } from "../types";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
+// Soho House colors
+const SH_GREEN = "#2D4A3E";
+const SH_GREEN_DARK = "#1E352B";
+const SH_CREAM = "#F5F0EB";
+const SH_GOLD = "#C9A96E";
+const SH_GRAY = "#9A9189";
+
+type CheckinDisplayState = "pending" | "completed" | "waiting";
+
 export function ElderHomeScreen() {
   const { state, dispatch } = useApp();
   const { isFamilia } = useSubscription();
   const [pulseAnim] = useState(new Animated.Value(1));
   const [lastCheckin, setLastCheckin] = useState<CheckIn | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [checkinDisplayState, setCheckinDisplayState] = useState<CheckinDisplayState>("pending");
+  const [confirmedTime, setConfirmedTime] = useState<string | null>(null);
+  const [nextCheckinTime, setNextCheckinTime] = useState<string | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const elderName = state.elderProfile?.name || state.currentUser?.name || "Voce";
   const todayCheckins = state.checkins.filter((c) => {
@@ -39,9 +52,88 @@ export function ElderHomeScreen() {
     (c) => c.status === "confirmed" || c.status === "auto_confirmed"
   ).length;
 
-  // Pulse animation for the check-in button
-  useEffect(() => {
+  // Determine check-in display state from local data
+  const computeDisplayState = useCallback(() => {
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+
+    // Default schedule times — ideally these come from settings
+    const scheduleTimes = ["09:00", "18:00"];
+
     if (pendingCheckin) {
+      setCheckinDisplayState("pending");
+      // Find next scheduled time after now
+      const nextTime = scheduleTimes.find((t) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m > nowMins;
+      });
+      setNextCheckinTime(nextTime || null);
+      return;
+    }
+
+    // Check if we have confirmed checkins today
+    const confirmedCheckins = todayCheckins.filter(
+      (c) => c.status === "confirmed" || c.status === "auto_confirmed"
+    );
+
+    // Check if any scheduled time has passed
+    const pastTimes = scheduleTimes.filter((t) => {
+      const [h, m] = t.split(":").map(Number);
+      return h * 60 + m <= nowMins;
+    });
+
+    if (pastTimes.length > 0 && confirmedCheckins.length > 0) {
+      setCheckinDisplayState("completed");
+      const lastConfirmed = confirmedCheckins[confirmedCheckins.length - 1];
+      const respondedAt = lastConfirmed.respondedAt
+        ? new Date(lastConfirmed.respondedAt)
+        : new Date();
+      setConfirmedTime(
+        respondedAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+      );
+      const nextTime = scheduleTimes.find((t) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m > nowMins;
+      });
+      setNextCheckinTime(nextTime || null);
+      return;
+    }
+
+    // No schedule set at all — backwards compatible, show as pending
+    if (!scheduleTimes || scheduleTimes.length === 0) {
+      setCheckinDisplayState("pending");
+      setNextCheckinTime(null);
+      return;
+    }
+
+    // Waiting for next checkin
+    const nextTime = scheduleTimes.find((t) => {
+      const [h, m] = t.split(":").map(Number);
+      return h * 60 + m > nowMins;
+    });
+
+    if (nextTime) {
+      setCheckinDisplayState("waiting");
+      setNextCheckinTime(nextTime);
+    } else {
+      // All times passed, nothing confirmed, nothing pending
+      setCheckinDisplayState("waiting");
+      setNextCheckinTime(scheduleTimes[0] || "09:00");
+    }
+  }, [pendingCheckin, todayCheckins]);
+
+  // Compute state on mount and every 30 seconds
+  useEffect(() => {
+    computeDisplayState();
+    intervalRef.current = setInterval(computeDisplayState, 30000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [computeDisplayState]);
+
+  // Pulse animation for the check-in button — only when pending
+  useEffect(() => {
+    if (checkinDisplayState === "pending") {
       const pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -58,10 +150,14 @@ export function ElderHomeScreen() {
       );
       pulse.start();
       return () => pulse.stop();
+    } else {
+      pulseAnim.setValue(1);
     }
-  }, [pendingCheckin]);
+  }, [checkinDisplayState]);
 
   const handleCheckin = useCallback(async () => {
+    // Only allow check-in when in pending state
+    if (checkinDisplayState !== "pending") return;
     if (isConfirming) return;
     setIsConfirming(true);
 
@@ -73,7 +169,7 @@ export function ElderHomeScreen() {
       dispatch({ type: "UPDATE_CHECKIN", payload: confirmed });
       setLastCheckin(confirmed);
     } else {
-      // Create and immediately confirm a new check-in
+      // Create and immediately confirm a new check-in (backwards compat)
       const elderId = state.elderProfile?.id || state.currentUser?.id || "elder";
       const newCheckin = checkInService.createCheckin(elderId, new Date().toISOString());
       const confirmed = checkInService.confirmCheckin(newCheckin);
@@ -81,8 +177,12 @@ export function ElderHomeScreen() {
       setLastCheckin(confirmed);
     }
 
-    setTimeout(() => setIsConfirming(false), 2000);
-  }, [pendingCheckin, isConfirming, state.elderProfile, state.currentUser]);
+    // Recompute state after confirming
+    setTimeout(() => {
+      setIsConfirming(false);
+      computeDisplayState();
+    }, 2000);
+  }, [checkinDisplayState, pendingCheckin, isConfirming, state.elderProfile, state.currentUser, computeDisplayState]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -91,11 +191,93 @@ export function ElderHomeScreen() {
     return "Boa noite";
   };
 
-  const buttonColor = pendingCheckin
-    ? COLORS.checkinPending
-    : isConfirming
-    ? COLORS.checkinGreen
-    : COLORS.checkinGreen;
+  const streak = (state as any).gamification?.streak || 0;
+
+  const renderCheckinArea = () => {
+    if (isConfirming) {
+      // Show brief confirmation animation
+      return (
+        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+          <View
+            style={[
+              styles.checkinButton,
+              { backgroundColor: SH_GREEN_DARK },
+            ]}
+          >
+            <Ionicons name="checkmark-circle" size={80} color={COLORS.white} />
+            <Text style={styles.checkinButtonText}>Confirmado</Text>
+          </View>
+        </Animated.View>
+      );
+    }
+
+    if (checkinDisplayState === "pending") {
+      return (
+        <>
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <TouchableOpacity
+              onPress={handleCheckin}
+              activeOpacity={0.8}
+              style={[
+                styles.checkinButton,
+                { backgroundColor: SH_GREEN },
+              ]}
+            >
+              <Ionicons name="hand-left" size={80} color={COLORS.white} />
+              <Text style={styles.checkinButtonText}>TOQUE AQUI</Text>
+            </TouchableOpacity>
+          </Animated.View>
+          <Text style={styles.pendingText}>
+            Voce tem um check-in pendente
+          </Text>
+        </>
+      );
+    }
+
+    if (checkinDisplayState === "completed") {
+      return (
+        <>
+          <View style={styles.completedCard}>
+            <Ionicons name="checkmark-circle" size={56} color={SH_GREEN} />
+            <Text style={styles.completedTitle}>Check-in confirmado</Text>
+            {confirmedTime && (
+              <Text style={styles.completedTime}>{`\u00E0s ${confirmedTime}`}</Text>
+            )}
+            {streak > 0 && (
+              <Text style={styles.completedStreak}>{`${streak} dias seguidos`}</Text>
+            )}
+          </View>
+          {nextCheckinTime && (
+            <Text style={styles.nextCheckinText}>
+              {`Pr\u00F3ximo check-in \u00E0s ${nextCheckinTime}`}
+            </Text>
+          )}
+        </>
+      );
+    }
+
+    // waiting state
+    return (
+      <>
+        <View
+          style={[
+            styles.checkinButton,
+            styles.waitingButton,
+          ]}
+        >
+          <Ionicons name="hand-left" size={80} color={COLORS.white} style={{ opacity: 0.6 }} />
+          <Text style={[styles.checkinButtonText, { opacity: 0.8 }]}>
+            {`Pr\u00F3ximo check-in`}
+          </Text>
+        </View>
+        {nextCheckinTime && (
+          <Text style={styles.waitingTimeText}>
+            {`\u00C0s ${nextCheckinTime}`}
+          </Text>
+        )}
+      </>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -115,38 +297,9 @@ export function ElderHomeScreen() {
           })}
         </Text>
 
-        {/* Main Check-in Button */}
+        {/* Main Check-in Area */}
         <View style={styles.checkinContainer}>
-          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-            <TouchableOpacity
-              onPress={handleCheckin}
-              activeOpacity={0.8}
-              style={[
-                styles.checkinButton,
-                { backgroundColor: buttonColor },
-                isConfirming && styles.checkinConfirmed,
-              ]}
-            >
-              <Ionicons
-                name={isConfirming ? "checkmark-circle" : "hand-left"}
-                size={80}
-                color={COLORS.white}
-              />
-              <Text style={styles.checkinButtonText}>
-                {isConfirming
-                  ? "Confirmado"
-                  : pendingCheckin
-                  ? "TOQUE AQUI"
-                  : "ESTOU BEM"}
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-
-          {pendingCheckin && (
-            <Text style={styles.pendingText}>
-              Voce tem um check-in pendente
-            </Text>
-          )}
+          {renderCheckinArea()}
         </View>
 
         {/* Today's Status */}
@@ -242,8 +395,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  checkinConfirmed: {
-    backgroundColor: COLORS.checkinGreenDark,
+  waitingButton: {
+    backgroundColor: SH_GRAY,
+    opacity: 0.85,
   },
   checkinButtonText: {
     ...FONTS.elderButton,
@@ -257,6 +411,52 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
     fontWeight: "500",
   },
+  // Completed state
+  completedCard: {
+    backgroundColor: "#E8F0EC",
+    borderWidth: 1,
+    borderColor: SH_GREEN,
+    borderRadius: 8,
+    paddingVertical: 28,
+    paddingHorizontal: 32,
+    alignItems: "center",
+    width: BUTTON_SIZE,
+  },
+  completedTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: SH_GREEN,
+    marginTop: SPACING.sm,
+    letterSpacing: 0.3,
+  },
+  completedTime: {
+    fontSize: 15,
+    color: "#5C5549",
+    marginTop: 4,
+  },
+  completedStreak: {
+    fontSize: 13,
+    color: SH_GOLD,
+    marginTop: SPACING.md,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  nextCheckinText: {
+    fontSize: 14,
+    color: SH_GRAY,
+    marginTop: SPACING.md,
+    letterSpacing: 0.3,
+  },
+  // Waiting state
+  waitingTimeText: {
+    fontSize: 16,
+    color: SH_GRAY,
+    marginTop: SPACING.md,
+    fontWeight: "500",
+    letterSpacing: 0.4,
+  },
+  // Status card
   statusCard: {
     width: "100%",
     marginBottom: SPACING.md,

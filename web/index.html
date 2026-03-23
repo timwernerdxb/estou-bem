@@ -1071,6 +1071,16 @@ function render() {
   save();
 }
 
+// ─── Auto-refresh check-in status every 30s ───────────────
+let checkinStatusInterval = null;
+function startCheckinStatusPolling() {
+  if (checkinStatusInterval) clearInterval(checkinStatusInterval);
+  checkinStatusInterval = setInterval(() => {
+    if (state.user?.role === 'elder') render();
+  }, 30000);
+}
+startCheckinStatusPolling();
+
 // ─── Onboarding ───────────────────────────────────────────
 function getSlides() {
   return [
@@ -2620,13 +2630,18 @@ function handleAction(action, el) {
       break;
     }
     case 'do-checkin': {
+      const checkinSt = getCheckinState();
+      // Only allow check-in when in pending state
+      if (checkinSt.state !== 'pending') {
+        break;
+      }
       const pending = todayCheckins().find(c => c.status === 'pending');
       if (pending) {
         pending.status = 'confirmed';
         pending.time = timeNow();
         if (authToken) api('PUT', `/api/checkins/${pending.id}`, { status: 'confirmed', time: timeNow() });
       } else {
-        // Also resolve any missed check-in that's currently escalating
+        // Backwards compat: no schedule set, create and confirm immediately
         const missed = todayCheckins().find(c => c.status === 'missed' && state.escalation?.checkinId === c.id);
         if (missed) missed.status = 'confirmed';
         const newCheckin = { id: genId(), time: timeNow(), status: 'confirmed', date: today() };
