@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.estoubem.app",
+      "bundleIdentifier": "com.twerner.estoubem",
       "infoPlist": {
         "NSHealthShareUsageDescription": "Estou Bem usa dados de saúde para monitorar o bem-estar do idoso e alertar familiares.",
         "NSHealthUpdateUsageDescription": "Estou Bem registra check-ins de saúde para acompanhamento familiar.",
@@ -29,7 +29,7 @@
       }
     },
     "android": {
-      "package": "com.estoubem.app",
+      "package": "com.twerner.estoubem",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#F5F0EB",

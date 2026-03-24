@@ -16,7 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   ios: {
     supportsTablet: false,
-    bundleIdentifier: "com.estoubem.app",
+    bundleIdentifier: "com.twerner.estoubem",
     buildNumber: "1",
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
@@ -46,7 +46,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       monochromeImage: "./assets/android-icon-monochrome.png",
       backgroundColor: "#F5F0EB",
     },
-    package: "com.estoubem.app",
+    package: "com.twerner.estoubem",
     permissions: [
       "ACTIVITY_RECOGNITION",
       "RECEIVE_BOOT_COMPLETED",
@@ -79,6 +79,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ["expo-task-manager"],
     ["@bacons/apple-targets"],
     ["./plugins/withAsyncStorageRepo"],
+    ["./plugins/withWearOS"],
   ],
   extra: {
     revenueCatAppleApiKey:

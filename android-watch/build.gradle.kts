@@ -1,14 +1,14 @@
 plugins {
-    id("com.android.application") version "8.2.2"
-    id("org.jetbrains.kotlin.android") version "1.9.22"
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
     namespace = "com.estoubem.watch"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.estoubem.watch"
+        applicationId = "com.twerner.estoubem"
         minSdk = 30
         targetSdk = 34
         versionCode = 1
