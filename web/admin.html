@@ -1428,10 +1428,9 @@ function renderAffiliates() {
               <div class="aff-edit-field">
                 <label>Status</label>
                 <div class="aff-edit-toggle">
-                  <input type="checkbox" id="affEditActive_${a.id}" ${a.is_active ? 'checked' : ''}>
+                  <input type="checkbox" id="affEditActive_${a.id}" ${a.is_active ? 'checked' : ''} onchange="this.nextElementSibling.textContent=this.checked?'Ativo':'Inativo'">
                   <span id="affEditActiveLabel_${a.id}">${a.is_active ? 'Ativo' : 'Inativo'}</span>
                 </div>
-                <script>document.getElementById('affEditActive_${a.id}').onchange=function(){document.getElementById('affEditActiveLabel_${a.id}').textContent=this.checked?'Ativo':'Inativo';}</script>
               </div>
               <div class="aff-edit-field full-width">
                 <label>Chave PIX</label>

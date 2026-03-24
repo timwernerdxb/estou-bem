@@ -1,6 +1,4 @@
-import { ExpoConfig, ConfigContext } from "expo/config";
-
-export default ({ config }: ConfigContext): ExpoConfig => ({
+export default ({ config }) => ({
   ...config,
   name: "Estou Bem",
   slug: "estou-bem",
@@ -47,6 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: "#F5F0EB",
     },
     package: "com.twerner.estoubem",
+    versionCode: 10,
     permissions: [
       "ACTIVITY_RECOGNITION",
       "RECEIVE_BOOT_COMPLETED",

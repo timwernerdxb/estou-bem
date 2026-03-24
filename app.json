@@ -55,6 +55,7 @@
       [
         "@bacons/apple-targets"
       ]
-    ]
+    ],
+    "owner": "timwernerdxb"
   }
 }

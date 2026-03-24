@@ -1,135 +1,105 @@
 package com.estoubem.watch
 
-import android.app.Application
+import android.app.Activity
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.wear.compose.navigation.SwipeDismissableNavHost
-import androidx.wear.compose.navigation.composable
-import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
-import com.estoubem.watch.presentation.CheckInScreen
-import com.estoubem.watch.presentation.FallAlertScreen
-import com.estoubem.watch.presentation.HealthScreen
-import com.estoubem.watch.presentation.SOSScreen
-import com.estoubem.watch.services.FallDetectionService
-import com.estoubem.watch.services.HealthService
-import com.estoubem.watch.services.MotionDetectionService
-import com.estoubem.watch.services.PhoneConnectionService
-import com.estoubem.watch.theme.EstouBemWatchTheme
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.view.View
+import android.widget.TextView
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
+import android.util.TypedValue
+import android.content.Context
 
-/**
- * Application class for Estou Bem Wear OS companion app.
- * Initializes services on startup.
- */
-class EstouBemWatchApp : Application() {
+class MainActivity : Activity() {
 
-    lateinit var phoneConnection: PhoneConnectionService
-    lateinit var healthService: HealthService
-    lateinit var fallDetectionService: FallDetectionService
-    lateinit var motionDetectionService: MotionDetectionService
+    private var isCheckedIn = false
 
-    override fun onCreate() {
-        super.onCreate()
-        instance = this
-        phoneConnection = PhoneConnectionService(this)
-        healthService = HealthService(this)
-        fallDetectionService = FallDetectionService(this)
-        motionDetectionService = MotionDetectionService(this)
-    }
-
-    companion object {
-        lateinit var instance: EstouBemWatchApp
-            private set
-    }
-}
-
-/**
- * Main Activity hosting the Wear OS Compose navigation.
- */
-class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(buildUI())
+    }
 
-        val app = application as EstouBemWatchApp
+    private fun buildUI(): View {
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#F5F0EB"))
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
 
-        // Start monitoring services
-        app.healthService.startMonitoring()
-        app.fallDetectionService.startMonitoring()
-        app.motionDetectionService.startMonitoring()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setPadding(16, 24, 16, 16)
+        }
 
-        setContent {
-            EstouBemWatchTheme {
-                WearNavigation(app)
+        val greeting = TextView(this).apply {
+            text = "Estou Bem"
+            setTextColor(Color.parseColor("#1A1A1A"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            gravity = Gravity.CENTER
+        }
+        container.addView(greeting)
+
+        val btnSize = (100 * resources.displayMetrics.density).toInt()
+        val btnBg = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.parseColor("#2D4A3E"))
+        }
+        val statusText = TextView(this).apply {
+            text = "Toque para confirmar"
+            setTextColor(Color.parseColor("#9A9189"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (8 * resources.displayMetrics.density).toInt() }
+        }
+
+        val mainButton = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(btnSize, btnSize).apply {
+                gravity = Gravity.CENTER
+                topMargin = (12 * resources.displayMetrics.density).toInt()
+            }
+            background = btnBg
+            isClickable = true
+            setOnClickListener {
+                if (!isCheckedIn) {
+                    isCheckedIn = true
+                    val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                    v.vibrate(VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE))
+                    (background as GradientDrawable).setColor(Color.parseColor("#1E352B"))
+                    statusText.text = "✓ Check-in confirmado!"
+                    statusText.setTextColor(Color.parseColor("#2D4A3E"))
+                }
             }
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        val app = application as EstouBemWatchApp
-        app.motionDetectionService.stopMonitoring()
-    }
-}
-
-/**
- * Navigation routes for the Wear OS app.
- */
-object WearRoutes {
-    const val CHECKIN = "checkin"
-    const val HEALTH = "health"
-    const val SOS = "sos"
-    const val FALL_ALERT = "fall_alert"
-}
-
-/**
- * Main navigation composable with swipe-to-dismiss support.
- */
-@Composable
-fun WearNavigation(app: EstouBemWatchApp) {
-    val navController = rememberSwipeDismissableNavController()
-
-    val fallDetected by app.fallDetectionService.fallDetected.collectAsState()
-
-    // Auto-navigate to fall alert when detected
-    if (fallDetected) {
-        navController.navigate(WearRoutes.FALL_ALERT) {
-            launchSingleTop = true
-        }
-    }
-
-    SwipeDismissableNavHost(
-        navController = navController,
-        startDestination = WearRoutes.CHECKIN
-    ) {
-        composable(WearRoutes.CHECKIN) {
-            CheckInScreen(
-                phoneConnection = app.phoneConnection,
-                motionService = app.motionDetectionService,
-                healthService = app.healthService,
-                fallDetectionService = app.fallDetectionService,
-                onNavigateToHealth = { navController.navigate(WearRoutes.HEALTH) },
-                onNavigateToSOS = { navController.navigate(WearRoutes.SOS) }
+        val btnLabel = TextView(this).apply {
+            text = "Estou\nBem"
+            setTextColor(Color.parseColor("#C9A96E"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            gravity = Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER
             )
         }
+        mainButton.addView(btnLabel)
+        container.addView(mainButton)
+        container.addView(statusText)
 
-        composable(WearRoutes.HEALTH) {
-            HealthScreen(healthService = app.healthService)
-        }
-
-        composable(WearRoutes.SOS) {
-            SOSScreen(phoneConnection = app.phoneConnection)
-        }
-
-        composable(WearRoutes.FALL_ALERT) {
-            FallAlertScreen(
-                fallDetectionService = app.fallDetectionService,
-                phoneConnection = app.phoneConnection,
-                onDismiss = { navController.popBackStack() }
-            )
-        }
+        root.addView(container)
+        return root
     }
 }
