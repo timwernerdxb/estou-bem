@@ -403,6 +403,131 @@ p { color: #4A4A4A; font-size: 1.05rem; }
   50% { transform: scale(1.08); opacity: 0.2; }
 }
 
+/* ── Watch Mockup ──────────────────────────────────────── */
+.devices-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  justify-content: center;
+}
+.watch-mockup {
+  position: relative;
+  animation: float 4s ease-in-out infinite 1s;
+}
+.watch-frame {
+  width: 160px;
+  height: 190px;
+  background: #1A1A1A;
+  border-radius: 40px;
+  padding: 10px;
+  box-shadow: 0 30px 60px rgba(26,26,26,0.12), 0 0 0 1px rgba(255,255,255,0.1) inset;
+  position: relative;
+}
+.watch-frame::before {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50px;
+  width: 6px;
+  height: 30px;
+  background: #333;
+  border-radius: 0 4px 4px 0;
+}
+.watch-screen {
+  width: 100%;
+  height: 100%;
+  background: #0A0A0A;
+  border-radius: 32px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.watch-band-top, .watch-band-bottom {
+  width: 80px;
+  height: 40px;
+  background: linear-gradient(180deg, #2A2A2A, #1A1A1A);
+  margin: 0 auto;
+  border-radius: 4px;
+}
+.watch-band-top { border-radius: 4px 4px 0 0; margin-bottom: -2px; }
+.watch-band-bottom { border-radius: 0 0 4px 4px; margin-top: -2px; }
+.watch-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  text-align: center;
+}
+.watch-hr-ring {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 3px solid #2D4A3E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  margin-bottom: 6px;
+  position: relative;
+}
+.watch-hr-ring::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: #C9A96E;
+  animation: watch-ring-spin 3s linear infinite;
+}
+@keyframes watch-ring-spin {
+  to { transform: rotate(360deg); }
+}
+.watch-hr-value {
+  font-family: 'Inter', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+.watch-hr-label {
+  font-size: 7px;
+  color: #C9A96E;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.watch-metrics {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+.watch-metric {
+  text-align: center;
+}
+.watch-metric-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+.watch-metric-label {
+  font-size: 6px;
+  color: #666;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.watch-status {
+  margin-top: 6px;
+  background: #2D4A3E;
+  color: #C9A96E;
+  font-size: 7px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .hero { padding: 120px 0 60px; min-height: auto; }
   .hero-grid { grid-template-columns: 1fr; gap: 48px; }
@@ -413,6 +538,12 @@ p { color: #4A4A4A; font-size: 1.05rem; }
   .hero-subtitle { margin-left: auto; margin-right: auto; }
   .hero-buttons { justify-content: center; }
   .hero-trust { justify-content: center; }
+  .watch-frame { width: 120px; height: 145px; border-radius: 30px; }
+  .watch-screen { border-radius: 24px; }
+  .watch-hr-ring { width: 50px; height: 50px; }
+  .watch-hr-value { font-size: 16px; }
+  .watch-band-top, .watch-band-bottom { width: 60px; height: 30px; }
+  .watch-metrics { gap: 8px; }
 }
 
 /* ── How It Works ──────────────────────────────────────── */
@@ -1099,7 +1230,8 @@ p { color: #4A4A4A; font-size: 1.05rem; }
           <span data-i18n="hero_trust">Mais de 2.000 famílias confiam em nós</span>
         </div>
       </div>
-      <div class="phone-mockup fade-in fade-in-delay-2">
+      <div class="devices-group fade-in fade-in-delay-2">
+      <div class="phone-mockup">
         <div class="phone-frame">
           <div class="phone-notch"></div>
           <div class="phone-screen" id="demo-screen">
@@ -1234,6 +1366,58 @@ p { color: #4A4A4A; font-size: 1.05rem; }
         </div>
         <div class="demo-swipe-hint">← Deslize para navegar →</div>
       </div>
+
+      <!-- Watch Mockup -->
+      <div class="watch-mockup">
+        <div class="watch-band-top"></div>
+        <div class="watch-frame">
+          <div class="watch-screen">
+            <div style="padding:6px 8px 2px;display:flex;justify-content:space-between;font-size:7px;color:#555">
+              <span>9:41</span>
+              <span style="color:#2D4A3E">●</span>
+            </div>
+            <div class="watch-content" id="watch-demo">
+              <!-- Watch Screen 1: Heart Rate -->
+              <div class="watch-view watch-active" id="watch-hr">
+                <div class="watch-hr-ring">
+                  <div class="watch-hr-value" id="watch-hr-num">72</div>
+                  <div class="watch-hr-label">BPM</div>
+                </div>
+                <div class="watch-metrics">
+                  <div class="watch-metric">
+                    <div class="watch-metric-value">97%</div>
+                    <div class="watch-metric-label">SpO2</div>
+                  </div>
+                  <div class="watch-metric">
+                    <div class="watch-metric-value">3.2k</div>
+                    <div class="watch-metric-label">Passos</div>
+                  </div>
+                </div>
+                <div class="watch-status">✓ Monitorando</div>
+              </div>
+              <!-- Watch Screen 2: Check-in -->
+              <div class="watch-view" id="watch-checkin" style="display:none">
+                <div style="font-size:9px;color:#C9A96E;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Check-in</div>
+                <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#2D4A3E,#3B5E4F);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;cursor:pointer;box-shadow:0 4px 16px rgba(45,74,62,0.4)" onclick="watchCheckin()">
+                  <span style="font-size:10px;color:#F5F0EB;font-weight:600;text-align:center;line-height:1.2">Estou<br>Bem</span>
+                </div>
+                <div style="font-size:8px;color:#666">Toque para confirmar</div>
+              </div>
+              <!-- Watch Screen 3: Confirmed -->
+              <div class="watch-view" id="watch-confirmed" style="display:none">
+                <div style="width:50px;height:50px;border-radius:50%;background:#2D4A3E;display:flex;align-items:center;justify-content:center;margin:0 auto 8px">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C9A96E" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div style="font-size:11px;color:#fff;font-weight:600">Confirmado!</div>
+                <div style="font-size:7px;color:#666;margin-top:4px">Família notificada</div>
+                <div class="watch-status" style="margin-top:8px">13 dias 🔥</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="watch-band-bottom"></div>
+      </div>
+      </div><!-- /devices-group -->
     </div>
   </div>
 </section>
@@ -2459,6 +2643,35 @@ function demoGoTo(idx) {
   clearInterval(demoAuto);
   demoAuto = setInterval(() => { if (!demoUserInteracted) demoGoTo(demoIdx + 1); demoUserInteracted = false; }, 8000);
 }
+
+// Watch demo animation
+let watchScreen = 0;
+function cycleWatch() {
+  const screens = ['watch-hr', 'watch-checkin', 'watch-confirmed'];
+  screens.forEach(s => { const el = document.getElementById(s); if (el) el.style.display = 'none'; });
+  watchScreen = (watchScreen + 1) % screens.length;
+  const active = document.getElementById(screens[watchScreen]);
+  if (active) active.style.display = 'flex';
+  // Animate heart rate
+  if (watchScreen === 0) {
+    const hrEl = document.getElementById('watch-hr-num');
+    if (hrEl) { hrEl.textContent = Math.floor(68 + Math.random() * 10); }
+  }
+}
+function watchCheckin() {
+  const screens = ['watch-hr', 'watch-checkin', 'watch-confirmed'];
+  screens.forEach(s => { const el = document.getElementById(s); if (el) el.style.display = 'none'; });
+  document.getElementById('watch-confirmed').style.display = 'flex';
+  watchScreen = 2;
+}
+setInterval(cycleWatch, 4000);
+// Also animate HR value periodically
+setInterval(() => {
+  const hrEl = document.getElementById('watch-hr-num');
+  if (hrEl && document.getElementById('watch-hr')?.style.display !== 'none') {
+    hrEl.textContent = Math.floor(68 + Math.random() * 10);
+  }
+}, 2000);
 
 function demoCheckin() {
   const btn = document.getElementById('demo-btn');
