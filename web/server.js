@@ -3077,13 +3077,19 @@ app.get('/api/affiliates/:code/dashboard', async (req, res) => {
 
 // ── Referral Routes ──────────────────────────────────────
 app.get('/api/referral-code', authMiddleware, async (req, res) => {
-  let user = await pool.query(`SELECT referral_code FROM users WHERE id = $1`, [req.userId]);
+  let user = await pool.query(`SELECT referral_code, referral_reward_count, free_months_earned FROM users WHERE id = $1`, [req.userId]);
   if (!user.rows[0].referral_code) {
     const code = 'EB' + Math.random().toString(36).toUpperCase().slice(2, 6);
     await pool.query(`UPDATE users SET referral_code = $1 WHERE id = $2`, [code, req.userId]);
-    return res.json({ code });
+    const referralCount = await pool.query('SELECT COUNT(*) FROM users WHERE referred_by = $1', [req.userId]);
+    return res.json({ code, referral_count: parseInt(referralCount.rows[0].count), free_months_earned: 0 });
   }
-  res.json({ code: user.rows[0].referral_code });
+  const referralCount = await pool.query('SELECT COUNT(*) FROM users WHERE referred_by = $1', [req.userId]);
+  res.json({
+    code: user.rows[0].referral_code,
+    referral_count: parseInt(referralCount.rows[0].count),
+    free_months_earned: user.rows[0].free_months_earned || 0
+  });
 });
 
 app.post('/api/referral/apply', authMiddleware, async (req, res) => {

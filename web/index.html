@@ -415,6 +415,10 @@ const translations = {
     settings_whatsapp: 'Integração WhatsApp',
     settings_whatsapp_desc: 'Alertas automáticos, chamadas e escalação completa.',
     settings_connected: 'Conectado', settings_logout: 'Sair da conta',
+    settings_referral: 'Indique e Ganhe', settings_referral_desc: 'A cada 5 indicações, você ganha 1 mês grátis!',
+    settings_referral_share: 'Compartilhar link', settings_referral_code: 'Seu código',
+    settings_referral_count: '{count} indicações', settings_referral_earned: '{count} mês(es) grátis ganho(s)',
+    settings_referral_copied: 'Link copiado!',
     settings_trial_period: 'Período de teste', settings_trial_days: '{days} dias restantes',
     settings_trial_features: 'Todos os recursos liberados',
     settings_movement: 'Detecção de Movimento',
@@ -531,6 +535,10 @@ const translations = {
     settings_whatsapp: 'WhatsApp Integration',
     settings_whatsapp_desc: 'Automatic alerts, calls, and full escalation.',
     settings_connected: 'Connected', settings_logout: 'Sign out',
+    settings_referral: 'Refer & Earn', settings_referral_desc: 'Every 5 referrals = 1 free month!',
+    settings_referral_share: 'Share link', settings_referral_code: 'Your code',
+    settings_referral_count: '{count} referrals', settings_referral_earned: '{count} free month(s) earned',
+    settings_referral_copied: 'Link copied!',
     settings_trial_period: 'Trial period', settings_trial_days: '{days} days remaining',
     settings_trial_features: 'All features unlocked',
     settings_movement: 'Movement Detection',
@@ -2062,6 +2070,27 @@ function renderSettings() {
         </div>
       ` : ''}
 
+      <div class="card" id="referral-card">
+        <h2>${t('settings_referral')}</h2>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">${t('settings_referral_desc')}</p>
+        <div id="referral-info" style="display:none">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+            <input type="text" id="referral-link" readonly style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:monospace;background:var(--bg);color:var(--text)">
+            <button class="btn btn-sm" onclick="copyReferralLink()" id="copy-referral-btn" style="padding:10px 16px;white-space:nowrap">${t('settings_referral_share')}</button>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <div style="background:var(--bg);padding:8px 14px;border-radius:var(--radius);font-size:13px"><strong id="referral-count">0</strong> <span style="color:var(--text3)">indicações</span></div>
+            <div style="background:var(--gold-light,#FAF5EB);padding:8px 14px;border-radius:var(--radius);font-size:13px"><strong id="referral-earned">0</strong> <span style="color:var(--text3)">meses grátis</span></div>
+            <div style="background:var(--bg);padding:8px 14px;border-radius:var(--radius);font-size:13px">Próximo: <strong id="referral-next">5</strong> <span style="color:var(--text3)">indicações</span></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn btn-sm btn-outline" onclick="shareReferralWhatsApp()" style="flex:1;padding:10px">📱 WhatsApp</button>
+            <button class="btn btn-sm btn-outline" onclick="shareReferralEmail()" style="flex:1;padding:10px">📧 Email</button>
+          </div>
+        </div>
+        <div id="referral-loading" style="text-align:center;padding:12px;color:var(--text3);font-size:13px">Carregando...</div>
+      </div>
+
       <div class="card">
         <h2>${t('settings_more')}</h2>
         <button class="menu-row w100" data-tab="contacts" style="border:none;background:none;text-align:left">
@@ -3353,6 +3382,71 @@ function renderEscalation() {
       `}
     </div>`;
 }
+
+// ─── Referral system ──────────────────────────────────────
+async function loadReferralInfo() {
+  const card = document.getElementById('referral-card');
+  if (!card || !authToken) return;
+  try {
+    const res = await api('GET', '/api/referral-code');
+    const code = res.code;
+    const baseUrl = window.location.origin;
+    const link = `${baseUrl}/?ref=${code}`;
+    const linkEl = document.getElementById('referral-link');
+    if (linkEl) linkEl.value = link;
+
+    const referralCount = res.referral_count || 0;
+    const freeMonths = res.free_months_earned || 0;
+    const nextMilestone = (Math.floor(referralCount / 5) + 1) * 5;
+
+    const countEl = document.getElementById('referral-count');
+    const earnedEl = document.getElementById('referral-earned');
+    const nextEl = document.getElementById('referral-next');
+    if (countEl) countEl.textContent = referralCount;
+    if (earnedEl) earnedEl.textContent = freeMonths;
+    if (nextEl) nextEl.textContent = nextMilestone - referralCount;
+
+    document.getElementById('referral-info').style.display = 'block';
+    document.getElementById('referral-loading').style.display = 'none';
+  } catch (e) {
+    document.getElementById('referral-loading').textContent = 'Erro ao carregar';
+  }
+}
+
+function copyReferralLink() {
+  const link = document.getElementById('referral-link');
+  if (!link) return;
+  navigator.clipboard.writeText(link.value).then(() => {
+    const btn = document.getElementById('copy-referral-btn');
+    btn.textContent = t('settings_referral_copied');
+    btn.style.background = 'var(--success)';
+    btn.style.color = '#fff';
+    setTimeout(() => { btn.textContent = t('settings_referral_share'); btn.style.background = ''; btn.style.color = ''; }, 2000);
+  });
+}
+
+function shareReferralWhatsApp() {
+  const link = document.getElementById('referral-link')?.value;
+  if (!link) return;
+  const text = encodeURIComponent(`Conheça o Estou Bem! Um app que cuida de quem você ama. Use meu link para se cadastrar: ${link}`);
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
+function shareReferralEmail() {
+  const link = document.getElementById('referral-link')?.value;
+  if (!link) return;
+  const subject = encodeURIComponent('Conheça o Estou Bem - Cuidado com quem você ama');
+  const body = encodeURIComponent(`Oi!\n\nQuero te indicar o Estou Bem, um app que monitora a segurança de pessoas idosas com check-ins diários, alertas de emergência e muito mais.\n\nUse meu link para se cadastrar:\n${link}\n\nA cada 5 indicações, eu ganho 1 mês grátis — e você também pode indicar!\n\nAbraço!`);
+  window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+}
+
+// Load referral info when settings tab renders
+const origRender = typeof render === 'function' ? render : null;
+document.addEventListener('click', (e) => {
+  if (e.target?.dataset?.tab === 'settings' || e.target?.closest('[data-tab="settings"]')) {
+    setTimeout(loadReferralInfo, 300);
+  }
+});
 
 // ─── Handle referral code from URL ────────────────────────
 (function() {
