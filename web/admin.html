@@ -370,6 +370,59 @@ tr.aff-pending:hover { background: #FEF3C7; }
 .audit-create { color: #22543D; font-weight: 600; }
 .audit-update { color: #2A4365; font-weight: 600; }
 .audit-delete, .audit-deactivate { color: #742A2A; font-weight: 600; }
+
+/* ─── BI / Analytics ──────────────────────────────────── */
+.bi-tabs {
+  display: flex; gap: 4px; background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 4px; margin-bottom: 20px;
+}
+.bi-tab {
+  flex: 1; padding: 10px 16px; font-size: 13px; font-weight: 600;
+  border-radius: 6px; color: var(--text2); transition: all .15s;
+  text-align: center;
+}
+.bi-tab:hover { background: #EDF2F7; color: var(--text); }
+.bi-tab.active { background: #2D4A3E; color: #FFF; }
+.bi-panel { display: none; }
+.bi-panel.active { display: block; }
+.bi-kpi-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+.bi-kpi {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; text-align: center;
+}
+.bi-kpi .bi-kpi-value {
+  font-size: 28px; font-weight: 800; color: #2D4A3E; line-height: 1.2;
+}
+.bi-kpi .bi-kpi-label {
+  font-size: 12px; color: var(--text3); text-transform: uppercase;
+  letter-spacing: .5px; margin-top: 6px;
+}
+.bi-kpi .bi-kpi-sub {
+  font-size: 11px; color: var(--text2); margin-top: 4px;
+}
+.bi-calendar-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px;
+}
+.bi-cal-day {
+  aspect-ratio: 1; border-radius: 3px; font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.bi-cal-none { background: #F7FAFC; color: #CBD5E0; }
+.bi-cal-partial { background: #FEFCBF; color: #975A16; }
+.bi-cal-full { background: #C6F6D5; color: #22543D; }
+.bi-cal-missed { background: #FED7D7; color: #742A2A; }
+@media (max-width: 900px) {
+  .bi-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  #bi-overview > div[style*="grid-template-columns: 1fr 1fr"],
+  #bi-engagement > div[style*="grid-template-columns: 1fr 1fr"],
+  #bi-health > div[style*="grid-template-columns: 1fr 1fr"],
+  #bi-revenue > div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
 </style>
 </head>
 <body>
@@ -390,8 +443,18 @@ tr.aff-pending:hover { background: #FEF3C7; }
         <input type="password" id="loginPassword" placeholder="Digite a senha..." onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <button class="btn" onclick="doLogin()">Entrar</button>
-      <div style="text-align:center;margin-top:16px">
-        <a href="#" onclick="showLegacyLogin()" style="font-size:12px;color:var(--text3)">Entrar com chave de admin (legado)</a>
+      <div style="text-align:center;margin-top:12px">
+        <a href="#" onclick="showAdminForgot()" style="font-size:12px;color:var(--primary)">Esqueceu a senha?</a>
+      </div>
+      <div style="text-align:center;margin-top:8px">
+        <a href="#" onclick="showLegacyLogin()" style="font-size:11px;color:var(--text3)">Entrar com chave de admin (legado)</a>
+      </div>
+      <div id="adminForgotForm" style="display:none;margin-top:16px;padding:16px;background:var(--bg);border-radius:6px">
+        <label style="font-size:12px;color:var(--text2)">Digite seu email de admin</label>
+        <input type="email" id="forgotAdminEmail" placeholder="seu@email.com" style="margin:8px 0">
+        <button class="btn btn-sm" onclick="doAdminForgot()" style="width:100%">Enviar link de redefinição</button>
+        <div id="forgotAdminMsg" style="margin-top:8px;font-size:12px;display:none"></div>
+        <a href="#" onclick="document.getElementById('adminForgotForm').style.display='none'" style="font-size:11px;color:var(--text3);display:block;margin-top:8px">Voltar ao login</a>
       </div>
     </div>
     <div id="loginModeLegacy" style="display:none">
@@ -474,6 +537,10 @@ tr.aff-pending:hover { background: #FEF3C7; }
       <div class="nav-item" data-section="gamification" onclick="navigateTo('gamification')">
         <svg viewBox="0 0 24 24"><path d="M7.5 21H2V9h5.5v12zm7.25-18h-5.5v18h5.5V3zM22 11h-5.5v10H22V11z"/></svg>
         Gamificacao
+      </div>
+      <div class="nav-item" data-section="bi" onclick="navigateTo('bi')">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+        Analise / BI
       </div>
 
       <div class="nav-section" data-admin-section="admin-mgmt">Administracao</div>
@@ -910,6 +977,97 @@ tr.aff-pending:hover { background: #FEF3C7; }
         </div>
       </div>
 
+      <!-- ═══ BI / ANALYTICS ═══ -->
+      <div id="sec-bi" class="section">
+        <!-- BI Tabs -->
+        <div class="bi-tabs">
+          <button class="bi-tab active" onclick="switchBiTab('overview')">Visao Geral</button>
+          <button class="bi-tab" onclick="switchBiTab('engagement')">Engajamento</button>
+          <button class="bi-tab" onclick="switchBiTab('health')">Saude</button>
+          <button class="bi-tab" onclick="switchBiTab('revenue')">Receita</button>
+          <button class="bi-tab" onclick="switchBiTab('individual')">Usuarios</button>
+        </div>
+
+        <!-- Tab 1: Overview -->
+        <div id="bi-overview" class="bi-panel active">
+          <div class="bi-kpi-grid" id="biKpiCards"><div class="loading">Carregando KPIs...</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+            <div class="panel"><div class="panel-header"><h3>Usuarios Ativos Diarios (30d)</h3></div><div class="panel-body" style="padding:16px"><canvas id="chartDAU"></canvas></div></div>
+            <div class="panel"><div class="panel-header"><h3>Novos Cadastros Diarios (30d)</h3></div><div class="panel-body" style="padding:16px"><canvas id="chartSignups"></canvas></div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+            <div class="panel"><div class="panel-header"><h3>Distribuicao de Usuarios</h3></div><div class="panel-body" style="padding:16px;max-height:300px;display:flex;justify-content:center"><canvas id="chartUserDist"></canvas></div></div>
+            <div class="panel"><div class="panel-header"><h3>Distribuicao de Assinaturas</h3></div><div class="panel-body" style="padding:16px;max-height:300px;display:flex;justify-content:center"><canvas id="chartSubDist"></canvas></div></div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Engagement -->
+        <div id="bi-engagement" class="bi-panel">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <div class="panel"><div class="panel-header"><h3>Check-in por Dia da Semana</h3></div><div class="panel-body" style="padding:16px"><canvas id="chartDow"></canvas></div></div>
+            <div class="panel"><div class="panel-header"><h3>Check-in por Hora do Dia</h3></div><div class="panel-body" style="padding:16px"><canvas id="chartHour"></canvas></div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+            <div class="panel"><div class="panel-header"><h3>Distribuicao de Streaks</h3></div><div class="panel-body" style="padding:16px;max-height:300px;display:flex;justify-content:center"><canvas id="chartStreaks"></canvas></div></div>
+            <div class="panel"><div class="panel-header"><h3>Retencao Semanal</h3></div><div class="panel-body padded" id="biRetentionCard"><div class="loading">Carregando...</div></div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+            <div class="panel"><div class="panel-header"><h3>Top 10 Streaks</h3></div><div class="panel-body" id="biTopStreaks"><div class="loading">Carregando...</div></div></div>
+            <div class="panel"><div class="panel-header"><h3>Nao Fizeram Check-in Hoje</h3></div><div class="panel-body" id="biNotCheckedIn"><div class="loading">Carregando...</div></div></div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Health -->
+        <div id="bi-health" class="bi-panel">
+          <div class="bi-kpi-grid" id="biHealthKpis"><div class="loading">Carregando...</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+            <div class="panel"><div class="panel-header"><h3>Frequencia Cardiaca Media (30d)</h3></div><div class="panel-body" style="padding:16px"><canvas id="chartHrTrend"></canvas></div></div>
+            <div class="panel"><div class="panel-header"><h3>Distribuicao SpO2</h3></div><div class="panel-body" style="padding:16px"><canvas id="chartSpo2"></canvas></div></div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Revenue -->
+        <div id="bi-revenue" class="bi-panel">
+          <div class="bi-kpi-grid" id="biRevenueKpis"><div class="loading">Carregando...</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+            <div class="panel"><div class="panel-header"><h3>Receita Mensal</h3></div><div class="panel-body" style="padding:16px"><canvas id="chartRevenue"></canvas></div></div>
+            <div class="panel"><div class="panel-header"><h3>Receita por Fonte</h3></div><div class="panel-body" style="padding:16px;max-height:300px;display:flex;justify-content:center"><canvas id="chartRevSource"></canvas></div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+            <div class="panel"><div class="panel-header"><h3>Churn por Plano</h3></div><div class="panel-body" id="biChurnTable"><div class="loading">Carregando...</div></div></div>
+            <div class="panel"><div class="panel-header"><h3>Top Afiliados (30d)</h3></div><div class="panel-body" id="biTopAffiliates"><div class="loading">Carregando...</div></div></div>
+          </div>
+        </div>
+
+        <!-- Tab 5: Individual Users -->
+        <div id="bi-individual" class="bi-panel">
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Buscar Usuario</h3>
+              <div class="toolbar">
+                <input type="search" id="biUserSearch" placeholder="Nome ou email..." style="width:300px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius)">
+                <button class="btn btn-sm btn-primary" onclick="biSearchUsers()">Buscar</button>
+              </div>
+            </div>
+            <div class="panel-body" id="biUserList"><div class="empty-state">Pesquise um usuario para ver seus detalhes.</div></div>
+          </div>
+          <div id="biUserDetail" style="display:none;margin-top:20px">
+            <div class="panel">
+              <div class="panel-header"><h3 id="biUserDetailName">Detalhes</h3></div>
+              <div class="panel-body padded" id="biUserDetailContent"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+              <div class="panel"><div class="panel-header"><h3>Calendario de Check-ins</h3></div><div class="panel-body padded" id="biUserCalendar"></div></div>
+              <div class="panel"><div class="panel-header"><h3>Saude</h3></div><div class="panel-body" style="padding:16px"><canvas id="chartUserHealth"></canvas></div></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+              <div class="panel"><div class="panel-header"><h3>Escalacoes</h3></div><div class="panel-body" id="biUserEscalations"></div></div>
+              <div class="panel"><div class="panel-header"><h3>Familiares Vinculados</h3></div><div class="panel-body" id="biUserFamily"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══ SETTINGS (Configuracoes) ═══ -->
       <div id="sec-settings" class="section">
         <div class="panel">
@@ -1156,6 +1314,7 @@ tr.aff-pending:hover { background: #FEF3C7; }
 <!-- Toast Container -->
 <div class="toast-container" id="toastContainer"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
 //  State & Config
@@ -1295,6 +1454,7 @@ const sectionTitles = {
   bookings: 'Agendamentos', institutions: 'Instituicoes B2B',
   conversions: 'Conversoes / Analytics', consent: 'LGPD / Consentimento',
   escalations: 'Escalacoes', gamification: 'Gamificacao',
+  bi: 'Analise / BI',
   team: 'Equipe', audit: 'Auditoria', settings: 'Configuracoes',
 };
 
@@ -1331,6 +1491,7 @@ function loadSection(section) {
     consent: loadConsent,
     escalations: loadEscalations,
     gamification: loadGamification,
+    bi: loadBI,
     team: loadTeam,
     audit: loadAuditLog,
     settings: loadSettings,
@@ -1351,6 +1512,18 @@ function showNewLogin() {
   document.getElementById('loginModeLegacy').style.display = 'none';
   document.getElementById('loginModeNew').style.display = 'block';
   document.getElementById('loginError').style.display = 'none';
+}
+function showAdminForgot() {
+  document.getElementById('adminForgotForm').style.display = 'block';
+}
+async function doAdminForgot() {
+  const email = document.getElementById('forgotAdminEmail').value.trim();
+  const msg = document.getElementById('forgotAdminMsg');
+  if (!email) { msg.style.display = 'block'; msg.style.color = '#8B3A3A'; msg.textContent = 'Digite seu email.'; return; }
+  try {
+    await fetch('/api/admin/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+    msg.style.display = 'block'; msg.style.color = '#2D4A3E'; msg.textContent = 'Se o email existir, você receberá um link de redefinição.';
+  } catch (e) { msg.style.display = 'block'; msg.style.color = '#8B3A3A'; msg.textContent = 'Erro de conexão.'; }
 }
 
 async function doLogin() {
@@ -1439,8 +1612,8 @@ function showApp() {
 // Role-based UI visibility
 function applyRoleRestrictions(role) {
   const sections = {
-    super_admin: ['dashboard', 'users', 'affiliates', 'commissions', 'payouts', 'escalations', 'marketplace', 'bookings', 'institutions', 'conversions', 'consent', 'gamification', 'team', 'audit', 'settings'],
-    admin: ['dashboard', 'users', 'affiliates', 'commissions', 'payouts', 'escalations', 'marketplace', 'bookings', 'institutions', 'conversions', 'consent', 'gamification', 'settings'],
+    super_admin: ['dashboard', 'users', 'affiliates', 'commissions', 'payouts', 'escalations', 'marketplace', 'bookings', 'institutions', 'conversions', 'consent', 'gamification', 'bi', 'team', 'audit', 'settings'],
+    admin: ['dashboard', 'users', 'affiliates', 'commissions', 'payouts', 'escalations', 'marketplace', 'bookings', 'institutions', 'conversions', 'consent', 'gamification', 'bi', 'settings'],
     support: ['dashboard', 'users', 'escalations'],
     viewer: ['dashboard'],
   };
@@ -2748,6 +2921,356 @@ async function loadSettings() {
     `;
   } catch (e) {
     el.innerHTML = '<div class="empty-state">Nao foi possivel carregar configuracoes.</div>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  BI / Analytics
+// ═══════════════════════════════════════════════════════════
+const biCharts = {};
+const BI_COLORS = { green: '#2D4A3E', gold: '#C9A96E', cream: '#F5F0EB', dark: '#1A1A1A', red: '#8B3A3A', blue: '#4A90D9', teal: '#38B2AC' };
+
+function switchBiTab(tab) {
+  document.querySelectorAll('.bi-tab').forEach(t => t.classList.toggle('active', t.textContent.toLowerCase().includes(tab === 'overview' ? 'geral' : tab === 'engagement' ? 'engaj' : tab === 'health' ? 'saude' : tab === 'revenue' ? 'receita' : 'usuario')));
+  document.querySelectorAll('.bi-panel').forEach(p => p.classList.toggle('active', p.id === 'bi-' + tab));
+  const loaders = { overview: loadBIOverview, engagement: loadBIEngagement, health: loadBIHealth, revenue: loadBIRevenue, individual: () => {} };
+  if (loaders[tab]) loaders[tab]();
+}
+
+function destroyChart(id) { if (biCharts[id]) { biCharts[id].destroy(); delete biCharts[id]; } }
+
+function createChart(canvasId, config) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  biCharts[canvasId] = new Chart(ctx, config);
+  return biCharts[canvasId];
+}
+
+async function loadBI() {
+  loadBIOverview();
+}
+
+async function loadBIOverview() {
+  try {
+    const [overview, growth, revenue] = await Promise.all([
+      apiFetch('/admin/analytics/overview'),
+      apiFetch('/admin/analytics/growth'),
+      apiFetch('/admin/analytics/revenue').catch(() => null),
+    ]);
+
+    // KPI Cards
+    const kpiEl = document.getElementById('biKpiCards');
+    const escData = await apiFetch('/admin/analytics/escalation').catch(() => ({ totalEscalations: 0, samuCalls: 0 }));
+    kpiEl.innerHTML = [
+      { label: 'Total Usuarios', value: overview.totalUsers, sub: `Idosos: ${overview.roleBreakdown.elder || 0}` },
+      { label: 'Ativos (7d)', value: overview.activeUsers7d, sub: `30d: ${overview.activeUsers30d}` },
+      { label: 'Novos este Mes', value: overview.newUsersThisMonth, sub: `Semana: ${overview.newUsersThisWeek}` },
+      { label: 'Taxa Check-in', value: overview.checkinRateMonth + '%', sub: `Hoje: ${overview.checkinRateToday}%` },
+      { label: 'Streak Medio', value: overview.avgStreak + 'd', sub: 'dias consecutivos' },
+      { label: 'MRR', value: revenue ? 'R$' + revenue.mrr.toLocaleString('pt-BR') : '-', sub: revenue ? `ARPU: R$${revenue.arpu.toFixed(2)}` : '' },
+      { label: 'Escalacoes', value: escData.totalEscalations, sub: `Taxa: ${escData.escalationRate || '0'}%` },
+      { label: 'Chamadas SAMU', value: escData.samuCalls || 0, sub: `Alarme falso: ${escData.falseAlarmRate || '0'}%` },
+    ].map(k => `<div class="bi-kpi"><div class="bi-kpi-value">${k.value}</div><div class="bi-kpi-label">${k.label}</div><div class="bi-kpi-sub">${k.sub}</div></div>`).join('');
+
+    // DAU Chart
+    const dauLabels = growth.dailyActiveUsers.map(d => d.day?.slice(5, 10) || d.day);
+    const dauData = growth.dailyActiveUsers.map(d => d.count);
+    createChart('chartDAU', {
+      type: 'line',
+      data: { labels: dauLabels, datasets: [{ label: 'Usuarios Ativos', data: dauData, borderColor: BI_COLORS.green, backgroundColor: BI_COLORS.green + '22', fill: true, tension: 0.3 }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+
+    // Signups Chart
+    const sigLabels = growth.dailySignups.map(d => d.day?.slice(5, 10) || d.day);
+    const sigData = growth.dailySignups.map(d => d.count);
+    createChart('chartSignups', {
+      type: 'line',
+      data: { labels: sigLabels, datasets: [{ label: 'Novos Cadastros', data: sigData, borderColor: BI_COLORS.gold, backgroundColor: BI_COLORS.gold + '22', fill: true, tension: 0.3 }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+
+    // User Distribution Pie
+    const rb = overview.roleBreakdown;
+    createChart('chartUserDist', {
+      type: 'doughnut',
+      data: { labels: ['Idosos', 'Familiares', 'Cuidadores'], datasets: [{ data: [rb.elder || 0, rb.family || 0, rb.caregiver || 0], backgroundColor: [BI_COLORS.green, BI_COLORS.gold, BI_COLORS.blue] }] },
+      options: { responsive: true, maintainAspectRatio: true }
+    });
+
+    // Subscription Distribution Pie
+    if (revenue) {
+      const sb = revenue.subscriptionBreakdown;
+      createChart('chartSubDist', {
+        type: 'doughnut',
+        data: { labels: ['Free', 'Familia', 'Central'], datasets: [{ data: [sb.free || 0, sb.familia || 0, sb.central || 0], backgroundColor: ['#A0AEC0', BI_COLORS.gold, BI_COLORS.green] }] },
+        options: { responsive: true, maintainAspectRatio: true }
+      });
+    }
+  } catch (e) {
+    document.getElementById('biKpiCards').innerHTML = '<div class="empty-state">Erro ao carregar dados de visao geral.</div>';
+    console.error('BI Overview error:', e);
+  }
+}
+
+async function loadBIEngagement() {
+  try {
+    const [eng, growth] = await Promise.all([
+      apiFetch('/admin/analytics/engagement'),
+      apiFetch('/admin/analytics/growth'),
+    ]);
+
+    // Check-in by Day of Week
+    const dowNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+    const dowData = new Array(7).fill(0);
+    const dowRates = new Array(7).fill(0);
+    eng.checkinByDow.forEach(d => { dowData[d.dow] = d.confirmed; dowRates[d.dow] = parseFloat(d.rate); });
+    createChart('chartDow', {
+      type: 'bar',
+      data: { labels: dowNames, datasets: [{ label: 'Confirmados', data: dowData, backgroundColor: BI_COLORS.green + 'CC' }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+
+    // Check-in by Hour
+    const hourLabels = Array.from({length: 24}, (_, i) => i + 'h');
+    const hourData = new Array(24).fill(0);
+    eng.checkinByHour.forEach(d => { hourData[d.hour] = d.count; });
+    createChart('chartHour', {
+      type: 'bar',
+      data: { labels: hourLabels, datasets: [{ label: 'Check-ins', data: hourData, backgroundColor: BI_COLORS.gold + 'CC' }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+
+    // Streak Distribution Donut
+    createChart('chartStreaks', {
+      type: 'doughnut',
+      data: {
+        labels: eng.streakDistribution.map(s => s.bracket + ' dias'),
+        datasets: [{ data: eng.streakDistribution.map(s => s.count), backgroundColor: [BI_COLORS.cream, BI_COLORS.gold, BI_COLORS.green, BI_COLORS.dark] }]
+      },
+      options: { responsive: true, maintainAspectRatio: true }
+    });
+
+    // Retention card
+    document.getElementById('biRetentionCard').innerHTML = `
+      <div style="text-align:center;padding:30px">
+        <div style="font-size:48px;font-weight:800;color:${BI_COLORS.green}">${growth.weeklyRetentionRate}%</div>
+        <div style="color:var(--text2);margin-top:8px">Retencao Semanal</div>
+        <div style="margin-top:16px;font-size:36px;font-weight:800;color:${parseFloat(growth.monthlyChurnRate) > 10 ? BI_COLORS.red : BI_COLORS.green}">${growth.monthlyChurnRate}%</div>
+        <div style="color:var(--text2);margin-top:8px">Churn Mensal</div>
+      </div>
+    `;
+
+    // Top Streaks Table
+    document.getElementById('biTopStreaks').innerHTML = eng.topStreaks.length === 0
+      ? '<div class="empty-state">Sem dados de streaks.</div>'
+      : '<table><thead><tr><th>#</th><th>Nome</th><th>Streak</th></tr></thead><tbody>' +
+        eng.topStreaks.map((u, i) => `<tr><td>${i+1}</td><td>${esc(u.name)}</td><td><strong>${u.streak} dias</strong></td></tr>`).join('') +
+        '</tbody></table>';
+
+    // Not Checked In Today
+    document.getElementById('biNotCheckedIn').innerHTML = eng.notCheckedInToday.length === 0
+      ? '<div class="empty-state">Todos fizeram check-in hoje!</div>'
+      : '<table><thead><tr><th>Nome</th><th>Email</th></tr></thead><tbody>' +
+        eng.notCheckedInToday.map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td></tr>`).join('') +
+        '</tbody></table>';
+  } catch (e) {
+    console.error('BI Engagement error:', e);
+  }
+}
+
+async function loadBIHealth() {
+  try {
+    const data = await apiFetch('/admin/analytics/health');
+
+    // Health KPI cards
+    document.getElementById('biHealthKpis').innerHTML = [
+      { label: 'FC Media', value: data.avgHeartRate ? data.avgHeartRate + ' bpm' : '-', sub: 'ultimos 30 dias' },
+      { label: 'Qualidade Sono', value: data.avgSleepQuality ? data.avgSleepQuality.toFixed(1) : '-', sub: 'media geral' },
+      { label: 'Quedas (30d)', value: data.fallEvents30d, sub: 'eventos detectados' },
+      { label: 'Alertas Inatividade', value: data.inactivityAlerts, sub: 'atualmente inativos' },
+      { label: 'Adesao Medicacao', value: data.medicationAdherenceRate + '%', sub: 'ultimos 30 dias' },
+    ].map(k => `<div class="bi-kpi"><div class="bi-kpi-value">${k.value}</div><div class="bi-kpi-label">${k.label}</div><div class="bi-kpi-sub">${k.sub}</div></div>`).join('');
+
+    // Heart Rate Trend
+    if (data.heartRateTrend.length > 0) {
+      createChart('chartHrTrend', {
+        type: 'line',
+        data: {
+          labels: data.heartRateTrend.map(d => d.day?.slice(5, 10) || d.day),
+          datasets: [{ label: 'FC Media', data: data.heartRateTrend.map(d => d.avg), borderColor: '#E53E3E', backgroundColor: '#E53E3E22', fill: true, tension: 0.3 }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 50, max: 120 } } }
+      });
+    }
+
+    // SpO2 Distribution
+    if (data.spo2Distribution.length > 0) {
+      createChart('chartSpo2', {
+        type: 'bar',
+        data: {
+          labels: data.spo2Distribution.map(d => d.range),
+          datasets: [{ label: 'Leituras', data: data.spo2Distribution.map(d => d.count), backgroundColor: [BI_COLORS.green, BI_COLORS.gold, '#ED8936', BI_COLORS.red] }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      });
+    }
+  } catch (e) {
+    document.getElementById('biHealthKpis').innerHTML = '<div class="empty-state">Erro ao carregar dados de saude.</div>';
+    console.error('BI Health error:', e);
+  }
+}
+
+async function loadBIRevenue() {
+  try {
+    const data = await apiFetch('/admin/analytics/revenue');
+
+    // Revenue KPI Cards
+    document.getElementById('biRevenueKpis').innerHTML = [
+      { label: 'MRR', value: 'R$ ' + data.mrr.toLocaleString('pt-BR', {minimumFractionDigits: 2}), sub: 'receita recorrente mensal' },
+      { label: 'ARPU', value: 'R$ ' + data.arpu.toFixed(2), sub: 'receita media por usuario' },
+      { label: 'Conversao', value: data.conversionRate + '%', sub: 'free para pago' },
+      { label: 'LTV Estimado', value: 'R$ ' + data.ltv.toFixed(2), sub: 'valor vitalicio estimado' },
+    ].map(k => `<div class="bi-kpi"><div class="bi-kpi-value">${k.value}</div><div class="bi-kpi-label">${k.label}</div><div class="bi-kpi-sub">${k.sub}</div></div>`).join('');
+
+    // Revenue by Month Chart
+    if (data.revenueByMonth.length > 0) {
+      createChart('chartRevenue', {
+        type: 'line',
+        data: {
+          labels: data.revenueByMonth.map(d => d.month),
+          datasets: [{ label: 'Receita (R$)', data: data.revenueByMonth.map(d => d.total), borderColor: BI_COLORS.green, backgroundColor: BI_COLORS.green + '22', fill: true, tension: 0.3 }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      });
+    }
+
+    // Revenue Source Pie
+    createChart('chartRevSource', {
+      type: 'doughnut',
+      data: {
+        labels: ['Organico', 'Afiliados'],
+        datasets: [{ data: [data.organicRevenue || 0, data.affiliateRevenue || 0], backgroundColor: [BI_COLORS.green, BI_COLORS.gold] }]
+      },
+      options: { responsive: true, maintainAspectRatio: true }
+    });
+
+    // Churn by Plan Table
+    document.getElementById('biChurnTable').innerHTML = data.churnByPlan.length === 0
+      ? '<div class="empty-state">Sem dados de churn.</div>'
+      : '<table><thead><tr><th>Plano</th><th>Mes Anterior</th><th>Churned</th><th>Taxa</th></tr></thead><tbody>' +
+        data.churnByPlan.map(r => `<tr><td>${esc(r.plan || 'free')}</td><td>${r.lastMonth}</td><td>${r.churned}</td><td>${r.rate}%</td></tr>`).join('') +
+        '</tbody></table>';
+
+    // Top Affiliates Table
+    document.getElementById('biTopAffiliates').innerHTML = data.topAffiliates.length === 0
+      ? '<div class="empty-state">Sem dados de afiliados.</div>'
+      : '<table><thead><tr><th>Nome</th><th>Codigo</th><th>Receita</th><th>Conversoes</th></tr></thead><tbody>' +
+        data.topAffiliates.map(a => `<tr><td>${esc(a.name)}</td><td>${esc(a.code)}</td><td>R$ ${a.revenue.toFixed(2)}</td><td>${a.conversions}</td></tr>`).join('') +
+        '</tbody></table>';
+  } catch (e) {
+    document.getElementById('biRevenueKpis').innerHTML = '<div class="empty-state">Erro ao carregar dados de receita.</div>';
+    console.error('BI Revenue error:', e);
+  }
+}
+
+async function biSearchUsers() {
+  const q = document.getElementById('biUserSearch').value.trim();
+  if (!q) return;
+  try {
+    const users = await apiFetch('/admin/users');
+    const filtered = users.filter(u => u.name?.toLowerCase().includes(q.toLowerCase()) || u.email?.toLowerCase().includes(q.toLowerCase())).slice(0, 20);
+    document.getElementById('biUserList').innerHTML = filtered.length === 0
+      ? '<div class="empty-state">Nenhum usuario encontrado.</div>'
+      : '<table><thead><tr><th>ID</th><th>Nome</th><th>Email</th><th>Tipo</th><th>Acao</th></tr></thead><tbody>' +
+        filtered.map(u => `<tr><td>${u.id}</td><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.role}</td><td><button class="btn btn-sm btn-primary" onclick="loadBIUserDetail(${u.id})">Ver</button></td></tr>`).join('') +
+        '</tbody></table>';
+  } catch (e) {
+    document.getElementById('biUserList').innerHTML = '<div class="empty-state">Erro na busca.</div>';
+  }
+}
+
+async function loadBIUserDetail(userId) {
+  const detailEl = document.getElementById('biUserDetail');
+  detailEl.style.display = 'block';
+  document.getElementById('biUserDetailContent').innerHTML = '<div class="loading">Carregando...</div>';
+  try {
+    const data = await apiFetch('/admin/analytics/users/' + userId);
+    const u = data.user;
+    document.getElementById('biUserDetailName').textContent = u.name + ' — Detalhes';
+
+    document.getElementById('biUserDetailContent').innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+        <div class="bi-kpi"><div class="bi-kpi-value">${u.streak_days || 0}</div><div class="bi-kpi-label">Streak Atual</div></div>
+        <div class="bi-kpi"><div class="bi-kpi-value">${u.total_points || 0}</div><div class="bi-kpi-label">Pontos</div></div>
+        <div class="bi-kpi"><div class="bi-kpi-value">${u.subscription || 'free'}</div><div class="bi-kpi-label">Plano</div></div>
+        <div class="bi-kpi"><div class="bi-kpi-value">${u.role}</div><div class="bi-kpi-label">Tipo</div></div>
+      </div>
+      <div style="margin-top:12px;font-size:13px;color:var(--text2)">
+        Email: ${esc(u.email)} | Tel: ${esc(u.phone || '-')} | Cadastro: ${new Date(u.created_at).toLocaleDateString('pt-BR')}
+      </div>
+    `;
+
+    // Calendar Heatmap
+    const calEl = document.getElementById('biUserCalendar');
+    const cal = data.checkinCalendar;
+    const days = Object.keys(cal).sort();
+    if (days.length === 0) {
+      calEl.innerHTML = '<div class="empty-state">Sem dados de check-in.</div>';
+    } else {
+      let html = '<div class="bi-calendar-grid">';
+      // Last 90 days
+      for (let i = 89; i >= 0; i--) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        const entry = cal[key];
+        let cls = 'bi-cal-none';
+        if (entry) {
+          if (entry.confirmed === entry.total) cls = 'bi-cal-full';
+          else if (entry.confirmed > 0) cls = 'bi-cal-partial';
+          else cls = 'bi-cal-missed';
+        }
+        html += `<div class="bi-cal-day ${cls}" title="${key}: ${entry ? entry.confirmed + '/' + entry.total : 'sem check-in'}">${d.getDate()}</div>`;
+      }
+      html += '</div><div style="margin-top:8px;font-size:11px;color:var(--text3)"><span class="bi-cal-day bi-cal-full" style="display:inline-block;width:14px;height:14px;margin-right:4px"></span>Completo <span class="bi-cal-day bi-cal-partial" style="display:inline-block;width:14px;height:14px;margin:0 4px"></span>Parcial <span class="bi-cal-day bi-cal-missed" style="display:inline-block;width:14px;height:14px;margin:0 4px"></span>Perdido <span class="bi-cal-day bi-cal-none" style="display:inline-block;width:14px;height:14px;margin:0 4px"></span>Sem agend.</div>';
+      calEl.innerHTML = html;
+    }
+
+    // User Health Chart
+    const hrData = data.healthData?.heart_rate || [];
+    if (hrData.length > 0) {
+      createChart('chartUserHealth', {
+        type: 'line',
+        data: {
+          labels: hrData.slice(0, 50).reverse().map(d => new Date(d.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })),
+          datasets: [{ label: 'FC', data: hrData.slice(0, 50).reverse().map(d => d.value), borderColor: '#E53E3E', tension: 0.3 }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+    } else {
+      const ctx = document.getElementById('chartUserHealth');
+      if (ctx) ctx.parentElement.innerHTML = '<div class="empty-state">Sem dados de saude.</div>';
+    }
+
+    // Escalation History
+    const escEl = document.getElementById('biUserEscalations');
+    escEl.innerHTML = data.escalations.length === 0
+      ? '<div class="empty-state">Sem escalacoes.</div>'
+      : '<table><thead><tr><th>Data</th><th>Nivel</th><th>Status</th></tr></thead><tbody>' +
+        data.escalations.map(e => `<tr><td>${new Date(e.created_at).toLocaleString('pt-BR')}</td><td>Nivel ${e.level}</td><td><span class="badge ${e.status === 'resolved' ? 'badge-success' : e.status === 'active' ? 'badge-danger' : 'badge-warning'}">${e.status}</span></td></tr>`).join('') +
+        '</tbody></table>';
+
+    // Family Members
+    const famEl = document.getElementById('biUserFamily');
+    famEl.innerHTML = data.familyMembers.length === 0
+      ? '<div class="empty-state">Sem familiares vinculados.</div>'
+      : '<table><thead><tr><th>Nome</th><th>Email</th><th>Telefone</th><th>Relacao</th></tr></thead><tbody>' +
+        data.familyMembers.map(f => `<tr><td>${esc(f.name)}</td><td>${esc(f.email || '-')}</td><td>${esc(f.phone || '-')}</td><td>${esc(f.relationship || '-')}</td></tr>`).join('') +
+        '</tbody></table>';
+  } catch (e) {
+    document.getElementById('biUserDetailContent').innerHTML = '<div class="empty-state">Erro ao carregar detalhes.</div>';
+    console.error('BI User Detail error:', e);
   }
 }
 

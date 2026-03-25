@@ -3500,6 +3500,54 @@ app.post('/api/admin/login', rateLimiter, asyncHandler(async (req, res) => {
   res.json({ ok: true, token, user: admin });
 }));
 
+// POST /api/admin/forgot-password
+app.post('/api/admin/forgot-password', rateLimiter, asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  const user = await pool.query(`SELECT id, name, email FROM admin_users WHERE email = $1 AND is_active = true`, [email.toLowerCase().trim()]);
+  if (user.rows.length === 0) {
+    return res.json({ ok: true, message: 'If an admin account with that email exists, a reset link has been sent.' });
+  }
+
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+  await pool.query(`INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`, [user.rows[0].id, resetToken, expiresAt]);
+
+  const resetUrl = `${SERVER_URL}/admin-reset-password?token=${resetToken}`;
+  await sendEmail(email.toLowerCase().trim(), 'Estou Bem Admin — Redefinir Senha', `
+    <div style="font-family:'Inter',sans-serif;max-width:500px;margin:0 auto;padding:24px;background:#F5F0EB;border-radius:8px">
+      <div style="text-align:center;margin-bottom:20px"><span style="font-family:Georgia,serif;font-size:24px;color:#2D4A3E">Estou Bem — Admin</span></div>
+      <div style="background:white;padding:24px;border-radius:4px;border:1px solid #E5DDD3">
+        <h2 style="color:#2D4A3E;margin:0 0 12px">Redefinir Senha</h2>
+        <p style="color:#5C5549;line-height:1.6">Olá ${user.rows[0].name}, você solicitou a redefinição da sua senha de administrador.</p>
+        <a href="${resetUrl}" style="display:inline-block;background:#2D4A3E;color:white;padding:12px 24px;border-radius:4px;text-decoration:none;margin:16px 0">Redefinir Senha</a>
+        <p style="color:#9A9189;font-size:13px;margin-top:16px">Este link expira em 1 hora.</p>
+      </div>
+    </div>
+  `);
+
+  res.json({ ok: true, message: 'If an admin account with that email exists, a reset link has been sent.' });
+}));
+
+// POST /api/admin/reset-password
+app.post('/api/admin/reset-password', rateLimiter, asyncHandler(async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+  const result = await pool.query(`SELECT user_id FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW() AND used = false`, [token]);
+  if (result.rows.length === 0) return res.status(400).json({ error: 'Invalid or expired reset token' });
+
+  const userId = result.rows[0].user_id;
+  const hash = await hashPassword(password);
+  await pool.query(`UPDATE admin_users SET password_hash = $1 WHERE id = $2`, [hash, userId]);
+  await pool.query(`UPDATE password_reset_tokens SET used = true WHERE token = $1`, [token]);
+  await pool.query(`DELETE FROM admin_sessions WHERE admin_user_id = $1`, [userId]);
+
+  res.json({ ok: true, message: 'Password reset successfully' });
+}));
+
 // POST /api/admin/logout
 app.post('/api/admin/logout', asyncHandler(async (req, res) => {
   const auth = req.headers.authorization;
@@ -4138,6 +4186,348 @@ app.put('/api/admin/payouts/:id', adminAuth, async (req, res) => {
   }
 });
 
+// ── Admin Analytics / BI Endpoints ────────────────────────
+
+// 1. Overview KPIs
+app.get('/api/admin/analytics/overview', adminAuth, requireRole('super_admin', 'admin', 'support'), asyncHandler(async (req, res) => {
+  const [
+    totalUsers, roleBreakdown, active7d, active30d, newThisWeek, newThisMonth,
+    checkinsToday, checkinsWeek, checkinsMonth, confirmedToday, confirmedWeek, confirmedMonth,
+    avgStreak, totalSos, totalEscalations, avgResponseTime
+  ] = await Promise.all([
+    pool.query(`SELECT COUNT(*) as cnt FROM users`),
+    pool.query(`SELECT role, COUNT(*) as cnt FROM users GROUP BY role`),
+    pool.query(`SELECT COUNT(DISTINCT user_id) as cnt FROM checkins WHERE created_at > NOW() - INTERVAL '7 days'`),
+    pool.query(`SELECT COUNT(DISTINCT user_id) as cnt FROM checkins WHERE created_at > NOW() - INTERVAL '30 days'`),
+    pool.query(`SELECT COUNT(*) as cnt FROM users WHERE created_at > NOW() - INTERVAL '7 days'`),
+    pool.query(`SELECT COUNT(*) as cnt FROM users WHERE created_at > NOW() - INTERVAL '30 days'`),
+    pool.query(`SELECT COUNT(*) as cnt FROM checkins WHERE date = TO_CHAR(NOW(), 'YYYY-MM-DD')`),
+    pool.query(`SELECT COUNT(*) as cnt FROM checkins WHERE created_at > NOW() - INTERVAL '7 days'`),
+    pool.query(`SELECT COUNT(*) as cnt FROM checkins WHERE created_at > NOW() - INTERVAL '30 days'`),
+    pool.query(`SELECT COUNT(*) as cnt FROM checkins WHERE date = TO_CHAR(NOW(), 'YYYY-MM-DD') AND status = 'confirmed'`),
+    pool.query(`SELECT COUNT(*) as cnt FROM checkins WHERE created_at > NOW() - INTERVAL '7 days' AND status = 'confirmed'`),
+    pool.query(`SELECT COUNT(*) as cnt FROM checkins WHERE created_at > NOW() - INTERVAL '30 days' AND status = 'confirmed'`),
+    pool.query(`SELECT COALESCE(AVG(streak_days), 0) as avg FROM users WHERE role = 'elder'`),
+    pool.query(`SELECT COUNT(*) as cnt FROM fall_events`),
+    pool.query(`SELECT COUNT(*) as cnt FROM escalation_alerts`),
+    pool.query(`SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (confirmed_at - created_at))), 0) as avg_seconds FROM checkins WHERE confirmed_at IS NOT NULL AND created_at > NOW() - INTERVAL '30 days'`),
+  ]);
+
+  const roles = {};
+  roleBreakdown.rows.forEach(r => { roles[r.role] = parseInt(r.cnt); });
+
+  const totalCheckinsToday = parseInt(checkinsToday.rows[0].cnt) || 1;
+  const totalCheckinsWeek = parseInt(checkinsWeek.rows[0].cnt) || 1;
+  const totalCheckinsMonth = parseInt(checkinsMonth.rows[0].cnt) || 1;
+
+  res.json({
+    totalUsers: parseInt(totalUsers.rows[0].cnt),
+    roleBreakdown: roles,
+    activeUsers7d: parseInt(active7d.rows[0].cnt),
+    activeUsers30d: parseInt(active30d.rows[0].cnt),
+    newUsersThisWeek: parseInt(newThisWeek.rows[0].cnt),
+    newUsersThisMonth: parseInt(newThisMonth.rows[0].cnt),
+    checkinsToday: parseInt(checkinsToday.rows[0].cnt),
+    checkinsWeek: parseInt(checkinsWeek.rows[0].cnt),
+    checkinsMonth: parseInt(checkinsMonth.rows[0].cnt),
+    checkinRateToday: (parseInt(confirmedToday.rows[0].cnt) / totalCheckinsToday * 100).toFixed(1),
+    checkinRateWeek: (parseInt(confirmedWeek.rows[0].cnt) / totalCheckinsWeek * 100).toFixed(1),
+    checkinRateMonth: (parseInt(confirmedMonth.rows[0].cnt) / totalCheckinsMonth * 100).toFixed(1),
+    avgStreak: parseFloat(parseFloat(avgStreak.rows[0].avg).toFixed(1)),
+    totalSos: parseInt(totalSos.rows[0].cnt),
+    totalEscalations: parseInt(totalEscalations.rows[0].cnt),
+    samuCalls: 0, // tracked separately if SAMU integration logs exist
+    avgResponseTimeSeconds: parseFloat(parseFloat(avgResponseTime.rows[0].avg_seconds).toFixed(0)),
+  });
+}));
+
+// 2. Growth Metrics
+app.get('/api/admin/analytics/growth', adminAuth, requireRole('super_admin', 'admin', 'support'), asyncHandler(async (req, res) => {
+  const [dailySignups, dailyActive, cumulativeGrowth] = await Promise.all([
+    pool.query(`SELECT DATE(created_at) as day, COUNT(*) as cnt FROM users WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY DATE(created_at) ORDER BY day`),
+    pool.query(`SELECT date, COUNT(DISTINCT user_id) as cnt FROM checkins WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY date ORDER BY date`),
+    pool.query(`SELECT DATE(created_at) as day, COUNT(*) as cnt FROM users GROUP BY DATE(created_at) ORDER BY day`),
+  ]);
+
+  // Weekly retention: users active this week who were also active last week
+  const retentionResult = await pool.query(`
+    SELECT
+      COUNT(DISTINCT CASE WHEN tw.user_id IS NOT NULL AND lw.user_id IS NOT NULL THEN tw.user_id END) as retained,
+      COUNT(DISTINCT lw.user_id) as last_week_total
+    FROM (SELECT DISTINCT user_id FROM checkins WHERE created_at > NOW() - INTERVAL '7 days') tw
+    FULL OUTER JOIN (SELECT DISTINCT user_id FROM checkins WHERE created_at BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '7 days') lw ON tw.user_id = lw.user_id
+  `);
+  const retained = parseInt(retentionResult.rows[0].retained) || 0;
+  const lastWeekTotal = parseInt(retentionResult.rows[0].last_week_total) || 1;
+
+  // Monthly churn: elders active last month but not this month
+  const churnResult = await pool.query(`
+    SELECT
+      COUNT(DISTINCT lm.user_id) as last_month,
+      COUNT(DISTINCT CASE WHEN tm.user_id IS NULL THEN lm.user_id END) as churned
+    FROM (SELECT DISTINCT user_id FROM checkins WHERE created_at BETWEEN NOW() - INTERVAL '60 days' AND NOW() - INTERVAL '30 days') lm
+    LEFT JOIN (SELECT DISTINCT user_id FROM checkins WHERE created_at > NOW() - INTERVAL '30 days') tm ON lm.user_id = tm.user_id
+  `);
+  const lastMonth = parseInt(churnResult.rows[0].last_month) || 1;
+  const churned = parseInt(churnResult.rows[0].churned) || 0;
+
+  // Build cumulative growth
+  let cumulative = 0;
+  const cumulativeData = cumulativeGrowth.rows.map(r => {
+    cumulative += parseInt(r.cnt);
+    return { day: r.day, total: cumulative };
+  });
+
+  res.json({
+    dailySignups: dailySignups.rows.map(r => ({ day: r.day, count: parseInt(r.cnt) })),
+    dailyActiveUsers: dailyActive.rows.map(r => ({ day: r.day, count: parseInt(r.cnt) })),
+    weeklyRetentionRate: (retained / lastWeekTotal * 100).toFixed(1),
+    monthlyChurnRate: (churned / lastMonth * 100).toFixed(1),
+    cumulativeGrowth: cumulativeData,
+  });
+}));
+
+// 3. Engagement Metrics
+app.get('/api/admin/analytics/engagement', adminAuth, requireRole('super_admin', 'admin', 'support'), asyncHandler(async (req, res) => {
+  const [byDow, byHour, streakDist, topStreaks, notCheckedIn] = await Promise.all([
+    pool.query(`
+      SELECT EXTRACT(DOW FROM created_at) as dow,
+             COUNT(*) as total,
+             COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed
+      FROM checkins WHERE created_at > NOW() - INTERVAL '30 days'
+      GROUP BY dow ORDER BY dow
+    `),
+    pool.query(`
+      SELECT EXTRACT(HOUR FROM confirmed_at) as hr,
+             COUNT(*) as cnt
+      FROM checkins WHERE confirmed_at IS NOT NULL AND created_at > NOW() - INTERVAL '30 days'
+      GROUP BY hr ORDER BY hr
+    `),
+    pool.query(`
+      SELECT
+        CASE
+          WHEN streak_days BETWEEN 0 AND 7 THEN '0-7'
+          WHEN streak_days BETWEEN 8 AND 14 THEN '8-14'
+          WHEN streak_days BETWEEN 15 AND 30 THEN '15-30'
+          ELSE '30+'
+        END as bracket,
+        COUNT(*) as cnt
+      FROM users WHERE role = 'elder'
+      GROUP BY bracket ORDER BY bracket
+    `),
+    pool.query(`SELECT id, name, streak_days FROM users WHERE role = 'elder' ORDER BY streak_days DESC LIMIT 10`),
+    pool.query(`
+      SELECT u.id, u.name, u.email, MAX(c.created_at) as last_checkin
+      FROM users u LEFT JOIN checkins c ON c.user_id = u.id AND c.date = TO_CHAR(NOW(), 'YYYY-MM-DD')
+      WHERE u.role = 'elder' AND c.id IS NULL
+      LIMIT 20
+    `),
+  ]);
+
+  res.json({
+    checkinByDow: byDow.rows.map(r => ({
+      dow: parseInt(r.dow),
+      total: parseInt(r.total),
+      confirmed: parseInt(r.confirmed),
+      rate: (parseInt(r.total) > 0 ? (parseInt(r.confirmed) / parseInt(r.total) * 100).toFixed(1) : '0.0'),
+    })),
+    checkinByHour: byHour.rows.map(r => ({ hour: parseInt(r.hr), count: parseInt(r.cnt) })),
+    streakDistribution: streakDist.rows.map(r => ({ bracket: r.bracket, count: parseInt(r.cnt) })),
+    topStreaks: topStreaks.rows.map(r => ({ id: r.id, name: r.name, streak: r.streak_days })),
+    notCheckedInToday: notCheckedIn.rows.map(r => ({ id: r.id, name: r.name, email: r.email })),
+  });
+}));
+
+// 4. Health Data (anonymized)
+app.get('/api/admin/analytics/health', adminAuth, requireRole('super_admin', 'admin', 'support'), asyncHandler(async (req, res) => {
+  const [avgHr, spo2Dist, falls, inactivity, medAdherence, sleepQuality, hrTrend] = await Promise.all([
+    pool.query(`SELECT COALESCE(AVG(value), 0) as avg FROM health_readings WHERE reading_type = 'heart_rate' AND recorded_at > NOW() - INTERVAL '30 days'`),
+    pool.query(`
+      SELECT
+        CASE
+          WHEN value >= 98 THEN '98-100'
+          WHEN value >= 95 THEN '95-97'
+          WHEN value >= 90 THEN '90-94'
+          ELSE '<90'
+        END as range,
+        COUNT(*) as cnt
+      FROM health_readings WHERE reading_type = 'spo2' AND recorded_at > NOW() - INTERVAL '30 days'
+      GROUP BY range ORDER BY range DESC
+    `),
+    pool.query(`SELECT COUNT(*) as cnt FROM fall_events WHERE detected_at > NOW() - INTERVAL '30 days'`),
+    pool.query(`SELECT COUNT(*) as cnt FROM activity_logs WHERE last_movement_at < NOW() - INTERVAL '2 hours'`),
+    pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE value > 0) as taken,
+        COUNT(*) as total
+      FROM health_entries WHERE type = 'medication' AND created_at > NOW() - INTERVAL '30 days'
+    `),
+    pool.query(`SELECT COALESCE(AVG(value), 0) as avg FROM health_readings WHERE reading_type = 'sleep' AND recorded_at > NOW() - INTERVAL '30 days'`),
+    pool.query(`
+      SELECT DATE(recorded_at) as day, AVG(value) as avg
+      FROM health_readings WHERE reading_type = 'heart_rate' AND recorded_at > NOW() - INTERVAL '30 days'
+      GROUP BY DATE(recorded_at) ORDER BY day
+    `),
+  ]);
+
+  const medTotal = parseInt(medAdherence.rows[0]?.total) || 1;
+  const medTaken = parseInt(medAdherence.rows[0]?.taken) || 0;
+
+  res.json({
+    avgHeartRate: parseFloat(parseFloat(avgHr.rows[0].avg).toFixed(1)),
+    spo2Distribution: spo2Dist.rows.map(r => ({ range: r.range, count: parseInt(r.cnt) })),
+    fallEvents30d: parseInt(falls.rows[0].cnt),
+    inactivityAlerts: parseInt(inactivity.rows[0].cnt),
+    medicationAdherenceRate: (medTaken / medTotal * 100).toFixed(1),
+    avgSleepQuality: parseFloat(parseFloat(sleepQuality.rows[0].avg).toFixed(1)),
+    heartRateTrend: hrTrend.rows.map(r => ({ day: r.day, avg: parseFloat(parseFloat(r.avg).toFixed(1)) })),
+  });
+}));
+
+// 5. Revenue Metrics
+app.get('/api/admin/analytics/revenue', adminAuth, requireRole('super_admin', 'admin'), asyncHandler(async (req, res) => {
+  const [subBreakdown, conversions, affiliateRev, revenueByMonth, churnByPlan] = await Promise.all([
+    pool.query(`SELECT subscription, COUNT(*) as cnt FROM users GROUP BY subscription`),
+    pool.query(`SELECT SUM(revenue) as total, COUNT(*) as cnt FROM conversions WHERE created_at > NOW() - INTERVAL '30 days'`),
+    pool.query(`
+      SELECT
+        SUM(CASE WHEN affiliate_code IS NOT NULL AND affiliate_code != '' THEN revenue ELSE 0 END) as affiliate_rev,
+        SUM(CASE WHEN affiliate_code IS NULL OR affiliate_code = '' THEN revenue ELSE 0 END) as organic_rev
+      FROM conversions WHERE created_at > NOW() - INTERVAL '30 days'
+    `),
+    pool.query(`
+      SELECT TO_CHAR(created_at, 'YYYY-MM') as month, SUM(revenue) as total
+      FROM conversions
+      GROUP BY TO_CHAR(created_at, 'YYYY-MM') ORDER BY month
+    `),
+    pool.query(`
+      SELECT u.subscription, COUNT(DISTINCT lm.user_id) as last_month, COUNT(DISTINCT CASE WHEN tm.user_id IS NULL THEN lm.user_id END) as churned
+      FROM (SELECT DISTINCT user_id FROM checkins WHERE created_at BETWEEN NOW() - INTERVAL '60 days' AND NOW() - INTERVAL '30 days') lm
+      LEFT JOIN (SELECT DISTINCT user_id FROM checkins WHERE created_at > NOW() - INTERVAL '30 days') tm ON lm.user_id = tm.user_id
+      JOIN users u ON u.id = lm.user_id
+      GROUP BY u.subscription
+    `),
+  ]);
+
+  const subs = {};
+  subBreakdown.rows.forEach(r => { subs[r.subscription || 'free'] = parseInt(r.cnt); });
+  const totalUsers = Object.values(subs).reduce((a, b) => a + b, 0) || 1;
+  const paidUsers = (subs.familia || 0) + (subs.central || 0);
+  const freeUsers = subs.free || 0;
+
+  // MRR estimation: familia = R$29.90, central = R$49.90
+  const mrr = (subs.familia || 0) * 29.90 + (subs.central || 0) * 49.90;
+  const arpu = totalUsers > 0 ? mrr / totalUsers : 0;
+
+  // Top affiliates
+  const topAffiliates = await pool.query(`
+    SELECT a.name, a.code, SUM(c.revenue) as total_revenue, COUNT(*) as conversions
+    FROM conversions c JOIN affiliates a ON a.code = c.affiliate_code
+    WHERE c.created_at > NOW() - INTERVAL '30 days'
+    GROUP BY a.name, a.code ORDER BY total_revenue DESC LIMIT 10
+  `);
+
+  res.json({
+    mrr: parseFloat(mrr.toFixed(2)),
+    subscriptionBreakdown: subs,
+    conversionRate: freeUsers > 0 ? (paidUsers / (freeUsers + paidUsers) * 100).toFixed(1) : '0.0',
+    arpu: parseFloat(arpu.toFixed(2)),
+    affiliateRevenue: parseFloat(affiliateRev.rows[0]?.affiliate_rev || 0),
+    organicRevenue: parseFloat(affiliateRev.rows[0]?.organic_rev || 0),
+    revenueByMonth: revenueByMonth.rows.map(r => ({ month: r.month, total: parseFloat(r.total) })),
+    churnByPlan: churnByPlan.rows.map(r => ({
+      plan: r.subscription,
+      lastMonth: parseInt(r.last_month),
+      churned: parseInt(r.churned),
+      rate: parseInt(r.last_month) > 0 ? (parseInt(r.churned) / parseInt(r.last_month) * 100).toFixed(1) : '0.0',
+    })),
+    topAffiliates: topAffiliates.rows.map(r => ({
+      name: r.name, code: r.code,
+      revenue: parseFloat(r.total_revenue), conversions: parseInt(r.conversions),
+    })),
+    ltv: parseFloat((arpu * 12 * 0.7).toFixed(2)), // Simple LTV: ARPU * 12 months * 70% retention
+  });
+}));
+
+// 6. Escalation Metrics
+app.get('/api/admin/analytics/escalation', adminAuth, requireRole('super_admin', 'admin', 'support'), asyncHandler(async (req, res) => {
+  const [byLevel, avgResolution, totalCheckins30d, samuCalls, byHour, falseAlarms] = await Promise.all([
+    pool.query(`SELECT level, COUNT(*) as cnt FROM escalation_alerts WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY level ORDER BY level`),
+    pool.query(`
+      SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (
+        CASE WHEN status IN ('resolved','dismissed') THEN
+          COALESCE(
+            (SELECT MAX(created_at) FROM admin_audit_log WHERE details->>'escalation_id' = escalation_alerts.id::text),
+            created_at + INTERVAL '30 minutes'
+          )
+        ELSE NULL END - created_at
+      ))), 0) as avg_seconds
+      FROM escalation_alerts WHERE created_at > NOW() - INTERVAL '30 days' AND status IN ('resolved','dismissed')
+    `),
+    pool.query(`SELECT COUNT(*) as cnt FROM checkins WHERE created_at > NOW() - INTERVAL '30 days'`),
+    pool.query(`SELECT COUNT(*) as cnt FROM escalation_alerts WHERE level >= 3 AND created_at > NOW() - INTERVAL '30 days'`),
+    pool.query(`
+      SELECT EXTRACT(HOUR FROM created_at) as hr, COUNT(*) as cnt
+      FROM escalation_alerts WHERE created_at > NOW() - INTERVAL '30 days'
+      GROUP BY hr ORDER BY hr
+    `),
+    pool.query(`SELECT COUNT(*) as cnt FROM escalation_alerts WHERE status = 'dismissed' AND created_at > NOW() - INTERVAL '30 days'`),
+  ]);
+
+  const totalEsc = byLevel.rows.reduce((sum, r) => sum + parseInt(r.cnt), 0);
+  const totalCI = parseInt(totalCheckins30d.rows[0].cnt) || 1;
+
+  res.json({
+    byLevel: byLevel.rows.map(r => ({ level: r.level, count: parseInt(r.cnt) })),
+    avgResolutionSeconds: parseFloat(parseFloat(avgResolution.rows[0].avg_seconds).toFixed(0)),
+    escalationRate: (totalEsc / totalCI * 100).toFixed(2),
+    samuCalls: parseInt(samuCalls.rows[0].cnt),
+    falseAlarmRate: totalEsc > 0 ? (parseInt(falseAlarms.rows[0].cnt) / totalEsc * 100).toFixed(1) : '0.0',
+    byHour: byHour.rows.map(r => ({ hour: parseInt(r.hr), count: parseInt(r.cnt) })),
+    totalEscalations: totalEsc,
+  });
+}));
+
+// 7. Individual User Analytics
+app.get('/api/admin/analytics/users/:id', adminAuth, requireRole('super_admin', 'admin', 'support'), asyncHandler(async (req, res) => {
+  const uid = req.params.id;
+  const [user, checkins, healthReadings, escalations, family, streak] = await Promise.all([
+    pool.query(`SELECT id, name, email, phone, role, subscription, trial_start, created_at, streak_days, total_points, badges FROM users WHERE id = $1`, [uid]),
+    pool.query(`SELECT id, time, status, date, confirmed_at, escalation_level, created_at FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 90`, [uid]),
+    pool.query(`SELECT reading_type, value, recorded_at FROM health_readings WHERE user_id = $1 ORDER BY recorded_at DESC LIMIT 200`, [uid]),
+    pool.query(`SELECT id, level, status, created_at FROM escalation_alerts WHERE elder_id = $1 ORDER BY created_at DESC LIMIT 20`, [uid]),
+    pool.query(`SELECT id, name, email, phone, relationship FROM family_contacts WHERE elder_id = $1`, [uid]),
+    pool.query(`SELECT streak_days FROM users WHERE id = $1`, [uid]),
+  ]);
+
+  if (user.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+  // Build calendar heatmap data (last 90 days)
+  const calendarData = {};
+  checkins.rows.forEach(c => {
+    if (!calendarData[c.date]) calendarData[c.date] = { total: 0, confirmed: 0 };
+    calendarData[c.date].total++;
+    if (c.status === 'confirmed') calendarData[c.date].confirmed++;
+  });
+
+  // Group health readings by type
+  const healthByType = {};
+  healthReadings.rows.forEach(r => {
+    if (!healthByType[r.reading_type]) healthByType[r.reading_type] = [];
+    healthByType[r.reading_type].push({ value: parseFloat(r.value), date: r.recorded_at });
+  });
+
+  res.json({
+    user: user.rows[0],
+    checkinCalendar: calendarData,
+    checkins: checkins.rows,
+    healthData: healthByType,
+    escalations: escalations.rows,
+    familyMembers: family.rows,
+    currentStreak: streak.rows[0]?.streak_days || 0,
+  });
+}));
+
 // ── Static Files (no-cache for development) ──────────────
 app.use(express.static(__dirname, {
   maxAge: 0,
@@ -4220,6 +4610,55 @@ async function doReset(){
     } else {
       msg.className='msg err';msg.textContent=d.error||'Erro ao redefinir senha.';msg.style.display='block';
     }
+  }catch(e){msg.className='msg err';msg.textContent='Erro de conexão.';msg.style.display='block'}
+}
+</script></body></html>`);
+});
+
+// Admin password reset page
+app.get('/admin-reset-password', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Estou Bem Admin — Redefinir Senha</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#1A1A2E;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#fff;border-radius:8px;padding:40px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+h1{font-family:'Playfair Display',serif;color:#2D4A3E;font-size:24px;margin-bottom:8px}
+p{color:#5C5549;font-size:14px;margin-bottom:24px;line-height:1.5}
+.badge{display:inline-block;background:#2D4A3E;color:#fff;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:2px;margin-bottom:16px}
+label{display:block;text-align:left;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#9A9189;margin-bottom:6px}
+input{width:100%;padding:12px;border:none;border-bottom:2px solid #E5DDD3;font-size:16px;background:transparent;outline:none;margin-bottom:16px;transition:border-color .2s}
+input:focus{border-color:#C9A96E}
+button{width:100%;padding:14px;background:#2D4A3E;color:#F5F0EB;border:none;border-radius:4px;font-size:13px;letter-spacing:2px;text-transform:uppercase;cursor:pointer}
+button:hover{background:#1E352B}
+.msg{margin-top:16px;padding:12px;border-radius:4px;font-size:13px}
+.msg.ok{background:#E8F0EC;color:#2D4A3E}.msg.err{background:#F5E8E8;color:#8B3A3A}
+</style></head><body>
+<div class="card">
+  <div class="badge">Painel Administrativo</div>
+  <h1>Redefinir Senha</h1>
+  <p>Digite sua nova senha de administrador.</p>
+  <div id="form">
+    <label>NOVA SENHA</label>
+    <input type="password" id="pw1" placeholder="Mínimo 8 caracteres">
+    <label>CONFIRMAR SENHA</label>
+    <input type="password" id="pw2" placeholder="Repita a senha">
+    <button onclick="doReset()">REDEFINIR SENHA</button>
+  </div>
+  <div id="msg" class="msg" style="display:none"></div>
+</div>
+<script>
+async function doReset(){
+  const pw1=document.getElementById('pw1').value,pw2=document.getElementById('pw2').value,msg=document.getElementById('msg');
+  if(pw1.length<8){msg.className='msg err';msg.textContent='A senha deve ter no mínimo 8 caracteres.';msg.style.display='block';return}
+  if(pw1!==pw2){msg.className='msg err';msg.textContent='As senhas não coincidem.';msg.style.display='block';return}
+  const token=new URLSearchParams(window.location.search).get('token');
+  if(!token){msg.className='msg err';msg.textContent='Token inválido.';msg.style.display='block';return}
+  try{
+    const r=await fetch('/api/admin/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,password:pw1})});
+    const d=await r.json();
+    if(r.ok){document.getElementById('form').style.display='none';msg.className='msg ok';msg.innerHTML='Senha redefinida!<br><br><a href="/admin" style="color:#2D4A3E;font-weight:600">Ir para o painel →</a>';msg.style.display='block'}
+    else{msg.className='msg err';msg.textContent=d.error||'Erro ao redefinir.';msg.style.display='block'}
   }catch(e){msg.className='msg err';msg.textContent='Erro de conexão.';msg.style.display='block'}
 }
 </script></body></html>`);
