@@ -417,15 +417,54 @@ p { color: #4A4A4A; font-size: 1.05rem; }
 
 /* ── How It Works ──────────────────────────────────────── */
 .how-it-works { background: #fff; }
+.role-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  margin-top: 40px;
+  margin-bottom: 48px;
+  border-bottom: 2px solid #E8E2DC;
+}
+.role-tab {
+  padding: 14px 28px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #9A9189;
+  cursor: pointer;
+  border: none;
+  background: none;
+  position: relative;
+  transition: color 0.3s ease;
+}
+.role-tab:hover { color: #2D4A3E; }
+.role-tab.active {
+  color: #2D4A3E;
+}
+.role-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #C9A96E;
+  border-radius: 3px 3px 0 0;
+}
+.role-tab-content {
+  display: none;
+}
+.role-tab-content.active {
+  display: block;
+}
 .steps-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 40px;
-  margin-top: 60px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px;
 }
 .step-card {
   text-align: center;
-  padding: 48px 32px;
+  padding: 40px 24px;
   border-radius: 24px;
   background: #F5F0EB;
   position: relative;
@@ -468,7 +507,7 @@ p { color: #4A4A4A; font-size: 1.05rem; }
     display: block;
     position: absolute;
     top: 50%;
-    right: -24px;
+    right: -18px;
     width: 8px; height: 8px;
     border-top: 2px solid #C9A96E;
     border-right: 2px solid #C9A96E;
@@ -478,6 +517,8 @@ p { color: #4A4A4A; font-size: 1.05rem; }
 }
 @media (max-width: 768px) {
   .steps-grid { grid-template-columns: 1fr; max-width: 400px; margin-left: auto; margin-right: auto; }
+  .role-tabs { flex-wrap: wrap; gap: 0; }
+  .role-tab { padding: 10px 16px; font-size: 0.8rem; }
 }
 
 /* ── Features ──────────────────────────────────────────── */
@@ -625,9 +666,9 @@ p { color: #4A4A4A; font-size: 1.05rem; }
 .pricing-section { background: #fff; }
 .pricing-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 28px;
-  max-width: 800px;
+  max-width: 1100px;
   margin: 60px auto 0;
 }
 .pricing-card {
@@ -1042,7 +1083,7 @@ p { color: #4A4A4A; font-size: 1.05rem; }
       <div class="hero-content fade-in">
         <p class="section-label" data-i18n="hero_label">Cuidado Inteligente</p>
         <h1 data-i18n-html="hero_headline">Cuide de quem você ama, <span>mesmo de longe</span></h1>
-        <p class="hero-subtitle" data-i18n="hero_subtitle">Check-in via WhatsApp. Sem app, sem relógio especial. Seu familiar responde SIM e você fica tranquilo. Se não responder, o SAMU 192 é acionado automaticamente.</p>
+        <p class="hero-subtitle" data-i18n="hero_subtitle">Check-in diário com um toque, via app, WhatsApp ou Apple Watch. Se não responder, ligamos automaticamente. Sem resposta? SAMU 192 é acionado.</p>
         <div class="hero-buttons">
           <a href="#baixar" class="btn btn-primary" data-i18n="nav_download">
             Baixar App
@@ -1203,35 +1244,108 @@ p { color: #4A4A4A; font-size: 1.05rem; }
     <div class="fade-in">
       <p class="section-label" data-i18n="how_label">Simples e Seguro</p>
       <h2 class="section-title" data-i18n="how_title">Como funciona</h2>
-      <p class="section-subtitle mx-auto" data-i18n="how_subtitle">Três passos simples para a tranquilidade da sua família.</p>
+      <p class="section-subtitle mx-auto" data-i18n="how_subtitle">Veja como cada perfil usa o Estou Bem.</p>
       <div class="divider"></div>
     </div>
-    <div class="steps-grid">
-      <div class="step-card fade-in fade-in-delay-1">
-        <div class="step-number">1</div>
-        <div class="step-icon">
-          <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+    <div class="role-tabs">
+      <button class="role-tab active" data-role="elder" data-i18n="tab_elder">Pessoa Assistida</button>
+      <button class="role-tab" data-role="family" data-i18n="tab_family">Familiar</button>
+      <button class="role-tab" data-role="caregiver" data-i18n="tab_caregiver">Cuidador</button>
+    </div>
+    <!-- Pessoa Assistida -->
+    <div class="role-tab-content active" id="role-elder">
+      <div class="steps-grid">
+        <div class="step-card fade-in fade-in-delay-1">
+          <div class="step-number">1</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>
+          <h3 data-i18n="elder_step1_title">Baixe o app ou use WhatsApp</h3>
+          <p data-i18n="elder_step1_desc">Escolha o canal mais confortável: app no celular, Apple Watch ou WhatsApp.</p>
+          <div class="step-connector"></div>
         </div>
-        <h3 data-i18n="step1_title">Cadastre seu familiar</h3>
-        <p data-i18n="step1_desc">Registre o nome, telefone e contatos de emergência. Leva 2 minutos.</p>
-        <div class="step-connector"></div>
+        <div class="step-card fade-in fade-in-delay-2">
+          <div class="step-number">2</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+          <h3 data-i18n="elder_step2_title">Configure seus horários</h3>
+          <p data-i18n="elder_step2_desc">Defina horários de check-in e lembretes de medicamentos.</p>
+          <div class="step-connector"></div>
+        </div>
+        <div class="step-card fade-in fade-in-delay-3">
+          <div class="step-number">3</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+          <h3 data-i18n="elder_step3_title">Confirme que está bem</h3>
+          <p data-i18n="elder_step3_desc">Com um toque ou respondendo SIM no WhatsApp.</p>
+          <div class="step-connector"></div>
+        </div>
+        <div class="step-card fade-in fade-in-delay-4">
+          <div class="step-number">4</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+          <h3 data-i18n="elder_step4_title">SOS em emergência</h3>
+          <p data-i18n="elder_step4_desc">Pressione SOS no app ou envie SOCORRO no WhatsApp.</p>
+        </div>
       </div>
-      <div class="step-card fade-in fade-in-delay-2">
-        <div class="step-number">2</div>
-        <div class="step-icon">
-          <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    </div>
+    <!-- Familiar -->
+    <div class="role-tab-content" id="role-family">
+      <div class="steps-grid">
+        <div class="step-card fade-in fade-in-delay-1">
+          <div class="step-number">1</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>
+          <h3 data-i18n="family_step1_title">Baixe o app no celular</h3>
+          <p data-i18n="family_step1_desc">Disponível para iOS e Android gratuitamente.</p>
+          <div class="step-connector"></div>
         </div>
-        <h3 data-i18n="step2_title">WhatsApp faz o resto</h3>
-        <p data-i18n="step2_desc">Todo dia, o idoso recebe uma mensagem no WhatsApp. Só precisa responder SIM. Sem app, sem relógio.</p>
-        <div class="step-connector"></div>
+        <div class="step-card fade-in fade-in-delay-2">
+          <div class="step-number">2</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></div>
+          <h3 data-i18n="family_step2_title">Vincule com o código</h3>
+          <p data-i18n="family_step2_desc">Use o código de conexão da pessoa assistida para vincular.</p>
+          <div class="step-connector"></div>
+        </div>
+        <div class="step-card fade-in fade-in-delay-3">
+          <div class="step-number">3</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></div>
+          <h3 data-i18n="family_step3_title">Receba alertas em tempo real</h3>
+          <p data-i18n="family_step3_desc">Via push, WhatsApp e email quando algo precisar de atenção.</p>
+          <div class="step-connector"></div>
+        </div>
+        <div class="step-card fade-in fade-in-delay-4">
+          <div class="step-number">4</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+          <h3 data-i18n="family_step4_title">Acompanhe no painel</h3>
+          <p data-i18n="family_step4_desc">Saúde, check-ins e localização em um painel completo.</p>
+        </div>
       </div>
-      <div class="step-card fade-in fade-in-delay-3">
-        <div class="step-number">3</div>
-        <div class="step-icon">
-          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <!-- Cuidador -->
+    <div class="role-tab-content" id="role-caregiver">
+      <div class="steps-grid">
+        <div class="step-card fade-in fade-in-delay-1">
+          <div class="step-number">1</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>
+          <h3 data-i18n="cg_step1_title">Baixe o app profissional</h3>
+          <p data-i18n="cg_step1_desc">Versão otimizada para cuidadores profissionais.</p>
+          <div class="step-connector"></div>
         </div>
-        <h3 data-i18n="step3_title">Proteção automática</h3>
-        <p data-i18n="step3_desc">Sem resposta? Ligação automática para o idoso. Ainda sem resposta? SAMU 192 é acionado com ficha médica completa.</p>
+        <div class="step-card fade-in fade-in-delay-2">
+          <div class="step-number">2</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
+          <h3 data-i18n="cg_step2_title">Vincule seus pacientes</h3>
+          <p data-i18n="cg_step2_desc">Conecte todos os pacientes sob seus cuidados.</p>
+          <div class="step-connector"></div>
+        </div>
+        <div class="step-card fade-in fade-in-delay-3">
+          <div class="step-number">3</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+          <h3 data-i18n="cg_step3_title">Painel centralizado</h3>
+          <p data-i18n="cg_step3_desc">Monitore múltiplos pacientes em uma única tela.</p>
+          <div class="step-connector"></div>
+        </div>
+        <div class="step-card fade-in fade-in-delay-4">
+          <div class="step-number">4</div>
+          <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+          <h3 data-i18n="cg_step4_title">Alertas e relatórios</h3>
+          <p data-i18n="cg_step4_desc">Alertas prioritários e relatórios semanais automáticos.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1384,15 +1498,27 @@ p { color: #4A4A4A; font-size: 1.05rem; }
     <div class="fade-in">
       <p class="section-label" data-i18n="pricing_label">Planos</p>
       <h2 class="section-title" data-i18n="pricing_title">Escolha o plano ideal</h2>
-      <p class="section-subtitle mx-auto" data-i18n="pricing_subtitle">Comece com 7 dias grátis. Cancele quando quiser.</p>
+      <p class="section-subtitle mx-auto" data-i18n="pricing_subtitle">Comece grátis para sempre. Upgrade quando quiser.</p>
       <div class="divider"></div>
     </div>
     <div class="pricing-grid">
       <div class="pricing-card fade-in fade-in-delay-1">
+        <div class="pricing-plan" data-i18n="plan0_name">Básico</div>
+        <h3 data-i18n="plan0_title">Para começar</h3>
+        <div class="pricing-amount" data-i18n-html="plan0_price">Grátis</div>
+        <p class="pricing-desc" data-i18n="plan0_desc">Para sempre, sem cartão</p>
+        <ul class="pricing-features">
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan0_f1">1 check-in por dia</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan0_f2">SOS por WhatsApp</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan0_f3">1 contato de emergência</span></li>
+        </ul>
+        <a href="#baixar" class="btn btn-outline" data-i18n="plan0_cta">Começar grátis</a>
+      </div>
+      <div class="pricing-card fade-in fade-in-delay-2">
         <div class="pricing-plan" data-i18n="plan1_name">Família</div>
-        <h3 data-i18n="plan1_title">Para começar</h3>
+        <h3 data-i18n="plan1_title">Para a família</h3>
         <div class="pricing-amount" data-i18n-html="plan1_price"><span class="currency">R$</span>49,90<span class="period">/mes</span></div>
-        <p class="pricing-desc" data-i18n="plan1_desc">Ideal para cuidar de 1 idoso</p>
+        <p class="pricing-desc" data-i18n="plan1_desc">7 dias grátis &middot; 1 idoso</p>
         <ul class="pricing-features">
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan1_f1">1 idoso monitorado</span></li>
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan1_f2">Check-ins diários com alarme</span></li>
@@ -1400,14 +1526,14 @@ p { color: #4A4A4A; font-size: 1.05rem; }
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Apple Watch + Galaxy Watch</li>
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="feat3_title">Emergência SOS</span></li>
         </ul>
-        <a href="#baixar" class="btn btn-outline" data-i18n="pricing_cta">Começar grátis</a>
+        <a href="#baixar" class="btn btn-outline" data-i18n="pricing_cta_trial">7 dias grátis</a>
       </div>
-      <div class="pricing-card featured fade-in fade-in-delay-2">
+      <div class="pricing-card featured fade-in fade-in-delay-3">
         <div class="pricing-badge" data-i18n="plan2_badge">Mais Popular</div>
         <div class="pricing-plan">Central</div>
         <h3 data-i18n="plan2_title">Para toda a família</h3>
         <div class="pricing-amount" data-i18n-html="plan2_price"><span class="currency">R$</span>89,90<span class="period">/mes</span></div>
-        <p class="pricing-desc" data-i18n="plan2_desc">Até 5 idosos monitorados</p>
+        <p class="pricing-desc" data-i18n="plan2_desc">7 dias grátis &middot; Até 5 idosos</p>
         <ul class="pricing-features">
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan2_f1">Até 5 idosos monitorados</span></li>
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan2_f2">Tudo do plano Família</span></li>
@@ -1415,7 +1541,7 @@ p { color: #4A4A4A; font-size: 1.05rem; }
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan2_f4">Relatórios semanais</span></li>
           <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="plan2_f5">Suporte prioritário</span></li>
         </ul>
-        <a href="#baixar" class="btn btn-primary" data-i18n="pricing_cta">Começar grátis</a>
+        <a href="#baixar" class="btn btn-primary" data-i18n="pricing_cta_trial">7 dias grátis</a>
       </div>
     </div>
   </div>
@@ -1616,7 +1742,7 @@ const translations = {
     nav_download: 'Baixar App',
     hero_label: 'Cuidado Inteligente',
     hero_headline: 'Cuide de quem você ama, <span>mesmo de longe</span>',
-    hero_subtitle: 'Check-ins diários, alertas inteligentes e monitoramento de saúde para idosos. Tranquilidade para toda a família.',
+    hero_subtitle: 'Check-in diário com um toque, via app, WhatsApp ou Apple Watch. Se não responder, ligamos automaticamente. Sem resposta? SAMU 192 é acionado.',
     hero_cta_learn: 'Conhecer mais',
     hero_trust: 'Mais de 2.000 famílias confiam em nós',
     phone_greeting: 'Bom dia, Maria',
@@ -1624,13 +1750,34 @@ const translations = {
     phone_streak: '12 dias seguidos',
     how_label: 'Simples e Seguro',
     how_title: 'Como funciona',
-    how_subtitle: 'Três passos simples para a tranquilidade da sua família.',
-    step1_title: 'O idoso recebe um lembrete',
-    step1_desc: 'Todo dia, no horário escolhido, um alarme gentil lembra de fazer o check-in.',
-    step2_title: 'Ele toca um botão: Estou Bem',
-    step2_desc: 'Um único toque confirma que está tudo bem. Simples, rápido e acessível.',
-    step3_title: 'Se não responder, você é alertado',
-    step3_desc: 'A família recebe uma notificação imediata se o check-in não for concluído.',
+    how_subtitle: 'Veja como cada perfil usa o Estou Bem.',
+    tab_elder: 'Pessoa Assistida',
+    tab_family: 'Familiar',
+    tab_caregiver: 'Cuidador',
+    elder_step1_title: 'Baixe o app ou use WhatsApp',
+    elder_step1_desc: 'Escolha o canal mais confortável: app no celular, Apple Watch ou WhatsApp.',
+    elder_step2_title: 'Configure seus horários',
+    elder_step2_desc: 'Defina horários de check-in e lembretes de medicamentos.',
+    elder_step3_title: 'Confirme que está bem',
+    elder_step3_desc: 'Com um toque ou respondendo SIM no WhatsApp.',
+    elder_step4_title: 'SOS em emergência',
+    elder_step4_desc: 'Pressione SOS no app ou envie SOCORRO no WhatsApp.',
+    family_step1_title: 'Baixe o app no celular',
+    family_step1_desc: 'Disponível para iOS e Android gratuitamente.',
+    family_step2_title: 'Vincule com o código',
+    family_step2_desc: 'Use o código de conexão da pessoa assistida para vincular.',
+    family_step3_title: 'Receba alertas em tempo real',
+    family_step3_desc: 'Via push, WhatsApp e email quando algo precisar de atenção.',
+    family_step4_title: 'Acompanhe no painel',
+    family_step4_desc: 'Saúde, check-ins e localização em um painel completo.',
+    cg_step1_title: 'Baixe o app profissional',
+    cg_step1_desc: 'Versão otimizada para cuidadores profissionais.',
+    cg_step2_title: 'Vincule seus pacientes',
+    cg_step2_desc: 'Conecte todos os pacientes sob seus cuidados.',
+    cg_step3_title: 'Painel centralizado',
+    cg_step3_desc: 'Monitore múltiplos pacientes em uma única tela.',
+    cg_step4_title: 'Alertas e relatórios',
+    cg_step4_desc: 'Alertas prioritários e relatórios semanais automáticos.',
     feat_label: 'Recursos',
     feat_title: 'Tudo que sua família precisa',
     feat_subtitle: 'Tecnologia pensada com carinho para quem mais importa.',
@@ -1655,24 +1802,32 @@ const translations = {
     stat_streak: 'Sequência',
     pricing_label: 'Planos',
     pricing_title: 'Escolha o plano ideal',
-    pricing_subtitle: 'Comece com 7 dias grátis. Cancele quando quiser.',
+    pricing_subtitle: 'Comece grátis para sempre. Upgrade quando quiser.',
+    plan0_name: 'Básico',
+    plan0_title: 'Para começar',
+    plan0_price: 'Grátis',
+    plan0_desc: 'Para sempre, sem cartão',
+    plan0_f1: '1 check-in por dia',
+    plan0_f2: 'SOS por WhatsApp',
+    plan0_f3: '1 contato de emergência',
+    plan0_cta: 'Começar grátis',
     plan1_name: 'Família',
-    plan1_title: 'Para começar',
+    plan1_title: 'Para a família',
     plan1_price: '<span class="currency">R$</span>49,90<span class="period">/mes</span>',
-    plan1_desc: 'Ideal para cuidar de 1 idoso',
+    plan1_desc: '7 dias grátis &middot; 1 idoso',
     plan1_f1: '1 idoso monitorado',
     plan1_f2: 'Check-ins diários com alarme',
     plan1_f3: 'Alertas para a família',
     plan2_badge: 'Mais Popular',
     plan2_title: 'Para toda a família',
     plan2_price: '<span class="currency">R$</span>89,90<span class="period">/mes</span>',
-    plan2_desc: 'Até 5 idosos monitorados',
+    plan2_desc: '7 dias grátis &middot; Até 5 idosos',
     plan2_f1: 'Até 5 idosos monitorados',
     plan2_f2: 'Tudo do plano Família',
     plan2_f3: 'Monitoramento de saúde',
     plan2_f4: 'Relatórios semanais',
     plan2_f5: 'Suporte prioritário',
-    pricing_cta: 'Começar grátis',
+    pricing_cta_trial: '7 dias grátis',
     test_label: 'Depoimentos',
     test_title: 'Quem usa, recomenda',
     test_subtitle: 'Histórias reais de famílias que encontraram tranquilidade.',
@@ -1733,7 +1888,7 @@ const translations = {
     nav_download: 'Download App',
     hero_label: 'Smart Care',
     hero_headline: 'Care for your loved ones, <span>even from afar</span>',
-    hero_subtitle: 'Daily check-ins, smart alerts and health monitoring for seniors. Peace of mind for the whole family.',
+    hero_subtitle: 'Daily check-in with one tap, via app, WhatsApp or Apple Watch. No response? We call automatically. Still nothing? Emergency services are dispatched.',
     hero_cta_learn: 'Learn more',
     hero_trust: 'Over 2,000 families trust us',
     phone_greeting: 'Good morning, Maria',
@@ -1741,13 +1896,34 @@ const translations = {
     phone_streak: '12 days in a row',
     how_label: 'Simple & Safe',
     how_title: 'How it works',
-    how_subtitle: 'Three simple steps for your family\'s peace of mind.',
-    step1_title: 'The senior gets a reminder',
-    step1_desc: 'Every day, at the chosen time, a gentle alarm reminds them to check in.',
-    step2_title: 'They tap a button: I\'m Fine',
-    step2_desc: 'A single tap confirms everything is okay. Simple, fast and accessible.',
-    step3_title: 'If no response, you get alerted',
-    step3_desc: 'The family receives an immediate notification if the check-in is not completed.',
+    how_subtitle: 'See how each role uses Estou Bem.',
+    tab_elder: 'Assisted Person',
+    tab_family: 'Family Member',
+    tab_caregiver: 'Caretaker',
+    elder_step1_title: 'Download the app or use WhatsApp',
+    elder_step1_desc: 'Choose the most comfortable channel: phone app, Apple Watch or WhatsApp.',
+    elder_step2_title: 'Set your schedules',
+    elder_step2_desc: 'Configure check-in times and medication reminders.',
+    elder_step3_title: 'Confirm you\'re fine',
+    elder_step3_desc: 'With one tap or by replying YES on WhatsApp.',
+    elder_step4_title: 'SOS in emergency',
+    elder_step4_desc: 'Press SOS in the app or send HELP on WhatsApp.',
+    family_step1_title: 'Download the app',
+    family_step1_desc: 'Available for iOS and Android for free.',
+    family_step2_title: 'Link with the code',
+    family_step2_desc: 'Use the assisted person\'s connection code to link.',
+    family_step3_title: 'Get real-time alerts',
+    family_step3_desc: 'Via push, WhatsApp and email when attention is needed.',
+    family_step4_title: 'Track on the dashboard',
+    family_step4_desc: 'Health, check-ins and location in a complete dashboard.',
+    cg_step1_title: 'Download the pro app',
+    cg_step1_desc: 'Version optimized for professional caregivers.',
+    cg_step2_title: 'Link your patients',
+    cg_step2_desc: 'Connect all patients under your care.',
+    cg_step3_title: 'Centralized dashboard',
+    cg_step3_desc: 'Monitor multiple patients on a single screen.',
+    cg_step4_title: 'Alerts and reports',
+    cg_step4_desc: 'Priority alerts and automatic weekly reports.',
     feat_label: 'Features',
     feat_title: 'Everything your family needs',
     feat_subtitle: 'Technology designed with care for those who matter most.',
@@ -1772,24 +1948,32 @@ const translations = {
     stat_streak: 'Streak',
     pricing_label: 'Plans',
     pricing_title: 'Choose the ideal plan',
-    pricing_subtitle: 'Start with 7 free days. Cancel anytime.',
+    pricing_subtitle: 'Start free forever. Upgrade when you want.',
+    plan0_name: 'Basic',
+    plan0_title: 'To get started',
+    plan0_price: 'Free',
+    plan0_desc: 'Forever, no card needed',
+    plan0_f1: '1 check-in per day',
+    plan0_f2: 'SOS via WhatsApp',
+    plan0_f3: '1 emergency contact',
+    plan0_cta: 'Start free',
     plan1_name: 'Family',
-    plan1_title: 'To get started',
+    plan1_title: 'For the family',
     plan1_price: '<span class="currency">$</span>9.90<span class="period">/mo</span>',
-    plan1_desc: 'Ideal for caring for 1 senior',
+    plan1_desc: '7 days free &middot; 1 senior',
     plan1_f1: '1 monitored senior',
     plan1_f2: 'Daily check-ins with alarm',
     plan1_f3: 'Family alerts',
     plan2_badge: 'Most Popular',
     plan2_title: 'For the whole family',
     plan2_price: '<span class="currency">$</span>17.90<span class="period">/mo</span>',
-    plan2_desc: 'Up to 5 monitored seniors',
+    plan2_desc: '7 days free &middot; Up to 5 seniors',
     plan2_f1: 'Up to 5 monitored seniors',
     plan2_f2: 'Everything in the Family plan',
     plan2_f3: 'Health monitoring',
     plan2_f4: 'Weekly reports',
     plan2_f5: 'Priority support',
-    pricing_cta: 'Start free',
+    pricing_cta_trial: '7 days free',
     test_label: 'Testimonials',
     test_title: 'Loved by users',
     test_subtitle: 'Real stories from families who found peace of mind.',
@@ -1850,7 +2034,7 @@ const translations = {
     nav_download: 'Descargar App',
     hero_label: 'Cuidado Inteligente',
     hero_headline: 'Cuida de quienes amas, <span>incluso a distancia</span>',
-    hero_subtitle: 'Check-ins diarios, alertas inteligentes y monitoreo de salud para adultos mayores. Tranquilidad para toda la familia.',
+    hero_subtitle: 'Check-in diario con un toque, via app, WhatsApp o Apple Watch. Sin respuesta? Llamamos automaticamente. Aun nada? Se activa emergencias.',
     hero_cta_learn: 'Conocer mas',
     hero_trust: 'Mas de 2.000 familias confian en nosotros',
     phone_greeting: 'Buenos dias, Maria',
@@ -1858,13 +2042,34 @@ const translations = {
     phone_streak: '12 dias seguidos',
     how_label: 'Simple y Seguro',
     how_title: 'Como funciona',
-    how_subtitle: 'Tres pasos simples para la tranquilidad de tu familia.',
-    step1_title: 'El adulto mayor recibe un recordatorio',
-    step1_desc: 'Cada dia, a la hora elegida, una alarma gentil recuerda hacer el check-in.',
-    step2_title: 'Toca un boton: Estoy Bien',
-    step2_desc: 'Un solo toque confirma que todo esta bien. Simple, rapido y accesible.',
-    step3_title: 'Si no responde, te alertamos',
-    step3_desc: 'La familia recibe una notificacion inmediata si el check-in no se completa.',
+    how_subtitle: 'Mira como cada perfil usa Estou Bem.',
+    tab_elder: 'Persona Asistida',
+    tab_family: 'Familiar',
+    tab_caregiver: 'Cuidador',
+    elder_step1_title: 'Descarga la app o usa WhatsApp',
+    elder_step1_desc: 'Elige el canal mas comodo: app en el celular, Apple Watch o WhatsApp.',
+    elder_step2_title: 'Configura tus horarios',
+    elder_step2_desc: 'Define horarios de check-in y recordatorios de medicamentos.',
+    elder_step3_title: 'Confirma que estas bien',
+    elder_step3_desc: 'Con un toque o respondiendo SI en WhatsApp.',
+    elder_step4_title: 'SOS en emergencia',
+    elder_step4_desc: 'Presiona SOS en la app o envia SOCORRO en WhatsApp.',
+    family_step1_title: 'Descarga la app en tu celular',
+    family_step1_desc: 'Disponible para iOS y Android gratis.',
+    family_step2_title: 'Vincula con el codigo',
+    family_step2_desc: 'Usa el codigo de conexion de la persona asistida.',
+    family_step3_title: 'Recibe alertas en tiempo real',
+    family_step3_desc: 'Via push, WhatsApp y email cuando algo necesite atencion.',
+    family_step4_title: 'Acompana en el panel',
+    family_step4_desc: 'Salud, check-ins y ubicacion en un panel completo.',
+    cg_step1_title: 'Descarga la app profesional',
+    cg_step1_desc: 'Version optimizada para cuidadores profesionales.',
+    cg_step2_title: 'Vincula tus pacientes',
+    cg_step2_desc: 'Conecta todos los pacientes bajo tu cuidado.',
+    cg_step3_title: 'Panel centralizado',
+    cg_step3_desc: 'Monitorea multiples pacientes en una sola pantalla.',
+    cg_step4_title: 'Alertas y reportes',
+    cg_step4_desc: 'Alertas prioritarias y reportes semanales automaticos.',
     feat_label: 'Recursos',
     feat_title: 'Todo lo que tu familia necesita',
     feat_subtitle: 'Tecnologia pensada con carino para quienes mas importan.',
@@ -1889,24 +2094,32 @@ const translations = {
     stat_streak: 'Racha',
     pricing_label: 'Planes',
     pricing_title: 'Elige el plan ideal',
-    pricing_subtitle: 'Comienza con 7 dias gratis. Cancela cuando quieras.',
-    plan1_name: 'Família',
-    plan1_title: 'Para empezar',
+    pricing_subtitle: 'Comienza gratis para siempre. Mejora cuando quieras.',
+    plan0_name: 'Basico',
+    plan0_title: 'Para empezar',
+    plan0_price: 'Gratis',
+    plan0_desc: 'Para siempre, sin tarjeta',
+    plan0_f1: '1 check-in por dia',
+    plan0_f2: 'SOS por WhatsApp',
+    plan0_f3: '1 contacto de emergencia',
+    plan0_cta: 'Empezar gratis',
+    plan1_name: 'Familia',
+    plan1_title: 'Para la familia',
     plan1_price: '<span class="currency">US$</span>9,90<span class="period">/mes</span>',
-    plan1_desc: 'Ideal para cuidar de 1 adulto mayor',
+    plan1_desc: '7 dias gratis &middot; 1 adulto mayor',
     plan1_f1: '1 adulto mayor monitoreado',
     plan1_f2: 'Check-ins diarios con alarma',
     plan1_f3: 'Alertas para la familia',
     plan2_badge: 'Mas Popular',
     plan2_title: 'Para toda la familia',
     plan2_price: '<span class="currency">US$</span>17,90<span class="period">/mes</span>',
-    plan2_desc: 'Hasta 5 adultos mayores monitoreados',
+    plan2_desc: '7 dias gratis &middot; Hasta 5 adultos mayores',
     plan2_f1: 'Hasta 5 adultos mayores monitoreados',
     plan2_f2: 'Todo del plan Familia',
     plan2_f3: 'Monitoreo de salud',
     plan2_f4: 'Reportes semanales',
     plan2_f5: 'Soporte prioritario',
-    pricing_cta: 'Empezar gratis',
+    pricing_cta_trial: '7 dias gratis',
     test_label: 'Testimonios',
     test_title: 'Quienes lo usan, lo recomiendan',
     test_subtitle: 'Historias reales de familias que encontraron tranquilidad.',
@@ -1967,7 +2180,7 @@ const translations = {
     nav_download: 'App herunterladen',
     hero_label: 'Intelligente Pflege',
     hero_headline: 'Sorge fuer deine Liebsten, <span>auch aus der Ferne</span>',
-    hero_subtitle: 'Taegliche Check-ins, intelligente Benachrichtigungen und Gesundheitsmonitoring fuer Senioren. Seelenfrieden fuer die ganze Familie.',
+    hero_subtitle: 'Taeglicher Check-in mit einem Tipp, per App, WhatsApp oder Apple Watch. Keine Antwort? Wir rufen automatisch an. Immer noch nichts? Rettungsdienst wird alarmiert.',
     hero_cta_learn: 'Mehr erfahren',
     hero_trust: 'Ueber 2.000 Familien vertrauen uns',
     phone_greeting: 'Guten Morgen, Maria',
@@ -1975,13 +2188,34 @@ const translations = {
     phone_streak: '12 Tage in Folge',
     how_label: 'Einfach & Sicher',
     how_title: 'So funktioniert es',
-    how_subtitle: 'Drei einfache Schritte fuer die Sicherheit Ihrer Familie.',
-    step1_title: 'Der Senior erhaelt eine Erinnerung',
-    step1_desc: 'Jeden Tag, zur gewaehlten Zeit, erinnert ein sanfter Alarm an den Check-in.',
-    step2_title: 'Ein Knopfdruck: Mir geht es gut',
-    step2_desc: 'Ein einziger Tipp bestaetigt, dass alles in Ordnung ist. Einfach, schnell und zugaenglich.',
-    step3_title: 'Keine Antwort? Sie werden benachrichtigt',
-    step3_desc: 'Die Familie erhaelt eine sofortige Benachrichtigung, wenn der Check-in nicht abgeschlossen wird.',
+    how_subtitle: 'So nutzt jede Rolle Estou Bem.',
+    tab_elder: 'Betreute Person',
+    tab_family: 'Familienmitglied',
+    tab_caregiver: 'Betreuer',
+    elder_step1_title: 'App herunterladen oder WhatsApp nutzen',
+    elder_step1_desc: 'Waehlen Sie den bequemsten Kanal: Handy-App, Apple Watch oder WhatsApp.',
+    elder_step2_title: 'Zeiten einstellen',
+    elder_step2_desc: 'Check-in-Zeiten und Medikamentenerinnerungen konfigurieren.',
+    elder_step3_title: 'Bestaetigen, dass es Ihnen gut geht',
+    elder_step3_desc: 'Mit einem Tipp oder per JA-Antwort auf WhatsApp.',
+    elder_step4_title: 'SOS im Notfall',
+    elder_step4_desc: 'SOS in der App druecken oder HILFE per WhatsApp senden.',
+    family_step1_title: 'App auf dem Handy herunterladen',
+    family_step1_desc: 'Kostenlos fuer iOS und Android verfuegbar.',
+    family_step2_title: 'Mit dem Code verknuepfen',
+    family_step2_desc: 'Den Verbindungscode der betreuten Person verwenden.',
+    family_step3_title: 'Echtzeit-Benachrichtigungen erhalten',
+    family_step3_desc: 'Per Push, WhatsApp und E-Mail wenn Aufmerksamkeit noetig ist.',
+    family_step4_title: 'Im Dashboard verfolgen',
+    family_step4_desc: 'Gesundheit, Check-ins und Standort in einem vollstaendigen Dashboard.',
+    cg_step1_title: 'Profi-App herunterladen',
+    cg_step1_desc: 'Version optimiert fuer professionelle Betreuer.',
+    cg_step2_title: 'Patienten verknuepfen',
+    cg_step2_desc: 'Alle Patienten unter Ihrer Betreuung verbinden.',
+    cg_step3_title: 'Zentrales Dashboard',
+    cg_step3_desc: 'Mehrere Patienten auf einem Bildschirm ueberwachen.',
+    cg_step4_title: 'Benachrichtigungen und Berichte',
+    cg_step4_desc: 'Prioritaets-Benachrichtigungen und automatische Wochenberichte.',
     feat_label: 'Funktionen',
     feat_title: 'Alles was Ihre Familie braucht',
     feat_subtitle: 'Technologie mit Sorgfalt fuer die Menschen entwickelt, die am wichtigsten sind.',
@@ -2006,24 +2240,32 @@ const translations = {
     stat_streak: 'Serie',
     pricing_label: 'Plaene',
     pricing_title: 'Waehlen Sie den idealen Plan',
-    pricing_subtitle: 'Starten Sie mit 7 kostenlosen Tagen. Jederzeit kuendbar.',
+    pricing_subtitle: 'Fuer immer kostenlos starten. Jederzeit upgraden.',
+    plan0_name: 'Basis',
+    plan0_title: 'Zum Starten',
+    plan0_price: 'Kostenlos',
+    plan0_desc: 'Fuer immer, ohne Kreditkarte',
+    plan0_f1: '1 Check-in pro Tag',
+    plan0_f2: 'SOS per WhatsApp',
+    plan0_f3: '1 Notfallkontakt',
+    plan0_cta: 'Kostenlos starten',
     plan1_name: 'Familie',
-    plan1_title: 'Zum Starten',
+    plan1_title: 'Fuer die Familie',
     plan1_price: '<span class="currency">\u20ac</span>9,90<span class="period">/Mon.</span>',
-    plan1_desc: 'Ideal fuer die Betreuung von 1 Senior',
+    plan1_desc: '7 Tage kostenlos &middot; 1 Senior',
     plan1_f1: '1 ueberwachter Senior',
     plan1_f2: 'Taegliche Check-ins mit Alarm',
     plan1_f3: 'Familien-Benachrichtigungen',
     plan2_badge: 'Beliebteste',
     plan2_title: 'Fuer die ganze Familie',
     plan2_price: '<span class="currency">\u20ac</span>17,90<span class="period">/Mon.</span>',
-    plan2_desc: 'Bis zu 5 ueberwachte Senioren',
+    plan2_desc: '7 Tage kostenlos &middot; Bis zu 5 Senioren',
     plan2_f1: 'Bis zu 5 ueberwachte Senioren',
     plan2_f2: 'Alles aus dem Familienplan',
     plan2_f3: 'Gesundheitsmonitoring',
     plan2_f4: 'Wochenberichte',
     plan2_f5: 'Prioritaets-Support',
-    pricing_cta: 'Kostenlos starten',
+    pricing_cta_trial: '7 Tage kostenlos',
     test_label: 'Erfahrungen',
     test_title: 'Empfohlen von Nutzern',
     test_subtitle: 'Echte Geschichten von Familien, die Seelenfrieden gefunden haben.',
@@ -2181,6 +2423,17 @@ function toggleFaq(btn) {
   // Toggle current
   if (!wasOpen) item.classList.add('open');
 }
+
+// ─── Role tabs (How It Works) ────────────────────────────
+document.querySelectorAll('.role-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.role-tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    const role = tab.getAttribute('data-role');
+    document.getElementById('role-' + role).classList.add('active');
+  });
+});
 
 // ── Interactive Phone Demo (mobile-optimized) ──
 const demoScreens = ['demo-checkin','demo-confirmed','demo-family','demo-sos'];

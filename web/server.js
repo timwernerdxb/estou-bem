@@ -724,6 +724,44 @@ async function initDB() {
       CREATE TRIGGER checkin_change_trigger
         AFTER INSERT OR UPDATE ON checkins
         FOR EACH ROW EXECUTE FUNCTION notify_checkin_change();
+
+      -- Admin users (RBAC)
+      CREATE TABLE IF NOT EXISTS admin_users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        name VARCHAR(200) NOT NULL,
+        role VARCHAR(50) NOT NULL DEFAULT 'viewer',
+        avatar_url VARCHAR(500),
+        is_active BOOLEAN DEFAULT true,
+        last_login TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by INTEGER REFERENCES admin_users(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_admin_users_email ON admin_users(email);
+
+      -- Admin audit log
+      CREATE TABLE IF NOT EXISTS admin_audit_log (
+        id SERIAL PRIMARY KEY,
+        admin_user_id INTEGER REFERENCES admin_users(id),
+        action VARCHAR(100) NOT NULL,
+        details JSONB,
+        ip_address VARCHAR(50),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_log_user ON admin_audit_log(admin_user_id);
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_log_action ON admin_audit_log(action);
+
+      -- Admin sessions
+      CREATE TABLE IF NOT EXISTS admin_sessions (
+        id SERIAL PRIMARY KEY,
+        admin_user_id INTEGER REFERENCES admin_users(id) ON DELETE CASCADE,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        ip_address VARCHAR(50),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(token);
     `);
     console.log('Database initialized');
 
@@ -751,6 +789,90 @@ async function initDB() {
     client.release();
   }
 }
+
+// ── Seed initial super_admin ─────────────────────────────
+async function seedAdminUser() {
+  try {
+    const existing = await pool.query('SELECT COUNT(*) as cnt FROM admin_users');
+    if (parseInt(existing.rows[0].cnt) > 0) return;
+
+    const email = process.env.ADMIN_EMAIL || 'admin@estoubem.com';
+    const password = process.env.ADMIN_PASSWORD || crypto.randomBytes(12).toString('base64url');
+    const hash = await hashPassword(password);
+
+    await pool.query(
+      `INSERT INTO admin_users (email, password_hash, name, role, is_active) VALUES ($1, $2, $3, $4, true)`,
+      [email, hash, 'Super Admin', 'super_admin']
+    );
+
+    console.log(`[ADMIN] Created initial super admin. Email: ${email} Password: ${password}`);
+  } catch (err) {
+    // Table may not exist yet on first run, ignore
+    if (err.code !== '42P01') console.error('[ADMIN] Seed error:', err.message);
+  }
+}
+
+// ── Admin Audit Logger ────────────────────────────────────
+async function logAdminAction(adminUserId, action, details, ipAddress) {
+  try {
+    await pool.query(
+      `INSERT INTO admin_audit_log (admin_user_id, action, details, ip_address) VALUES ($1, $2, $3, $4)`,
+      [adminUserId, action, details ? JSON.stringify(details) : null, ipAddress || null]
+    );
+  } catch (err) {
+    console.error('[Audit] Failed to log action:', err.message);
+  }
+}
+
+// ── Admin Token Management ────────────────────────────────
+function generateAdminToken(adminUserId) {
+  return 'adm_' + crypto.createHmac('sha256', JWT_SECRET)
+    .update(String(adminUserId) + Date.now() + crypto.randomBytes(16).toString('hex'))
+    .digest('hex');
+}
+
+async function storeAdminToken(token, adminUserId, ipAddress) {
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+  try {
+    await pool.query(
+      `INSERT INTO admin_sessions (admin_user_id, token, expires_at, ip_address) VALUES ($1, $2, $3, $4)`,
+      [adminUserId, token, expiresAt, ipAddress || null]
+    );
+  } catch (err) {
+    console.error('[AdminSessions] Failed to store token:', err.message);
+  }
+}
+
+async function getAdminByToken(token) {
+  try {
+    const result = await pool.query(
+      `SELECT au.* FROM admin_users au
+       JOIN admin_sessions s ON s.admin_user_id = au.id
+       WHERE s.token = $1 AND s.expires_at > NOW() AND au.is_active = true`,
+      [token]
+    );
+    return result.rows[0] || null;
+  } catch (err) {
+    console.error('[AdminSessions] Token lookup error:', err.message);
+    return null;
+  }
+}
+
+async function deleteAdminToken(token) {
+  try {
+    await pool.query(`DELETE FROM admin_sessions WHERE token = $1`, [token]);
+  } catch (err) {
+    console.error('[AdminSessions] Delete token error:', err.message);
+  }
+}
+
+// Clean up expired admin sessions every hour
+setInterval(async () => {
+  try {
+    const result = await pool.query(`DELETE FROM admin_sessions WHERE expires_at < NOW()`);
+    if (result.rowCount > 0) console.log(`[AdminSessions] Cleaned up ${result.rowCount} expired sessions`);
+  } catch (err) { /* table may not exist yet */ }
+}, 60 * 60 * 1000);
 
 // ── Middleware ─────────────────────────────────────────────
 app.use(express.json());
@@ -918,6 +1040,21 @@ app.post('/api/register', rateLimiter, async (req, res) => {
   const sanitizedName = sanitizeString(name);
 
   try {
+    // Check duplicate phone number
+    if (phone) {
+      const phoneCheck = await pool.query(`SELECT id, role, linked_elder_id FROM users WHERE phone = $1`, [phone]);
+      if (phoneCheck.rows.length > 0) {
+        const existingUser = phoneCheck.rows[0];
+        if (existingUser.linked_elder_id || existingUser.role === 'elder') {
+          return res.status(409).json({
+            error: 'phone_exists',
+            message: 'Este número já está cadastrado. Se você é familiar, peça o código de conexão ao responsável.',
+            existing_role: existingUser.role
+          });
+        }
+      }
+    }
+
     // Check referral
     let referredBy = null;
     if (referral_code) {
@@ -3294,16 +3431,216 @@ app.get('/api/health-report/elder/:month', authMiddleware, async (req, res) => {
   res.status(404).json({ error: 'Report not yet generated. Ask elder to generate it first.' });
 });
 
-// ── Admin Auth Middleware ──────────────────────────────────
-function adminAuth(req, res, next) {
-  const key = req.headers['x-admin-key'];
-  if (!key || key !== ADMIN_KEY) {
-    return res.status(401).json({ error: 'Unauthorized: invalid or missing X-Admin-Key' });
+// ── Admin Auth Middleware (JWT + legacy X-Admin-Key fallback) ──
+async function adminAuth(req, res, next) {
+  // 1. Try Bearer token (new admin auth)
+  const auth = req.headers.authorization;
+  if (auth?.startsWith('Bearer adm_')) {
+    const token = auth.slice(7);
+    const adminUser = await getAdminByToken(token);
+    if (adminUser) {
+      req.adminUser = adminUser;
+      return next();
+    }
+    return res.status(401).json({ error: 'Invalid or expired admin token' });
   }
-  next();
+
+  // 2. Legacy fallback: X-Admin-Key header
+  const key = req.headers['x-admin-key'];
+  if (key && key === ADMIN_KEY) {
+    req.adminUser = { id: null, email: 'legacy@admin', name: 'Legacy Admin', role: 'super_admin', is_active: true };
+    return next();
+  }
+
+  return res.status(401).json({ error: 'Unauthorized: missing or invalid credentials' });
 }
 
-// ── Admin API Routes ──────────────────────────────────────
+// Role-based access control helper
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.adminUser) return res.status(401).json({ error: 'Unauthorized' });
+    if (!roles.includes(req.adminUser.role)) {
+      return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
+    }
+    next();
+  };
+}
+
+function getAdminIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
+}
+
+// ── Admin Auth API Routes ─────────────────────────────────
+
+// POST /api/admin/login — email + password login
+app.post('/api/admin/login', rateLimiter, asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+
+  const result = await pool.query(
+    `SELECT id, email, password_hash, name, role, avatar_url, is_active FROM admin_users WHERE email = $1`,
+    [email.toLowerCase().trim()]
+  );
+
+  if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
+
+  const admin = result.rows[0];
+  if (!admin.is_active) return res.status(401).json({ error: 'Account is deactivated' });
+
+  const valid = await verifyPassword(password, admin.password_hash);
+  if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
+
+  const token = generateAdminToken(admin.id);
+  const ip = getAdminIp(req);
+  await storeAdminToken(token, admin.id, ip);
+  await pool.query(`UPDATE admin_users SET last_login = NOW() WHERE id = $1`, [admin.id]);
+  await logAdminAction(admin.id, 'login', { email: admin.email }, ip);
+
+  delete admin.password_hash;
+  res.json({ ok: true, token, user: admin });
+}));
+
+// POST /api/admin/logout
+app.post('/api/admin/logout', asyncHandler(async (req, res) => {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith('Bearer adm_')) {
+    await deleteAdminToken(auth.slice(7));
+  }
+  res.json({ ok: true });
+}));
+
+// GET /api/admin/me — current admin user info
+app.get('/api/admin/me', adminAuth, asyncHandler(async (req, res) => {
+  const { password_hash, ...user } = req.adminUser;
+  res.json(user);
+}));
+
+// GET /api/admin/team — list admin users (super_admin only)
+app.get('/api/admin/team', adminAuth, requireRole('super_admin'), asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, email, name, role, avatar_url, is_active, last_login, created_at, created_by
+     FROM admin_users ORDER BY created_at DESC`
+  );
+  res.json(result.rows);
+}));
+
+// POST /api/admin/team — create admin user (super_admin only)
+app.post('/api/admin/team', adminAuth, requireRole('super_admin'), asyncHandler(async (req, res) => {
+  const { email, password, name, role } = req.body;
+  if (!email || !password || !name || !role) {
+    return res.status(400).json({ error: 'email, password, name, and role are required' });
+  }
+  if (!['super_admin', 'admin', 'support', 'viewer'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'Invalid email format' });
+
+  const hash = await hashPassword(password);
+  try {
+    const result = await pool.query(
+      `INSERT INTO admin_users (email, password_hash, name, role, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, email, name, role, is_active, created_at, created_by`,
+      [email.toLowerCase().trim(), hash, name.trim(), role, req.adminUser.id]
+    );
+    const ip = getAdminIp(req);
+    await logAdminAction(req.adminUser.id, 'admin_user_create', { created_email: email, role }, ip);
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Email already in use' });
+    throw err;
+  }
+}));
+
+// PUT /api/admin/team/:id — update admin user (super_admin only)
+app.put('/api/admin/team/:id', adminAuth, requireRole('super_admin'), asyncHandler(async (req, res) => {
+  const { name, email, role, is_active, password } = req.body;
+  const targetId = parseInt(req.params.id);
+
+  if (req.adminUser.id === targetId && is_active === false) {
+    return res.status(400).json({ error: 'Cannot deactivate your own account' });
+  }
+
+  const updates = [];
+  const values = [];
+  let idx = 1;
+
+  if (name !== undefined) { updates.push(`name = $${idx++}`); values.push(name.trim()); }
+  if (email !== undefined) { updates.push(`email = $${idx++}`); values.push(email.toLowerCase().trim()); }
+  if (role !== undefined) {
+    if (!['super_admin', 'admin', 'support', 'viewer'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    updates.push(`role = $${idx++}`); values.push(role);
+  }
+  if (is_active !== undefined) { updates.push(`is_active = $${idx++}`); values.push(is_active); }
+  if (password) {
+    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    updates.push(`password_hash = $${idx++}`); values.push(await hashPassword(password));
+  }
+
+  if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+  values.push(targetId);
+  const result = await pool.query(
+    `UPDATE admin_users SET ${updates.join(', ')} WHERE id = $${idx}
+     RETURNING id, email, name, role, is_active, last_login, created_at`,
+    values
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Admin user not found' });
+
+  const ip = getAdminIp(req);
+  await logAdminAction(req.adminUser.id, 'admin_user_update', { target_id: targetId, changes: req.body }, ip);
+
+  if (is_active === false) {
+    await pool.query(`DELETE FROM admin_sessions WHERE admin_user_id = $1`, [targetId]);
+  }
+
+  res.json(result.rows[0]);
+}));
+
+// DELETE /api/admin/team/:id — deactivate admin user (super_admin only)
+app.delete('/api/admin/team/:id', adminAuth, requireRole('super_admin'), asyncHandler(async (req, res) => {
+  const targetId = parseInt(req.params.id);
+  if (req.adminUser.id === targetId) {
+    return res.status(400).json({ error: 'Cannot deactivate your own account' });
+  }
+  const result = await pool.query(
+    `UPDATE admin_users SET is_active = false WHERE id = $1 RETURNING id, email, name, role`,
+    [targetId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Admin user not found' });
+  await pool.query(`DELETE FROM admin_sessions WHERE admin_user_id = $1`, [targetId]);
+
+  const ip = getAdminIp(req);
+  await logAdminAction(req.adminUser.id, 'admin_user_deactivate', { target: result.rows[0] }, ip);
+  res.json({ ok: true, deactivated: result.rows[0] });
+}));
+
+// GET /api/admin/audit-log — view audit log (super_admin + admin)
+app.get('/api/admin/audit-log', adminAuth, requireRole('super_admin', 'admin'), asyncHandler(async (req, res) => {
+  const { admin_user_id, action, from_date, to_date, limit: lim } = req.query;
+  let query = `SELECT al.*, au.name as admin_name, au.email as admin_email
+    FROM admin_audit_log al
+    LEFT JOIN admin_users au ON al.admin_user_id = au.id
+    WHERE 1=1`;
+  const values = [];
+  let idx = 1;
+
+  if (admin_user_id) { query += ` AND al.admin_user_id = $${idx++}`; values.push(parseInt(admin_user_id)); }
+  if (action) { query += ` AND al.action = $${idx++}`; values.push(action); }
+  if (from_date) { query += ` AND al.created_at >= $${idx++}`; values.push(from_date); }
+  if (to_date) { query += ` AND al.created_at <= $${idx++}`; values.push(to_date + 'T23:59:59Z'); }
+
+  query += ` ORDER BY al.created_at DESC LIMIT $${idx}`;
+  values.push(parseInt(lim) || 200);
+
+  const result = await pool.query(query, values);
+  res.json(result.rows);
+}));
+
+// ── Admin Data API Routes ─────────────────────────────────
 
 // GET /api/admin/stats - overview stats
 app.get('/api/admin/stats', adminAuth, async (req, res) => {
@@ -3847,6 +4184,9 @@ async function start() {
   if (process.env.DATABASE_URL) {
     await initDB();
     console.log('PostgreSQL connected');
+
+    // Seed initial super admin if no admin users exist
+    await seedAdminUser();
 
     // Start PG LISTEN/NOTIFY for real-time event-driven escalation
     startPgListener().catch(err => console.error('[PG Listener] Startup error:', err.message));

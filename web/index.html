@@ -1169,14 +1169,16 @@ function renderLogin() {
         </div>
       </div>
 
-      <div class="input-label">${t('login_email')}</div>
-      <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
+      <div id="login-fields">
+        <div class="input-label">${t('login_email')}</div>
+        <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
 
-      <div class="input-label">${t('login_password')}</div>
-      <input type="password" id="login-password" placeholder="Sua senha" autocomplete="current-password">
+        <div class="input-label">${t('login_password')}</div>
+        <input type="password" id="login-password" placeholder="Sua senha" autocomplete="current-password">
 
-      <button class="btn btn-elder mt-lg" data-action="do-login">${t('login_enter')}</button>
-      <span class="forgot-link" data-action="show-forgot-password">${t('login_forgot_password')}</span>
+        <button class="btn btn-elder mt-lg" data-action="do-login">${t('login_enter')}</button>
+        <span class="forgot-link" data-action="show-forgot-password">${t('login_forgot_password')}</span>
+      </div>
       <div id="forgot-password-form" style="display:none">
         <div class="forgot-form">
           <h2>${t('login_forgot_title')}</h2>
@@ -2776,6 +2778,9 @@ function handleAction(action, el) {
     case 'show-forgot-password': {
       const form = $('#forgot-password-form');
       if (form) form.style.display = 'block';
+      // Hide login fields
+      const loginFields = $('#login-fields');
+      if (loginFields) loginFields.style.display = 'none';
       break;
     }
     case 'hide-forgot-password': {
@@ -2783,6 +2788,9 @@ function handleAction(action, el) {
       if (form) form.style.display = 'none';
       const msg = $('#forgot-success-msg');
       if (msg) msg.style.display = 'none';
+      // Show login fields again
+      const loginFieldsBack = $('#login-fields');
+      if (loginFieldsBack) loginFieldsBack.style.display = 'block';
       break;
     }
     case 'do-forgot-password': {

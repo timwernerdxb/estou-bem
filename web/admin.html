@@ -358,6 +358,18 @@ tr.aff-pending:hover { background: #FEF3C7; }
 .gap-8 { gap: 8px; }
 .flex { display: flex; }
 .items-center { align-items: center; }
+
+/* ─── Admin Role Badges ───────────────────────────────── */
+.badge-role-super_admin { background: #FED7D7; color: #742A2A; }
+.badge-role-admin { background: #BEE3F8; color: #2A4365; }
+.badge-role-support { background: #C6F6D5; color: #22543D; }
+.badge-role-viewer { background: #EDF2F7; color: #4A5568; }
+
+/* ─── Audit Action Colors ─────────────────────────────── */
+.audit-login { color: #718096; }
+.audit-create { color: #22543D; font-weight: 600; }
+.audit-update { color: #2A4365; font-weight: 600; }
+.audit-delete, .audit-deactivate { color: #742A2A; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -368,11 +380,30 @@ tr.aff-pending:hover { background: #FEF3C7; }
     <h1>Estou Bem</h1>
     <p>Painel Administrativo</p>
     <div id="loginError" class="login-error"></div>
-    <div class="form-group">
-      <label>Senha de administrador</label>
-      <input type="password" id="loginPassword" placeholder="Digite a senha..." onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="loginModeNew">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="admin@estoubem.com" onkeydown="if(event.key==='Enter')document.getElementById('loginPassword').focus()">
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="loginPassword" placeholder="Digite a senha..." onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="btn" onclick="doLogin()">Entrar</button>
+      <div style="text-align:center;margin-top:16px">
+        <a href="#" onclick="showLegacyLogin()" style="font-size:12px;color:var(--text3)">Entrar com chave de admin (legado)</a>
+      </div>
     </div>
-    <button class="btn" onclick="doLogin()">Entrar</button>
+    <div id="loginModeLegacy" style="display:none">
+      <div class="form-group">
+        <label>Chave de administrador</label>
+        <input type="password" id="loginAdminKey" placeholder="Digite a chave..." onkeydown="if(event.key==='Enter')doLegacyLogin()">
+      </div>
+      <button class="btn" onclick="doLegacyLogin()">Entrar</button>
+      <div style="text-align:center;margin-top:16px">
+        <a href="#" onclick="showNewLogin()" style="font-size:12px;color:var(--text3)">Entrar com email e senha</a>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -436,12 +467,34 @@ tr.aff-pending:hover { background: #FEF3C7; }
         <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
         LGPD / Consentimento
       </div>
+      <div class="nav-item" data-section="escalations" onclick="navigateTo('escalations')">
+        <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+        Escalacoes
+      </div>
       <div class="nav-item" data-section="gamification" onclick="navigateTo('gamification')">
         <svg viewBox="0 0 24 24"><path d="M7.5 21H2V9h5.5v12zm7.25-18h-5.5v18h5.5V3zM22 11h-5.5v10H22V11z"/></svg>
-        Gamificação
+        Gamificacao
+      </div>
+
+      <div class="nav-section" data-admin-section="admin-mgmt">Administracao</div>
+      <div class="nav-item" data-section="team" onclick="navigateTo('team')">
+        <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        Equipe
+      </div>
+      <div class="nav-item" data-section="audit" onclick="navigateTo('audit')">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        Auditoria
+      </div>
+      <div class="nav-item" data-section="settings" onclick="navigateTo('settings')">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        Configuracoes
       </div>
     </nav>
     <div class="sidebar-footer">
+      <div id="sidebarUserInfo" style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.08);display:none">
+        <div style="font-size:13px;font-weight:600;color:#FFF" id="sidebarUserName"></div>
+        <div style="font-size:11px;margin-top:2px" id="sidebarUserRole"></div>
+      </div>
       <button onclick="doLogout()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
         Sair
@@ -753,23 +806,116 @@ tr.aff-pending:hover { background: #FEF3C7; }
         </div>
       </div>
 
+      <!-- ═══ ESCALATIONS ═══ -->
+      <div id="sec-escalations" class="section">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Alertas de Escalacao</h3>
+            <div class="toolbar">
+              <select id="escalationStatusFilter" onchange="loadEscalations()">
+                <option value="">Todos</option>
+                <option value="active">Ativos</option>
+                <option value="resolved">Resolvidos</option>
+                <option value="dismissed">Dispensados</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr><th>ID</th><th>Idoso</th><th>Nivel</th><th>Status</th><th>Criado em</th><th>Acoes</th></tr>
+              </thead>
+              <tbody id="escalationsTableBody">
+                <tr><td colspan="6" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══ GAMIFICATION ═══ -->
       <div id="sec-gamification" class="section">
         <div class="panel">
           <div class="panel-header">
-            <h3>Ranking — Sequência e Pontos</h3>
+            <h3>Ranking — Sequencia e Pontos</h3>
           </div>
           <div class="panel-body table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>#</th><th>Nome</th><th>Email</th><th>Sequência (dias)</th><th>Pontos</th><th>Conquistas</th>
+                  <th>#</th><th>Nome</th><th>Email</th><th>Sequencia (dias)</th><th>Pontos</th><th>Conquistas</th>
                 </tr>
               </thead>
               <tbody id="gamificationTableBody">
                 <tr><td colspan="6" class="loading">Carregando...</td></tr>
               </tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ TEAM (Equipe) ═══ -->
+      <div id="sec-team" class="section">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Equipe Administrativa</h3>
+            <button class="btn btn-sm" onclick="openModal('teamModal')">+ Novo Administrador</button>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr><th>Nome</th><th>Email</th><th>Cargo</th><th>Status</th><th>Ultimo Login</th><th>Criado em</th><th>Acoes</th></tr>
+              </thead>
+              <tbody id="teamTableBody">
+                <tr><td colspan="7" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ AUDIT LOG (Auditoria) ═══ -->
+      <div id="sec-audit" class="section">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Log de Auditoria</h3>
+            <div class="toolbar">
+              <select id="auditAdminFilter" onchange="loadAuditLog()">
+                <option value="">Todos os admins</option>
+              </select>
+              <select id="auditActionFilter" onchange="loadAuditLog()">
+                <option value="">Todas as acoes</option>
+                <option value="login">Login</option>
+                <option value="admin_user_create">Criar usuario</option>
+                <option value="admin_user_update">Atualizar usuario</option>
+                <option value="admin_user_deactivate">Desativar usuario</option>
+                <option value="affiliate_approve">Aprovar afiliado</option>
+                <option value="payout_approve">Aprovar pagamento</option>
+                <option value="settings_change">Alterar config</option>
+              </select>
+              <input type="date" id="auditFromDate" onchange="loadAuditLog()">
+              <input type="date" id="auditToDate" onchange="loadAuditLog()">
+            </div>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr><th>Data</th><th>Administrador</th><th>Acao</th><th>Detalhes</th><th>IP</th></tr>
+              </thead>
+              <tbody id="auditTableBody">
+                <tr><td colspan="5" class="loading">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ SETTINGS (Configuracoes) ═══ -->
+      <div id="sec-settings" class="section">
+        <div class="panel">
+          <div class="panel-header"><h3>Configuracoes Gerais</h3></div>
+          <div class="panel-body padded" id="settingsContent">
+            <div class="loading">Carregando...</div>
           </div>
         </div>
       </div>
@@ -967,6 +1113,46 @@ tr.aff-pending:hover { background: #FEF3C7; }
   </div>
 </div>
 
+<!-- Team Create/Edit Modal -->
+<div id="teamModal" class="modal-overlay" onclick="if(event.target===this)closeModal('teamModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="teamModalTitle">Novo Administrador</h3>
+      <span class="modal-close" onclick="closeModal('teamModal')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="teamEditId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nome *</label>
+          <input type="text" id="teamName" placeholder="Nome completo">
+        </div>
+        <div class="form-group">
+          <label>Email *</label>
+          <input type="email" id="teamEmail" placeholder="email@estoubem.com">
+        </div>
+        <div class="form-group">
+          <label id="teamPasswordLabel">Senha *</label>
+          <input type="password" id="teamPassword" placeholder="Minimo 8 caracteres">
+        </div>
+        <div class="form-group">
+          <label>Cargo *</label>
+          <select id="teamRole">
+            <option value="viewer">Visualizador</option>
+            <option value="support">Suporte</option>
+            <option value="admin">Administrador</option>
+            <option value="super_admin">Super Admin</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('teamModal')">Cancelar</button>
+      <button class="btn" onclick="saveTeamMember()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -975,19 +1161,26 @@ tr.aff-pending:hover { background: #FEF3C7; }
 //  State & Config
 // ═══════════════════════════════════════════════════════════
 const API = window.location.origin + '/api';
-let adminKey = sessionStorage.getItem('adminKey') || '';
+let adminToken = sessionStorage.getItem('adminToken') || '';
+let adminKey = sessionStorage.getItem('adminKey') || ''; // legacy
+let currentAdminUser = null;
 let currentSection = 'dashboard';
+let authMode = 'new'; // 'new' or 'legacy'
 
 // Cache
 let allUsers = [];
 let allAffiliates = [];
 let allConsentRecords = [];
+let allTeamMembers = [];
 
 // ═══════════════════════════════════════════════════════════
 //  Helpers
 // ═══════════════════════════════════════════════════════════
 function adminHeaders() {
-  return { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey };
+  const h = { 'Content-Type': 'application/json' };
+  if (adminToken) h['Authorization'] = 'Bearer ' + adminToken;
+  else if (adminKey) h['X-Admin-Key'] = adminKey;
+  return h;
 }
 
 async function apiFetch(path, opts = {}) {
@@ -1096,12 +1289,13 @@ function toggleSidebar() {
 }
 
 const sectionTitles = {
-  dashboard: 'Visão Geral', users: 'Usuários', affiliates: 'Afiliados',
-  commissions: 'Comissões', payouts: 'Pagamentos PIX',
-  marketplace: 'Provedores de Serviço',
-  bookings: 'Agendamentos', institutions: 'Instituições B2B',
-  conversions: 'Conversões / Analytics', consent: 'LGPD / Consentimento',
-  gamification: 'Gamificação',
+  dashboard: 'Visao Geral', users: 'Usuarios', affiliates: 'Afiliados',
+  commissions: 'Comissoes', payouts: 'Pagamentos PIX',
+  marketplace: 'Provedores de Servico',
+  bookings: 'Agendamentos', institutions: 'Instituicoes B2B',
+  conversions: 'Conversoes / Analytics', consent: 'LGPD / Consentimento',
+  escalations: 'Escalacoes', gamification: 'Gamificacao',
+  team: 'Equipe', audit: 'Auditoria', settings: 'Configuracoes',
 };
 
 function navigateTo(section) {
@@ -1135,7 +1329,11 @@ function loadSection(section) {
     institutions: loadInstitutions,
     conversions: loadConversions,
     consent: loadConsent,
+    escalations: loadEscalations,
     gamification: loadGamification,
+    team: loadTeam,
+    audit: loadAuditLog,
+    settings: loadSettings,
   };
   if (loaders[section]) loaders[section]();
   document.getElementById('lastRefresh').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
@@ -1144,35 +1342,87 @@ function loadSection(section) {
 // ═══════════════════════════════════════════════════════════
 //  Auth
 // ═══════════════════════════════════════════════════════════
-function doLogin() {
+function showLegacyLogin() {
+  document.getElementById('loginModeNew').style.display = 'none';
+  document.getElementById('loginModeLegacy').style.display = 'block';
+  document.getElementById('loginError').style.display = 'none';
+}
+function showNewLogin() {
+  document.getElementById('loginModeLegacy').style.display = 'none';
+  document.getElementById('loginModeNew').style.display = 'block';
+  document.getElementById('loginError').style.display = 'none';
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
   const pw = document.getElementById('loginPassword').value.trim();
-  if (!pw) {
-    document.getElementById('loginError').textContent = 'Digite a senha';
+  if (!email || !pw) {
+    document.getElementById('loginError').textContent = 'Preencha email e senha';
     document.getElementById('loginError').style.display = 'block';
     return;
   }
-  adminKey = pw;
-  sessionStorage.setItem('adminKey', pw);
-  // Attempt to validate by fetching stats
+  try {
+    const res = await fetch(API + '/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pw }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      document.getElementById('loginError').textContent = data.error || 'Erro ao fazer login';
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
+    adminToken = data.token;
+    currentAdminUser = data.user;
+    authMode = 'new';
+    sessionStorage.setItem('adminToken', adminToken);
+    sessionStorage.removeItem('adminKey');
+    showApp();
+  } catch (e) {
+    document.getElementById('loginError').textContent = 'Erro de conexao';
+    document.getElementById('loginError').style.display = 'block';
+  }
+}
+
+function doLegacyLogin() {
+  const key = document.getElementById('loginAdminKey').value.trim();
+  if (!key) {
+    document.getElementById('loginError').textContent = 'Digite a chave';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+  adminKey = key;
+  adminToken = '';
+  authMode = 'legacy';
+  sessionStorage.setItem('adminKey', key);
+  sessionStorage.removeItem('adminToken');
+  currentAdminUser = { name: 'Admin (Legado)', role: 'super_admin', email: 'legacy' };
+  // Validate by fetching stats
   apiFetch('/admin/stats')
-    .then(() => {
-      showApp();
-    })
+    .then(() => showApp())
     .catch(() => {
-      // If the admin endpoint doesn't exist yet, still allow login with default password
-      if (pw === 'estoubem-admin-2024') {
-        showApp();
-      } else {
-        document.getElementById('loginError').textContent = 'Senha incorreta';
-        document.getElementById('loginError').style.display = 'block';
-        adminKey = '';
-        sessionStorage.removeItem('adminKey');
-      }
+      document.getElementById('loginError').textContent = 'Chave incorreta';
+      document.getElementById('loginError').style.display = 'block';
+      adminKey = '';
+      currentAdminUser = null;
+      sessionStorage.removeItem('adminKey');
     });
 }
 
-function doLogout() {
+async function doLogout() {
+  try {
+    if (adminToken) {
+      await fetch(API + '/admin/logout', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + adminToken },
+      });
+    }
+  } catch (e) { /* ignore */ }
+  adminToken = '';
   adminKey = '';
+  currentAdminUser = null;
+  sessionStorage.removeItem('adminToken');
   sessionStorage.removeItem('adminKey');
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('appLayout').style.display = 'none';
@@ -1181,13 +1431,75 @@ function doLogout() {
 function showApp() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appLayout').style.display = 'flex';
+  updateSidebarUserInfo();
+  applyRoleRestrictions(currentAdminUser?.role || 'viewer');
   loadSection('dashboard');
 }
 
-// Auto-login if key in session
-if (adminKey) {
-  showApp();
+// Role-based UI visibility
+function applyRoleRestrictions(role) {
+  const sections = {
+    super_admin: ['dashboard', 'users', 'affiliates', 'commissions', 'payouts', 'escalations', 'marketplace', 'bookings', 'institutions', 'conversions', 'consent', 'gamification', 'team', 'audit', 'settings'],
+    admin: ['dashboard', 'users', 'affiliates', 'commissions', 'payouts', 'escalations', 'marketplace', 'bookings', 'institutions', 'conversions', 'consent', 'gamification', 'settings'],
+    support: ['dashboard', 'users', 'escalations'],
+    viewer: ['dashboard'],
+  };
+  const allowed = sections[role] || sections.viewer;
+
+  // Hide/show nav items
+  document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+    const sec = item.dataset.section;
+    item.style.display = allowed.includes(sec) ? '' : 'none';
+  });
+
+  // Hide admin management section header if not super_admin
+  const adminMgmtHeader = document.querySelector('.nav-section[data-admin-section="admin-mgmt"]');
+  if (adminMgmtHeader) {
+    adminMgmtHeader.style.display = (role === 'super_admin' || role === 'admin') ? '' : 'none';
+  }
 }
+
+function updateSidebarUserInfo() {
+  const nameEl = document.getElementById('sidebarUserName');
+  const roleEl = document.getElementById('sidebarUserRole');
+  const container = document.getElementById('sidebarUserInfo');
+  if (currentAdminUser) {
+    nameEl.textContent = currentAdminUser.name || 'Admin';
+    const roleLabels = { super_admin: 'Super Admin', admin: 'Administrador', support: 'Suporte', viewer: 'Visualizador' };
+    const roleColors = { super_admin: '#F56565', admin: '#4299E1', support: '#48BB78', viewer: '#A0AEC0' };
+    roleEl.textContent = roleLabels[currentAdminUser.role] || currentAdminUser.role;
+    roleEl.style.color = roleColors[currentAdminUser.role] || '#A0AEC0';
+    container.style.display = 'block';
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+// Auto-login if token in session
+(async function autoLogin() {
+  if (adminToken) {
+    try {
+      const res = await fetch(API + '/admin/me', {
+        headers: { 'Authorization': 'Bearer ' + adminToken },
+      });
+      if (res.ok) {
+        currentAdminUser = await res.json();
+        authMode = 'new';
+        showApp();
+        return;
+      }
+    } catch (e) { /* fall through */ }
+    // Token invalid, clear
+    adminToken = '';
+    sessionStorage.removeItem('adminToken');
+  }
+  if (adminKey) {
+    // Legacy auto-login
+    currentAdminUser = { name: 'Admin (Legado)', role: 'super_admin', email: 'legacy' };
+    authMode = 'legacy';
+    showApp();
+  }
+})();
 
 // ═══════════════════════════════════════════════════════════
 //  DASHBOARD
@@ -2177,6 +2489,265 @@ async function loadGamification() {
     `).join('');
   } catch (e) {
     tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Não foi possível carregar ranking.</td></tr>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ESCALATIONS
+// ═══════════════════════════════════════════════════════════
+async function loadEscalations() {
+  const tbody = document.getElementById('escalationsTableBody');
+  tbody.innerHTML = '<tr><td colspan="6" class="loading">Carregando...</td></tr>';
+  const status = document.getElementById('escalationStatusFilter').value;
+  const query = status ? `?status=${status}` : '';
+  try {
+    const data = await apiFetch('/admin/escalations' + query);
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum alerta de escalacao.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(e => `
+      <tr>
+        <td>${e.id}</td>
+        <td>${esc(e.elder_name || e.elder_id || '—')}</td>
+        <td><span class="badge ${e.level >= 3 ? 'badge-danger' : e.level >= 2 ? 'badge-warning' : 'badge-info'}">Nivel ${e.level}</span></td>
+        <td>${statusBadge(e.status)}</td>
+        <td>${formatDate(e.created_at)}</td>
+        <td>
+          ${e.status === 'active' ? `<button class="btn btn-sm btn-success" onclick="resolveEscalation(${e.id})">Resolver</button>` : '—'}
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nao foi possivel carregar escalacoes.</td></tr>';
+  }
+}
+
+async function resolveEscalation(id) {
+  try {
+    await apiFetch(`/admin/escalations/${id}/resolve`, { method: 'PUT' });
+    toast('Escalacao resolvida', 'success');
+    loadEscalations();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TEAM (Equipe)
+// ═══════════════════════════════════════════════════════════
+async function loadTeam() {
+  const tbody = document.getElementById('teamTableBody');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading">Carregando...</td></tr>';
+  try {
+    allTeamMembers = await apiFetch('/admin/team');
+    renderTeam();
+    // Also populate audit filter
+    populateAuditAdminFilter();
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nao foi possivel carregar equipe.</td></tr>';
+  }
+}
+
+function adminRoleBadge(role) {
+  const labels = { super_admin: 'Super Admin', admin: 'Administrador', support: 'Suporte', viewer: 'Visualizador' };
+  return `<span class="badge badge-role-${role}">${labels[role] || role}</span>`;
+}
+
+function renderTeam() {
+  const tbody = document.getElementById('teamTableBody');
+  if (!allTeamMembers.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nenhum administrador cadastrado.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = allTeamMembers.map(m => `
+    <tr>
+      <td><strong>${esc(m.name)}</strong></td>
+      <td>${esc(m.email)}</td>
+      <td>${adminRoleBadge(m.role)}</td>
+      <td>${m.is_active ? '<span class="badge badge-success">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}</td>
+      <td>${m.last_login ? formatDate(m.last_login) : 'Nunca'}</td>
+      <td>${formatDate(m.created_at)}</td>
+      <td>
+        <div class="btn-group">
+          <button class="btn btn-sm btn-outline" onclick="editTeamMember(${m.id})">Editar</button>
+          ${m.id !== currentAdminUser?.id ? `
+            <button class="btn btn-sm ${m.is_active ? 'btn-warning' : 'btn-success'}" onclick="toggleTeamMember(${m.id}, ${!m.is_active})">
+              ${m.is_active ? 'Desativar' : 'Ativar'}
+            </button>
+          ` : ''}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function editTeamMember(id) {
+  const m = allTeamMembers.find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('teamEditId').value = m.id;
+  document.getElementById('teamName').value = m.name || '';
+  document.getElementById('teamEmail').value = m.email || '';
+  document.getElementById('teamPassword').value = '';
+  document.getElementById('teamPassword').placeholder = 'Deixe vazio para manter';
+  document.getElementById('teamPasswordLabel').textContent = 'Nova Senha (opcional)';
+  document.getElementById('teamRole').value = m.role || 'viewer';
+  document.getElementById('teamModalTitle').textContent = 'Editar Administrador';
+  openModal('teamModal');
+}
+
+async function saveTeamMember() {
+  const editId = document.getElementById('teamEditId').value;
+  const name = document.getElementById('teamName').value.trim();
+  const email = document.getElementById('teamEmail').value.trim();
+  const password = document.getElementById('teamPassword').value;
+  const role = document.getElementById('teamRole').value;
+
+  if (!name || !email || !role) {
+    toast('Preencha nome, email e cargo', 'error');
+    return;
+  }
+
+  try {
+    if (editId) {
+      const body = { name, email, role };
+      if (password) body.password = password;
+      await apiFetch(`/admin/team/${editId}`, { method: 'PUT', body });
+      toast('Administrador atualizado', 'success');
+    } else {
+      if (!password || password.length < 8) {
+        toast('Senha deve ter pelo menos 8 caracteres', 'error');
+        return;
+      }
+      await apiFetch('/admin/team', { method: 'POST', body: { name, email, password, role } });
+      toast('Administrador criado com sucesso', 'success');
+    }
+    closeModal('teamModal');
+    clearTeamForm();
+    loadTeam();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+async function toggleTeamMember(id, active) {
+  try {
+    await apiFetch(`/admin/team/${id}`, { method: 'PUT', body: { is_active: active } });
+    toast(active ? 'Administrador ativado' : 'Administrador desativado', 'success');
+    loadTeam();
+  } catch (e) {
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+function clearTeamForm() {
+  document.getElementById('teamEditId').value = '';
+  document.getElementById('teamName').value = '';
+  document.getElementById('teamEmail').value = '';
+  document.getElementById('teamPassword').value = '';
+  document.getElementById('teamPassword').placeholder = 'Minimo 8 caracteres';
+  document.getElementById('teamPasswordLabel').textContent = 'Senha *';
+  document.getElementById('teamRole').value = 'viewer';
+  document.getElementById('teamModalTitle').textContent = 'Novo Administrador';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AUDIT LOG (Auditoria)
+// ═══════════════════════════════════════════════════════════
+function populateAuditAdminFilter() {
+  const sel = document.getElementById('auditAdminFilter');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Todos os admins</option>';
+  (allTeamMembers || []).forEach(m => {
+    sel.innerHTML += `<option value="${m.id}">${esc(m.name)}</option>`;
+  });
+  if (current) sel.value = current;
+}
+
+async function loadAuditLog() {
+  const tbody = document.getElementById('auditTableBody');
+  tbody.innerHTML = '<tr><td colspan="5" class="loading">Carregando...</td></tr>';
+
+  const adminUserId = document.getElementById('auditAdminFilter')?.value || '';
+  const action = document.getElementById('auditActionFilter')?.value || '';
+  const fromDate = document.getElementById('auditFromDate')?.value || '';
+  const toDate = document.getElementById('auditToDate')?.value || '';
+
+  const params = new URLSearchParams();
+  if (adminUserId) params.set('admin_user_id', adminUserId);
+  if (action) params.set('action', action);
+  if (fromDate) params.set('from_date', fromDate);
+  if (toDate) params.set('to_date', toDate);
+  const query = params.toString() ? '?' + params.toString() : '';
+
+  try {
+    const data = await apiFetch('/admin/audit-log' + query);
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Nenhum registro de auditoria.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(e => {
+      const actionClass = e.action.includes('create') ? 'audit-create'
+        : e.action.includes('update') ? 'audit-update'
+        : e.action.includes('deactivate') || e.action.includes('delete') ? 'audit-delete'
+        : e.action === 'login' ? 'audit-login' : '';
+      const actionLabels = {
+        login: 'Login', admin_user_create: 'Criar admin', admin_user_update: 'Atualizar admin',
+        admin_user_deactivate: 'Desativar admin', affiliate_approve: 'Aprovar afiliado',
+        payout_approve: 'Aprovar pagamento', settings_change: 'Alterar config',
+      };
+      let details = '—';
+      if (e.details) {
+        try {
+          const d = typeof e.details === 'string' ? JSON.parse(e.details) : e.details;
+          details = Object.entries(d).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(', ');
+          if (details.length > 120) details = details.substring(0, 120) + '...';
+        } catch (err) { details = String(e.details).substring(0, 120); }
+      }
+      return `
+        <tr>
+          <td>${formatDate(e.created_at)}</td>
+          <td>${esc(e.admin_name || '—')}</td>
+          <td><span class="${actionClass}">${actionLabels[e.action] || e.action}</span></td>
+          <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${esc(details)}">${esc(details)}</td>
+          <td style="font-size:12px;color:var(--text3)">${esc(e.ip_address || '—')}</td>
+        </tr>
+      `;
+    }).join('');
+
+    // Populate admin filter if not already populated
+    if (document.getElementById('auditAdminFilter').options.length <= 1) {
+      try {
+        const team = await apiFetch('/admin/team');
+        allTeamMembers = team;
+        populateAuditAdminFilter();
+      } catch (e) { /* viewer may not have access */ }
+    }
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Nao foi possivel carregar auditoria.</td></tr>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════════════
+async function loadSettings() {
+  const el = document.getElementById('settingsContent');
+  el.innerHTML = '<div class="loading">Carregando...</div>';
+  try {
+    const data = await apiFetch('/admin/settings');
+    el.innerHTML = `
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Comissao Padrao</label>
+          <pre style="font-size:12px;background:#F7FAFC;padding:12px;border-radius:6px;overflow-x:auto">${JSON.stringify(data, null, 2)}</pre>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = '<div class="empty-state">Nao foi possivel carregar configuracoes.</div>';
   }
 }
 
