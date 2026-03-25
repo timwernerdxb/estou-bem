@@ -30,11 +30,9 @@ import kotlinx.coroutines.launch
 /**
  * Foreground service that monitors health metrics via Health Services API:
  * - Heart rate (MeasureClient)
- * - SpO2 / blood oxygen (MeasureClient)
  * - Steps (PassiveMonitoringClient)
  *
  * Stores latest readings in SharedPreferences and sends data to phone every 60s.
- * Alerts when SpO2 drops below 90%.
  */
 class HealthService : Service() {
 
@@ -44,10 +42,8 @@ class HealthService : Service() {
         private const val CHANNEL_ID = "health_monitoring"
         const val PREFS_NAME = "estoubem_health"
         const val ACTION_HEALTH_UPDATED = "com.estoubem.watch.HEALTH_UPDATED"
-        const val ACTION_SPO2_ALERT = "com.estoubem.watch.SPO2_ALERT"
 
         private const val PHONE_SYNC_INTERVAL_MS = 60_000L
-        private const val SPO2_ALERT_THRESHOLD = 90f
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -57,10 +53,9 @@ class HealthService : Service() {
     private val handler = Handler(Looper.getMainLooper())
 
     private var currentHeartRate: Float = 0f
-    private var currentSpO2: Float = 0f
     private var currentSteps: Long = 0L
 
-    // ---- MeasureCallbacks ----
+    // ---- Heart Rate MeasureCallback ----
 
     private val heartRateCallback = object : MeasureCallback {
         override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
@@ -74,34 +69,6 @@ class HealthService : Service() {
                 Log.d(TAG, "Heart rate: $currentHeartRate bpm")
                 storeReading("heart_rate", currentHeartRate)
                 broadcastUpdate()
-            }
-        }
-    }
-
-    private val spo2Callback = object : MeasureCallback {
-        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
-            Log.d(TAG, "SpO2 availability: $availability")
-        }
-
-        override fun onDataReceived(data: DataPointContainer) {
-            val spo2Points = data.getData(DataType.OXYGEN_SATURATION)
-            for (point in spo2Points) {
-                currentSpO2 = point.value.toFloat()
-                Log.d(TAG, "SpO2: $currentSpO2%")
-                storeReading("spo2", currentSpO2)
-                broadcastUpdate()
-
-                // Alert on low SpO2
-                if (currentSpO2 > 0 && currentSpO2 < SPO2_ALERT_THRESHOLD) {
-                    Log.w(TAG, "LOW SpO2 ALERT: $currentSpO2%")
-                    sendBroadcast(Intent(ACTION_SPO2_ALERT).apply {
-                        putExtra("spo2", currentSpO2)
-                    })
-                    // Also send alert to phone immediately
-                    PhoneConnectionService.sendHealthData(
-                        this@HealthService, currentHeartRate, currentSpO2, currentSteps
-                    )
-                }
             }
         }
     }
@@ -124,9 +91,9 @@ class HealthService : Service() {
 
     private val phoneSyncRunnable = object : Runnable {
         override fun run() {
-            Log.d(TAG, "Syncing health data to phone: HR=$currentHeartRate, SpO2=$currentSpO2, steps=$currentSteps")
+            Log.d(TAG, "Syncing health data to phone: HR=$currentHeartRate, steps=$currentSteps")
             PhoneConnectionService.sendHealthData(
-                this@HealthService, currentHeartRate, currentSpO2, currentSteps
+                this@HealthService, currentHeartRate, 0f, currentSteps
             )
             handler.postDelayed(this, PHONE_SYNC_INTERVAL_MS)
         }
@@ -166,7 +133,6 @@ class HealthService : Service() {
     private fun startHealthMonitoring() {
         serviceScope.launch {
             try {
-                // Check capabilities and register heart rate
                 val capabilities = measureClient.getCapabilitiesAsync().await()
                 if (DataType.HEART_RATE_BPM in capabilities.supportedDataTypesMeasure) {
                     measureClient.registerMeasureCallback(DataType.HEART_RATE_BPM, heartRateCallback)
@@ -174,20 +140,11 @@ class HealthService : Service() {
                 } else {
                     Log.w(TAG, "Heart rate not supported on this device")
                 }
-
-                // Register SpO2 if supported
-                if (DataType.OXYGEN_SATURATION in capabilities.supportedDataTypesMeasure) {
-                    measureClient.registerMeasureCallback(DataType.OXYGEN_SATURATION, spo2Callback)
-                    Log.d(TAG, "SpO2 monitoring registered")
-                } else {
-                    Log.w(TAG, "SpO2 not supported on this device")
-                }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to register MeasureCallbacks", e)
+                Log.e(TAG, "Failed to register heart rate callback", e)
             }
 
             try {
-                // Register passive step counting
                 val passiveConfig = PassiveListenerConfig.builder()
                     .setDataTypes(setOf(DataType.STEPS_DAILY))
                     .build()
@@ -202,14 +159,9 @@ class HealthService : Service() {
     private fun stopHealthMonitoring() {
         serviceScope.launch {
             try {
-                measureClient.unregisterMeasureCallbackAsync(DataType.HEART_RATE_BPM, heartRateCallback)
+                measureClient.unregisterMeasureCallbackAsync(DataType.HEART_RATE_BPM, heartRateCallback).await()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to unregister heart rate callback", e)
-            }
-            try {
-                measureClient.unregisterMeasureCallbackAsync(DataType.OXYGEN_SATURATION, spo2Callback)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to unregister SpO2 callback", e)
             }
             try {
                 passiveMonitoringClient.clearPassiveListenerCallbackAsync().await()
