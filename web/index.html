@@ -165,6 +165,19 @@ select.form-input{cursor:pointer;-webkit-appearance:none;appearance:none;backgro
 .take-btn:active{opacity:.85;transform:scale(.98)}
 .delete-btn{position:absolute;top:20px;right:20px;background:none;border:none;color:var(--danger);padding:4px}
 .delete-btn svg{width:18px;height:18px;fill:var(--danger)}
+.med-card.low-stock-card{border:1px solid var(--danger);background:#FDF6F6}
+.low-stock-banner{background:var(--danger-light);color:var(--danger);padding:12px 16px;border-radius:4px;font-size:13px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.refill-btn{display:inline-flex;align-items:center;gap:4px;padding:8px 14px;background:var(--gold);color:#FFF;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border:none;margin-top:8px;cursor:pointer;transition:opacity .15s}
+.refill-btn:active{opacity:.8}
+.ws-status{position:fixed;top:calc(var(--safe-top) + 4px);right:12px;z-index:200;display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text3);letter-spacing:.04em;opacity:.8}
+.ws-dot{width:8px;height:8px;border-radius:50%;transition:background .3s}
+.ws-dot.connected{background:#2D8C4E}
+.ws-dot.disconnected{background:var(--danger)}
+.forgot-link{display:block;text-align:center;margin-top:12px;font-size:13px;color:var(--text3);cursor:pointer;text-decoration:underline;letter-spacing:.02em}
+.forgot-link:hover{color:var(--primary)}
+.forgot-form{margin-top:24px;padding:24px;background:var(--card);border:1px solid var(--border);border-radius:4px}
+.forgot-form h2{font-family:var(--serif);font-size:20px;margin-bottom:16px;text-align:center}
+.forgot-success{background:var(--success-light);color:var(--primary);padding:14px;border-radius:4px;font-size:13px;text-align:center;margin-top:12px}
 
 /* ─── Dashboard ────────────────────────────────────────── */
 .status-card{border-left:3px solid var(--text3)}
@@ -285,6 +298,11 @@ svg{flex-shrink:0}
 <!-- Toast -->
 <div id="toast" class="toast"></div>
 
+<!-- WebSocket Status Indicator -->
+<div class="ws-status" id="ws-status" style="display:none">
+  <div class="ws-dot disconnected" id="ws-dot"></div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════════
 // ESTOU BEM — Mobile Web Prototype
@@ -338,7 +356,11 @@ const translations = {
     // Login
     login_welcome: 'Bem-vindo', login_subtitle: 'Acesse sua conta Estou Bem',
     login_email: 'E-mail', login_password: 'Senha', login_enter: 'Entrar',
-    login_create_account: 'Criar conta', login_skip: 'Usar sem conta', login_already_have: 'Já tenho conta',
+    login_create_account: 'Criar conta', login_skip: 'Usar sem conta', login_already_have: 'J\u00e1 tenho conta',
+    login_forgot_password: 'Esqueceu a senha?', login_forgot_title: 'Redefinir senha',
+    login_forgot_email_placeholder: 'Digite seu e-mail', login_forgot_submit: 'Enviar link',
+    login_forgot_back: 'Voltar ao login',
+    login_forgot_success: 'Se o email existir, voc\u00ea receber\u00e1 um link de redefini\u00e7\u00e3o',
     // Register
     register_title: 'Criar conta', register_subtitle: 'Configure seu perfil para usar o Estou Bem',
     register_who: 'Quem é você?', register_name: 'Seu nome', register_name_placeholder: 'Como devemos te chamar?',
@@ -367,7 +389,8 @@ const translations = {
     meds_name: 'Nome do medicamento', meds_dosage: 'Dosagem', meds_frequency: 'Frequência',
     meds_time: 'Horário', meds_stock: 'Estoque', meds_unit: 'Unidade',
     meds_save: 'Salvar Medicamento', meds_took: 'Tomei', meds_stock_low: 'Baixo!',
-    meds_stock_label: 'Estoque',
+    meds_stock_label: 'Estoque', meds_refill: 'Reabastecer', meds_low_banner: 'est\u00e1 acabando \u2014 restam',
+    meds_low_banner_units: 'unidades',
     meds_freq_1x: '1x ao dia', meds_freq_2x: '2x ao dia', meds_freq_3x: '3x ao dia',
     meds_freq_weekly: 'Semanal', meds_freq_asneeded: 'Quando necessário',
     // SOS
@@ -457,6 +480,10 @@ const translations = {
     login_welcome: 'Welcome', login_subtitle: 'Access your Estou Bem account',
     login_email: 'Email', login_password: 'Password', login_enter: 'Sign In',
     login_create_account: 'Create account', login_skip: 'Use without account', login_already_have: 'I already have an account',
+    login_forgot_password: 'Forgot your password?', login_forgot_title: 'Reset password',
+    login_forgot_email_placeholder: 'Enter your email', login_forgot_submit: 'Send link',
+    login_forgot_back: 'Back to login',
+    login_forgot_success: 'If the email exists, you will receive a reset link',
     register_title: 'Create account', register_subtitle: 'Set up your profile to use Estou Bem',
     register_who: 'Who are you?', register_name: 'Your name', register_name_placeholder: 'What should we call you?',
     register_phone: 'Phone', register_confirm_password: 'Confirm password',
@@ -481,7 +508,8 @@ const translations = {
     meds_name: 'Medication name', meds_dosage: 'Dosage', meds_frequency: 'Frequency',
     meds_time: 'Time', meds_stock: 'Stock', meds_unit: 'Unit',
     meds_save: 'Save Medication', meds_took: 'Taken', meds_stock_low: 'Low!',
-    meds_stock_label: 'Stock',
+    meds_stock_label: 'Stock', meds_refill: 'Refill', meds_low_banner: 'is running low \u2014',
+    meds_low_banner_units: 'units remaining',
     meds_freq_1x: 'Once daily', meds_freq_2x: 'Twice daily', meds_freq_3x: '3x daily',
     meds_freq_weekly: 'Weekly', meds_freq_asneeded: 'As needed',
     sos_title: '🆘 Emergency', sos_subtitle: 'Hold the button for 3 seconds to trigger emergency',
@@ -564,6 +592,10 @@ const translations = {
     login_welcome: 'Bienvenido', login_subtitle: 'Accede a tu cuenta Estou Bem',
     login_email: 'Correo electrónico', login_password: 'Contraseña', login_enter: 'Iniciar sesión',
     login_create_account: 'Crear cuenta', login_skip: 'Usar sin cuenta', login_already_have: 'Ya tengo cuenta',
+    login_forgot_password: '\u00bfOlvidaste tu contrase\u00f1a?', login_forgot_title: 'Restablecer contrase\u00f1a',
+    login_forgot_email_placeholder: 'Ingresa tu correo', login_forgot_submit: 'Enviar enlace',
+    login_forgot_back: 'Volver al login',
+    login_forgot_success: 'Si el correo existe, recibir\u00e1s un enlace de restablecimiento',
     register_title: 'Crear cuenta', register_subtitle: 'Configura tu perfil para usar Estou Bem',
     register_who: '¿Quién eres?', register_name: 'Tu nombre', register_name_placeholder: '¿Cómo debemos llamarte?',
     register_phone: 'Teléfono', register_confirm_password: 'Confirmar contraseña',
@@ -587,8 +619,9 @@ const translations = {
     meds_add: '+ Agregar Medicamento', meds_new: 'Nuevo Medicamento',
     meds_name: 'Nombre del medicamento', meds_dosage: 'Dosis', meds_frequency: 'Frecuencia',
     meds_time: 'Horario', meds_stock: 'Inventario', meds_unit: 'Unidad',
-    meds_save: 'Guardar Medicamento', meds_took: 'Tomado', meds_stock_low: '¡Bajo!',
-    meds_stock_label: 'Inventario',
+    meds_save: 'Guardar Medicamento', meds_took: 'Tomado', meds_stock_low: '\u00a1Bajo!',
+    meds_stock_label: 'Inventario', meds_refill: 'Reabastecer', meds_low_banner: 'se est\u00e1 acabando \u2014 quedan',
+    meds_low_banner_units: 'unidades',
     meds_freq_1x: '1x al día', meds_freq_2x: '2x al día', meds_freq_3x: '3x al día',
     meds_freq_weekly: 'Semanal', meds_freq_asneeded: 'Cuando sea necesario',
     sos_title: '🆘 Emergencia', sos_subtitle: 'Mantén presionado el botón por 3 segundos para activar la emergencia',
@@ -671,6 +704,10 @@ const translations = {
     login_welcome: 'Willkommen', login_subtitle: 'Melden Sie sich bei Ihrem Estou Bem Konto an',
     login_email: 'E-Mail', login_password: 'Passwort', login_enter: 'Anmelden',
     login_create_account: 'Konto erstellen', login_skip: 'Ohne Konto nutzen', login_already_have: 'Ich habe bereits ein Konto',
+    login_forgot_password: 'Passwort vergessen?', login_forgot_title: 'Passwort zur\u00fccksetzen',
+    login_forgot_email_placeholder: 'Geben Sie Ihre E-Mail ein', login_forgot_submit: 'Link senden',
+    login_forgot_back: 'Zur\u00fcck zum Login',
+    login_forgot_success: 'Wenn die E-Mail existiert, erhalten Sie einen Link zum Zur\u00fccksetzen',
     register_title: 'Konto erstellen', register_subtitle: 'Richten Sie Ihr Profil ein um Estou Bem zu nutzen',
     register_who: 'Wer sind Sie?', register_name: 'Ihr Name', register_name_placeholder: 'Wie sollen wir Sie nennen?',
     register_phone: 'Telefon', register_confirm_password: 'Passwort bestätigen',
@@ -695,7 +732,8 @@ const translations = {
     meds_name: 'Medikamentenname', meds_dosage: 'Dosierung', meds_frequency: 'Häufigkeit',
     meds_time: 'Uhrzeit', meds_stock: 'Bestand', meds_unit: 'Einheit',
     meds_save: 'Medikament speichern', meds_took: 'Eingenommen', meds_stock_low: 'Niedrig!',
-    meds_stock_label: 'Bestand',
+    meds_stock_label: 'Bestand', meds_refill: 'Nachf\u00fcllen', meds_low_banner: 'geht zur Neige \u2014 noch',
+    meds_low_banner_units: 'Einheiten',
     meds_freq_1x: '1x täglich', meds_freq_2x: '2x täglich', meds_freq_3x: '3x täglich',
     meds_freq_weekly: 'Wöchentlich', meds_freq_asneeded: 'Bei Bedarf',
     sos_title: '🆘 Notfall', sos_subtitle: 'Halten Sie den Button 3 Sekunden gedrückt um den Notfall auszulösen',
@@ -1138,6 +1176,17 @@ function renderLogin() {
       <input type="password" id="login-password" placeholder="Sua senha" autocomplete="current-password">
 
       <button class="btn btn-elder mt-lg" data-action="do-login">${t('login_enter')}</button>
+      <span class="forgot-link" data-action="show-forgot-password">${t('login_forgot_password')}</span>
+      <div id="forgot-password-form" style="display:none">
+        <div class="forgot-form">
+          <h2>${t('login_forgot_title')}</h2>
+          <div class="input-label">${t('login_email')}</div>
+          <input type="email" id="forgot-email" placeholder="${t('login_forgot_email_placeholder')}" autocomplete="email">
+          <button class="btn mt-md" data-action="do-forgot-password">${t('login_forgot_submit')}</button>
+          <span class="forgot-link" data-action="hide-forgot-password">${t('login_forgot_back')}</span>
+          <div id="forgot-success-msg" style="display:none" class="forgot-success">${t('login_forgot_success')}</div>
+        </div>
+      </div>
       <button class="btn-outline btn mt-md" data-action="go-register" style="border-color:var(--border);color:var(--text2)">${t('login_create_account')}</button>
       <button class="btn-ghost btn mt-sm" style="font-size:13px;color:var(--text3);letter-spacing:.04em" data-action="skip-login">${t('login_skip')}</button>
     </div>`;
@@ -1490,6 +1539,9 @@ function renderMedications() {
   return `
     <div class="screen active screen-padtop">
       <h1>💊 ${t('meds_title')}</h1>
+      ${state.medications.filter(m => m.stock <= m.lowThreshold).map(m => `
+        <div class="low-stock-banner">⚠️ ${m.name} ${t('meds_low_banner')} ${m.stock} ${t('meds_low_banner_units')}</div>
+      `).join('')}
       ${state.medications.length === 0 ? `
         <div class="empty-state mt-lg">
           ${icons.medical}
@@ -1497,7 +1549,7 @@ function renderMedications() {
           <p style="font-size:13px;color:var(--text3);margin-top:4px">${t('meds_empty_desc')}</p>
         </div>
       ` : state.medications.map(m => `
-        <div class="card med-card">
+        <div class="card med-card ${m.stock <= m.lowThreshold ? 'low-stock-card' : ''}">
           <button class="delete-btn" data-action="delete-med" data-id="${m.id}">${icons.trash}</button>
           <div class="med-name">${m.name}</div>
           <div class="med-dosage">${m.dosage}</div>
@@ -1506,6 +1558,7 @@ function renderMedications() {
             ${icons.cube.replace('width','style="width:16px;height:16px;fill:currentColor" width')}
             ${t('meds_stock_label')}: ${m.stock} ${m.unit}${m.stock <= m.lowThreshold ? ' ⚠️ '+t('meds_stock_low') : ''}
           </div>
+          ${m.stock <= m.lowThreshold ? `<button class="refill-btn" data-action="refill-med" data-id="${m.id}">+ ${t('meds_refill')}</button>` : ''}
           <button class="take-btn" data-action="take-med" data-id="${m.id}">
             ${icons.checkmark.replace('width','style="width:20px;height:20px;fill:#FFF" width')}
             ${t('meds_took')}
@@ -2710,6 +2763,37 @@ function handleAction(action, el) {
       toast('Medicamento removido');
       render();
       break;
+    case 'refill-med': {
+      const med = state.medications.find(m => m.id === el.dataset.id);
+      if (!med) return;
+      med.stock += 30;
+      if (authToken) api('PUT', `/api/medications/${med.id}`, { stock: med.stock });
+      toast(`✅ ${med.name} reabastecido! Estoque: ${med.stock} ${med.unit}`);
+      save();
+      render();
+      break;
+    }
+    case 'show-forgot-password': {
+      const form = $('#forgot-password-form');
+      if (form) form.style.display = 'block';
+      break;
+    }
+    case 'hide-forgot-password': {
+      const form = $('#forgot-password-form');
+      if (form) form.style.display = 'none';
+      const msg = $('#forgot-success-msg');
+      if (msg) msg.style.display = 'none';
+      break;
+    }
+    case 'do-forgot-password': {
+      const email = $('#forgot-email')?.value?.trim()?.toLowerCase();
+      if (!email) { toast('❌ Digite seu e-mail'); return; }
+      api('POST', '/api/forgot-password', { email }).then(res => {
+        const msg = $('#forgot-success-msg');
+        if (msg) msg.style.display = 'block';
+      });
+      break;
+    }
     case 'show-add-contact':
       $('#modal-add-contact')?.classList.add('visible');
       break;
@@ -3318,6 +3402,149 @@ setInterval(() => {
     render();
   }
 }, 5000);
+
+// ─── WebSocket with reconnection + heartbeat ────────────────
+const WS = {
+  socket: null,
+  reconnectDelay: 1000,
+  maxReconnectDelay: 30000,
+  heartbeatInterval: null,
+  reconnectTimer: null,
+  intentionalClose: false,
+
+  getUrl() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${location.host}/ws`;
+  },
+
+  connect() {
+    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) return;
+    this.intentionalClose = false;
+    try {
+      this.socket = new WebSocket(this.getUrl());
+    } catch(e) {
+      console.warn('[WS] Failed to create WebSocket:', e.message);
+      this.scheduleReconnect();
+      return;
+    }
+
+    this.socket.onopen = () => {
+      console.log('[WS] Connected');
+      this.reconnectDelay = 1000;
+      this.updateStatus(true);
+      // Authenticate if we have a token
+      if (authToken) {
+        this.send({ type: 'auth', token: authToken });
+      }
+      // Start heartbeat
+      this.startHeartbeat();
+    };
+
+    this.socket.onclose = (e) => {
+      console.log('[WS] Closed:', e.code, e.reason);
+      this.updateStatus(false);
+      this.stopHeartbeat();
+      if (!this.intentionalClose) {
+        this.scheduleReconnect();
+      }
+    };
+
+    this.socket.onerror = (e) => {
+      console.warn('[WS] Error');
+      this.updateStatus(false);
+    };
+
+    this.socket.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'pong') return; // heartbeat response
+        if (msg.type === 'checkin-update' || msg.type === 'medication-update' || msg.type === 'refresh' ||
+            msg.type === 'checkin_confirmed' || msg.type === 'checkin_auto_confirmed') {
+          // Re-sync from API on server push
+          if (authToken) syncFromAPI().then(() => render());
+        }
+        if (msg.type === 'notification') {
+          toast(msg.message || 'Nova notificacao');
+        }
+        // Handle real-time alerts
+        if (msg.type === 'escalation' || msg.type === 'fall_detected' || msg.type === 'fall_samu_escalation' ||
+            msg.type === 'spo2_critical' || msg.type === 'spo2_low' || msg.type === 'inactivity_alert' ||
+            msg.type === 'medication_low_stock') {
+          toast(msg.body || msg.message || 'Alerta recebido');
+          if (authToken) syncFromAPI().then(() => render());
+        }
+      } catch(err) {
+        console.warn('[WS] Bad message:', err.message);
+      }
+    };
+  },
+
+  send(data) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(data));
+    }
+  },
+
+  startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatInterval = setInterval(() => {
+      this.send({ type: 'ping' });
+    }, 30000);
+  },
+
+  stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  },
+
+  scheduleReconnect() {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    console.log(`[WS] Reconnecting in ${this.reconnectDelay / 1000}s...`);
+    this.reconnectTimer = setTimeout(() => {
+      this.connect();
+    }, this.reconnectDelay);
+    // Exponential backoff: 1s -> 2s -> 4s -> 8s -> ... -> 30s max
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+  },
+
+  updateStatus(connected) {
+    const statusEl = $('#ws-status');
+    const dotEl = $('#ws-dot');
+    if (!statusEl || !dotEl) return;
+    if (authToken) {
+      statusEl.style.display = 'flex';
+      dotEl.className = connected ? 'ws-dot connected' : 'ws-dot disconnected';
+    } else {
+      statusEl.style.display = 'none';
+    }
+  },
+
+  disconnect() {
+    this.intentionalClose = true;
+    this.stopHeartbeat();
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.socket) this.socket.close();
+    this.updateStatus(false);
+  }
+};
+
+// Start WebSocket if user is logged in
+if (authToken) WS.connect();
+
+// Patch setToken to connect/disconnect WS on auth changes
+const _origSetToken = setToken;
+setToken = function(token) {
+  _origSetToken(token);
+  if (token) {
+    WS.connect();
+  } else {
+    WS.disconnect();
+    const statusEl = $('#ws-status');
+    if (statusEl) statusEl.style.display = 'none';
+  }
+};
 </script>
 </body>
 </html>

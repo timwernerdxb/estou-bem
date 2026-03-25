@@ -5,6 +5,15 @@ const bcrypt = require('bcrypt');
 const path = require('path');
 const http = require('http');
 
+// Twilio — graceful fallback if not installed
+let twilioValidateRequest;
+try {
+  const twilio = require('twilio');
+  twilioValidateRequest = twilio.validateRequest;
+} catch (e) {
+  console.warn('[Twilio] twilio package not installed. Webhook signature validation disabled.');
+}
+
 const BCRYPT_ROUNDS = 12;
 
 // WebSocket — graceful fallback if not installed
@@ -14,6 +23,54 @@ try { WebSocket = require('ws'); } catch (e) {
 }
 
 const PORT = process.env.PORT || 3000;
+
+// ── Configuration (env vars with secure defaults) ──────────
+const SERVER_URL = process.env.SERVER_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? 'https://' + process.env.RAILWAY_PUBLIC_DOMAIN : 'http://localhost:' + PORT);
+const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || '+12627472376';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'alertas@estoubem.com';
+const SAMU_NUMBER = process.env.SAMU_NUMBER || '+55192';
+
+// ── Security: Generate random secrets if not set ───────────
+const JWT_SECRET = (() => {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  const generated = crypto.randomBytes(32).toString('hex');
+  console.log(`[SECURITY] No JWT_SECRET set. Generated temporary secret. Set JWT_SECRET env var for production.`);
+  return generated;
+})();
+
+const ADMIN_KEY = (() => {
+  if (process.env.ADMIN_KEY) return process.env.ADMIN_KEY;
+  const generated = crypto.randomBytes(24).toString('hex');
+  console.log(`[ADMIN] No ADMIN_KEY set. Generated temporary key: ${generated}. Set ADMIN_KEY env var for production.`);
+  return generated;
+})();
+
+// ── CORS whitelist ─────────────────────────────────────────
+function isAllowedOrigin(origin) {
+  if (!origin) return true; // Allow same-origin requests (no Origin header)
+  const allowed = [
+    'http://localhost:3333',
+    'http://localhost:8081',
+    SERVER_URL,
+  ];
+  // Add RAILWAY_PUBLIC_DOMAIN variants
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    allowed.push('https://' + process.env.RAILWAY_PUBLIC_DOMAIN);
+  }
+  // Add SERVER_URL env var domain
+  if (process.env.SERVER_URL) {
+    allowed.push(process.env.SERVER_URL);
+  }
+  return allowed.includes(origin);
+}
+
+// ── Async route wrapper (catches unhandled promise rejections) ──
+function asyncHandler(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
 const app = express();
 const server = http.createServer(app);
 
@@ -101,7 +158,7 @@ async function sendEmail(to, subject, html) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Estou Bem <alertas@estoubem.com>',
+        from: `Estou Bem <${FROM_EMAIL}>`,
         to,
         subject,
         html,
@@ -406,6 +463,23 @@ async function initDB() {
       -- Auto-checkin settings
       ALTER TABLE settings ADD COLUMN IF NOT EXISTS auto_checkin_mode TEXT DEFAULT 'manual';
 
+      -- Contact type unification (family, emergency, caregiver)
+      ALTER TABLE emergency_contacts ADD COLUMN IF NOT EXISTS contact_type TEXT DEFAULT 'emergency';
+      ALTER TABLE family_contacts ADD COLUMN IF NOT EXISTS contact_type TEXT DEFAULT 'family';
+      ALTER TABLE contacts ADD COLUMN IF NOT EXISTS contact_type TEXT DEFAULT 'emergency';
+
+      -- Medication low stock alert tracking (one alert per day per medication)
+      CREATE TABLE IF NOT EXISTS medication_alerts (
+        id SERIAL PRIMARY KEY,
+        medication_id INTEGER REFERENCES medications(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        alert_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        alert_type TEXT DEFAULT 'low_stock',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(medication_id, alert_date, alert_type)
+      );
+      CREATE INDEX IF NOT EXISTS idx_medication_alerts_med ON medication_alerts(medication_id, alert_date);
+
       -- Marketplace: service providers
       CREATE TABLE IF NOT EXISTS service_providers (
         id SERIAL PRIMARY KEY,
@@ -682,9 +756,12 @@ async function initDB() {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Twilio webhooks send form-encoded data
 
-// CORS
+// CORS — restricted to whitelist
 app.use('/api', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (isAllowedOrigin(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Key');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
@@ -706,7 +783,7 @@ async function verifyPassword(pw, hash) {
 }
 
 function generateToken(userId) {
-  return crypto.createHmac('sha256', process.env.JWT_SECRET || 'estoubem-secret-key-change-in-prod')
+  return crypto.createHmac('sha256', JWT_SECRET)
     .update(String(userId) + Date.now() + crypto.randomBytes(16).toString('hex'))
     .digest('hex');
 }
@@ -1057,7 +1134,7 @@ const WA_TEMPLATES = {
 async function sendWhatsAppTemplate(to, templateSid, variables = {}) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const waNumber = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+12627472376';
+  const waNumber = TWILIO_WHATSAPP_NUMBER.startsWith('whatsapp:') ? TWILIO_WHATSAPP_NUMBER : 'whatsapp:' + TWILIO_WHATSAPP_NUMBER;
 
   if (!accountSid || !authToken) {
     console.log(`[WhatsApp Template] No credentials. Would send ${templateSid} to ${to}`);
@@ -1098,7 +1175,7 @@ async function sendWhatsAppTemplate(to, templateSid, variables = {}) {
 async function sendWhatsAppBusiness(to, body) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const waNumber = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+12627472376';
+  const waNumber = TWILIO_WHATSAPP_NUMBER.startsWith('whatsapp:') ? TWILIO_WHATSAPP_NUMBER : 'whatsapp:' + TWILIO_WHATSAPP_NUMBER;
 
   if (!accountSid || !authToken) {
     console.log(`[WhatsApp] No Twilio credentials. Would send to ${to}: ${body}`);
@@ -1191,7 +1268,7 @@ async function makeVoiceCall(to, message) {
 
   try {
     const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-    const twiml = `<Response><Say language="pt-BR" voice="Polly.Camila">${message}</Say><Pause length="2"/><Say language="pt-BR" voice="Polly.Camila">Pressione 1 se voce esta bem. Pressione 2 se precisa de ajuda.</Say><Gather numDigits="1" action="https://estou-bem-web-production.up.railway.app/api/twilio/gather" method="POST"><Say language="pt-BR" voice="Polly.Camila">Aguardando sua resposta.</Say></Gather></Response>`;
+    const twiml = `<Response><Say language="pt-BR" voice="Polly.Camila">${message}</Say><Pause length="2"/><Say language="pt-BR" voice="Polly.Camila">Pressione 1 se voce esta bem. Pressione 2 se precisa de ajuda.</Say><Gather numDigits="1" action="${SERVER_URL}/api/twilio/gather" method="POST"><Say language="pt-BR" voice="Polly.Camila">Aguardando sua resposta.</Say></Gather></Response>`;
 
     const params = new URLSearchParams({
       To: to,
@@ -1286,10 +1363,10 @@ async function callSAMUWithConference(elder, familyPhones) {
     </Response>`;
 
     const samuParams = new URLSearchParams({
-      To: '+55192',
+      To: SAMU_NUMBER,
       From: fromNumber,
       Twiml: samuTwiml,
-      StatusCallback: `https://estou-bem-web-production.up.railway.app/api/twilio/status`,
+      StatusCallback: `${SERVER_URL}/api/twilio/status`,
       StatusCallbackEvent: 'completed',
     });
 
@@ -1344,8 +1421,29 @@ async function callSAMUWithConference(elder, familyPhones) {
   }
 }
 
+// ── Twilio Webhook Signature Verification ────────────────
+function twilioWebhookAuth(req, res, next) {
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!authToken || !twilioValidateRequest) {
+    // Dev mode: skip verification if no auth token or twilio not installed
+    return next();
+  }
+  const signature = req.headers['x-twilio-signature'];
+  if (!signature) {
+    console.warn('[Twilio] Missing X-Twilio-Signature header');
+    return res.status(403).send('Forbidden');
+  }
+  const url = SERVER_URL + req.originalUrl;
+  const isValid = twilioValidateRequest(authToken, signature, url, req.body || {});
+  if (!isValid) {
+    console.warn('[Twilio] Invalid webhook signature for', req.originalUrl);
+    return res.status(403).send('Forbidden');
+  }
+  next();
+}
+
 // Twilio call status callback
-app.post('/api/twilio/status', express.urlencoded({ extended: false }), (req, res) => {
+app.post('/api/twilio/status', express.urlencoded({ extended: false }), twilioWebhookAuth, (req, res) => {
   console.log(`[Twilio Status] Call ${req.body.CallSid}: ${req.body.CallStatus} (duration: ${req.body.CallDuration}s)`);
   res.sendStatus(200);
 });
@@ -1403,7 +1501,7 @@ app.delete('/api/push-token', authMiddleware, async (req, res) => {
 // ── Twilio Webhooks ──────────────────────────────────────
 
 // Twilio voice call gather callback
-app.post('/api/twilio/gather', express.urlencoded({ extended: false }), async (req, res) => {
+app.post('/api/twilio/gather', express.urlencoded({ extended: false }), twilioWebhookAuth, asyncHandler(async (req, res) => {
   const digit = req.body.Digits;
   const callerPhone = req.body.To;
 
@@ -1432,10 +1530,10 @@ app.post('/api/twilio/gather', express.urlencoded({ extended: false }), async (r
   } else {
     res.type('text/xml').send('<Response><Say language="pt-BR" voice="Polly.Camila">Nao entendi. Pressione 1 se esta bem, ou 2 se precisa de ajuda.</Say><Gather numDigits="1"><Say language="pt-BR">Aguardando.</Say></Gather></Response>');
   }
-});
+}));
 
 // Twilio incoming SMS webhook (for elder replying "SIM" to SMS check-in)
-app.post('/api/twilio/sms', express.urlencoded({ extended: false }), async (req, res) => {
+app.post('/api/twilio/sms', express.urlencoded({ extended: false }), twilioWebhookAuth, asyncHandler(async (req, res) => {
   const body = (req.body.Body || '').trim().toUpperCase();
   const from = req.body.From;
 
@@ -1466,7 +1564,7 @@ app.post('/api/twilio/sms', express.urlencoded({ extended: false }), async (req,
   } else {
     res.type('text/xml').send('<Response><Message>Estou Bem: Responda SIM para confirmar seu check-in.</Message></Response>');
   }
-});
+}));
 
 // Test endpoint: send a WhatsApp check-in reminder to any number
 app.post('/api/twilio/test-whatsapp', async (req, res) => {
@@ -1478,9 +1576,9 @@ app.post('/api/twilio/test-whatsapp', async (req, res) => {
 });
 
 // Twilio WhatsApp incoming message webhook
-// Set this URL in Twilio Console → WhatsApp Senders → +12627472376 → Webhook URL:
-// https://estou-bem-web-production.up.railway.app/api/twilio/whatsapp
-app.post('/api/twilio/whatsapp', express.urlencoded({ extended: false }), async (req, res) => {
+// Set this URL in Twilio Console -> WhatsApp Senders -> Webhook URL:
+// ${SERVER_URL}/api/twilio/whatsapp
+app.post('/api/twilio/whatsapp', express.urlencoded({ extended: false }), twilioWebhookAuth, asyncHandler(async (req, res) => {
   const body = (req.body.Body || '').trim().toUpperCase();
   const from = (req.body.From || '').replace('whatsapp:', '');
 
@@ -1546,7 +1644,7 @@ app.post('/api/twilio/whatsapp', express.urlencoded({ extended: false }), async 
   } else {
     res.type('text/xml').send('<Response><Message>Estou Bem: Responda *SIM* para confirmar seu check-in, ou *SOS* se precisar de ajuda urgente.</Message></Response>');
   }
-});
+}));
 
 // ── User Routes ───────────────────────────────────────────
 app.get('/api/me', authMiddleware, async (req, res) => {
@@ -3197,11 +3295,9 @@ app.get('/api/health-report/elder/:month', authMiddleware, async (req, res) => {
 });
 
 // ── Admin Auth Middleware ──────────────────────────────────
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'estoubem-admin-2024';
-
 function adminAuth(req, res, next) {
   const key = req.headers['x-admin-key'];
-  if (!key || key !== ADMIN_PASSWORD) {
+  if (!key || key !== ADMIN_KEY) {
     return res.status(401).json({ error: 'Unauthorized: invalid or missing X-Admin-Key' });
   }
   next();
@@ -3740,6 +3836,12 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// ── Global Express Error Handler ──────────────────────────
+app.use((err, req, res, next) => {
+  console.error('[ERROR]', err.stack || err.message || err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 // ── Start ─────────────────────────────────────────────────
 async function start() {
   if (process.env.DATABASE_URL) {
@@ -3860,7 +3962,7 @@ async function start() {
     }
     try {
       const twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      const waNumber = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER || '+12627472376';
+      const waNumber = TWILIO_WHATSAPP_NUMBER;
       await twilioClient.messages.create({
         from: `whatsapp:${waNumber}`,
         to: `whatsapp:${to.replace('whatsapp:', '')}`,
@@ -3878,7 +3980,7 @@ async function start() {
     if (!phone) return res.status(400).json({ error: 'phone required' });
     try {
       const twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      const waNumber = process.env.TWILIO_WHATSAPP_NUMBER || '+12627472376';
+      const waNumber = TWILIO_WHATSAPP_NUMBER;
       // Send with interactive buttons
       const msg = await twilioClient.messages.create({
         from: `whatsapp:${waNumber}`,
@@ -4409,6 +4511,115 @@ async function checkMissedCheckins() {
           [inactive.user_id, JSON.stringify({ type: 'inactivity', inactiveHours, contacts: inactFamily.rows.map(f => f.name) })]
         );
       }
+    }
+
+    // ── Medication Low Stock Alerts ───────────────────────────
+    try {
+      const lowStockMeds = await pool.query(`
+        SELECT m.id, m.name, m.stock, m.low_threshold, m.user_id, u.name as elder_name
+        FROM medications m
+        JOIN users u ON m.user_id = u.id
+        WHERE m.stock <= m.low_threshold AND m.stock > 0
+      `);
+
+      const todayDate = new Date().toISOString().slice(0, 10);
+
+      for (const med of lowStockMeds.rows) {
+        // Check if already alerted today for this medication
+        const alreadyAlerted = await pool.query(
+          `SELECT id FROM medication_alerts WHERE medication_id = $1 AND alert_date = $2 AND alert_type = 'low_stock'`,
+          [med.id, todayDate]
+        );
+        if (alreadyAlerted.rows.length > 0) continue;
+
+        // Record the alert
+        await pool.query(
+          `INSERT INTO medication_alerts (medication_id, user_id, alert_date, alert_type) VALUES ($1, $2, $3, 'low_stock') ON CONFLICT DO NOTHING`,
+          [med.id, med.user_id, todayDate]
+        );
+
+        // Push notification to elder
+        const elderTokens = await pool.query(
+          `SELECT token FROM push_tokens WHERE user_id = $1`, [med.user_id]
+        );
+        if (elderTokens.rows.length > 0) {
+          await sendPushNotifications(
+            elderTokens.rows.map(r => r.token),
+            'Medicamento acabando',
+            `Seu medicamento ${med.name} esta acabando. Restam ${med.stock} unidades.`,
+            { type: 'low_stock', medicationId: med.id },
+            false
+          );
+        }
+
+        // Push notification to family
+        const familyTokens = await pool.query(
+          `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`,
+          [med.user_id]
+        );
+        if (familyTokens.rows.length > 0) {
+          await sendPushNotifications(
+            familyTokens.rows.map(r => r.token),
+            'Medicamento acabando',
+            `${med.elder_name} esta com estoque baixo de ${med.name}. Restam ${med.stock} unidades.`,
+            { type: 'low_stock', elderId: med.user_id, medicationId: med.id },
+            false
+          );
+        }
+
+        // WebSocket alert to family
+        await sendWsAlertToFamily(med.user_id, {
+          type: 'medication_low_stock',
+          elder: { id: med.user_id, name: med.elder_name },
+          medication: { id: med.id, name: med.name, stock: med.stock },
+          message: `${med.elder_name} esta com estoque baixo de ${med.name}`,
+          timestamp: new Date().toISOString(),
+        });
+
+        console.log(`[Medication] Low stock alert: ${med.elder_name} - ${med.name} (${med.stock} remaining)`);
+      }
+    } catch (medErr) {
+      console.error('[Medication] Error checking low stock:', medErr.message);
+    }
+
+    // ── Auto Check-in Mode ──────────────────────────────────
+    try {
+      const autoCheckinElders = await pool.query(`
+        SELECT u.id, u.name, s.auto_checkin_mode
+        FROM users u
+        JOIN settings s ON s.user_id = u.id
+        WHERE u.role = 'elder' AND s.auto_checkin_mode = 'auto'
+      `);
+
+      for (const elder of autoCheckinElders.rows) {
+        const pendingCheckins = await pool.query(
+          `SELECT id, time FROM checkins WHERE user_id = $1 AND date = $2 AND status = 'pending'`,
+          [elder.id, today]
+        );
+
+        for (const checkin of pendingCheckins.rows) {
+          // Auto-confirm after the checkin is at least 5 minutes old
+          const [h, m] = checkin.time.split(':').map(Number);
+          const scheduledMin = h * 60 + m;
+          if (nowMinutes - scheduledMin >= 5) {
+            await pool.query(
+              `UPDATE checkins SET status = 'auto_confirmed', confirmed_at = NOW() WHERE id = $1`,
+              [checkin.id]
+            );
+            console.log(`[Auto Check-in] Auto-confirmed check-in ${checkin.id} for ${elder.name} (passive monitoring mode)`);
+
+            // Notify family via WebSocket
+            await sendWsAlertToFamily(elder.id, {
+              type: 'checkin_auto_confirmed',
+              userId: elder.id,
+              checkinId: checkin.id,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      }
+    } catch (autoErr) {
+      console.error('[Auto Check-in] Error:', autoErr.message);
     }
 
     // Reset hourly movement counts
