@@ -25,11 +25,19 @@ jobs:
     - name: Create local.properties
       run: echo "sdk.dir=$ANDROID_HOME" > android-watch/local.properties
 
+    - name: Decode keystore
+      run: echo "${{ secrets.WEAR_KEYSTORE_BASE64 }}" | base64 --decode > android-watch/release.keystore
+
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
     - name: Build Release AAB
       working-directory: android-watch
+      env:
+        KEYSTORE_PATH: release.keystore
+        KEYSTORE_PASSWORD: ${{ secrets.WEAR_KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.WEAR_KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.WEAR_KEY_PASSWORD }}
       run: gradle bundleRelease --no-daemon
 
     - name: Upload AAB
