@@ -3776,6 +3776,70 @@ app.get('/api/admin/users/:id', adminAuth, async (req, res) => {
   }
 });
 
+// PUT /api/admin/users/:id - edit regular user
+app.put('/api/admin/users/:id', adminAuth, async (req, res) => {
+  try {
+    if (!['super_admin', 'admin'].includes(req.adminUser.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    const { name, email, phone, role, subscription, linked_elder_id } = req.body;
+    const result = await pool.query(
+      `UPDATE users SET
+        name = COALESCE($1, name),
+        email = COALESCE($2, email),
+        phone = COALESCE($3, phone),
+        role = COALESCE($4, role),
+        subscription = COALESCE($5, subscription),
+        linked_elder_id = COALESCE($6, linked_elder_id)
+      WHERE id = $7 RETURNING id, name, email, phone, role, subscription, linked_elder_id`,
+      [name, email, phone, role, subscription, linked_elder_id, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    // Audit log
+    if (req.adminUser) {
+      await pool.query(`INSERT INTO admin_audit_log (admin_user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)`,
+        [req.adminUser.id, 'update_user', 'user', req.params.id, JSON.stringify(req.body)]);
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Admin update user error:', err);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// POST /api/admin/users/:id/reset-password - admin resets user password
+app.post('/api/admin/users/:id/reset-password', adminAuth, async (req, res) => {
+  try {
+    if (!['super_admin', 'admin'].includes(req.adminUser.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    const { new_password } = req.body;
+    if (!new_password || new_password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    const bcrypt = require('bcryptjs');
+    const hashed = await bcrypt.hash(new_password, 12);
+    const result = await pool.query(
+      `UPDATE users SET password = $1 WHERE id = $2 RETURNING id, name, email`,
+      [hashed, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    // Audit log
+    if (req.adminUser) {
+      await pool.query(`INSERT INTO admin_audit_log (admin_user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)`,
+        [req.adminUser.id, 'reset_user_password', 'user', req.params.id, JSON.stringify({ user_email: result.rows[0].email })]);
+    }
+
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (err) {
+    console.error('Admin reset user password error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
 // GET /api/admin/affiliates - all affiliates
 app.get('/api/admin/affiliates', adminAuth, async (req, res) => {
   try {

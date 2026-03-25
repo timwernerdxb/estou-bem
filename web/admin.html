@@ -8,27 +8,28 @@
 /* ─── CSS Variables ────────────────────────────────────── */
 :root {
   --sidebar-width: 260px;
-  --sidebar-bg: #1A1A2E;
-  --sidebar-hover: #16213E;
-  --sidebar-active: #0F3460;
-  --sidebar-text: #A0AEC0;
-  --sidebar-text-active: #FFF;
-  --primary: #4A90D9;
-  --primary-dark: #2E6DB4;
-  --primary-light: #7CB3E8;
+  --sidebar-bg: #1E3A2F;
+  --sidebar-hover: #2D4A3E;
+  --sidebar-active: #3a6153;
+  --sidebar-text: #B8C9C0;
+  --sidebar-text-active: #F5F0EB;
+  --primary: #2D4A3E;
+  --primary-dark: #1E3A2F;
+  --primary-light: #3a6153;
+  --accent: #C9A96E;
   --success: #48BB78;
   --warning: #ED8936;
   --danger: #F56565;
-  --info: #4299E1;
-  --bg: #F7FAFC;
+  --info: #2D4A3E;
+  --bg: #F5F0EB;
   --card: #FFF;
-  --border: #E2E8F0;
-  --text: #1A202C;
-  --text2: #718096;
-  --text3: #A0AEC0;
+  --border: #D4C5A0;
+  --text: #1A1A1A;
+  --text2: #5A5A5A;
+  --text3: #8A8A7A;
   --radius: 8px;
-  --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
-  --shadow-lg: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+  --shadow: 0 1px 3px rgba(45,74,62,.1), 0 1px 2px rgba(45,74,62,.06);
+  --shadow-lg: 0 4px 6px rgba(45,74,62,.07), 0 2px 4px rgba(45,74,62,.06);
 }
 
 /* ─── Reset ────────────────────────────────────────────── */
@@ -1789,14 +1790,55 @@ async function showUserDetail(id) {
     const u = await apiFetch(`/admin/users/${id}`);
     el.innerHTML = `
       <div class="form-grid mb-16">
+        <div class="form-group">
+          <label>Nome</label>
+          <input type="text" id="editUserName" value="${esc(u.name || '')}" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="editUserEmail" value="${esc(u.email || '')}" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Telefone</label>
+          <input type="text" id="editUserPhone" value="${esc(u.phone || '')}" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Papel</label>
+          <select id="editUserRole" class="form-control">
+            <option value="elder" ${u.role==='elder'?'selected':''}>Pessoa Assistida</option>
+            <option value="family" ${u.role==='family'?'selected':''}>Familiar</option>
+            <option value="caretaker" ${u.role==='caretaker'?'selected':''}>Cuidador</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Assinatura</label>
+          <select id="editUserSub" class="form-control">
+            <option value="free" ${u.subscription==='free'?'selected':''}>Gratuito</option>
+            <option value="basic" ${u.subscription==='basic'?'selected':''}>Básico</option>
+            <option value="family" ${u.subscription==='family'?'selected':''}>Família</option>
+            <option value="premium" ${u.subscription==='premium'?'selected':''}>Premium</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Idoso Vinculado (ID)</label>
+          <input type="text" id="editUserLinked" value="${u.linked_elder_id || ''}" class="form-control">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn btn-primary" onclick="saveUser(${u.id})">Salvar Alterações</button>
+        <button class="btn" style="background:var(--warning);color:#fff" onclick="toggleResetPassword(${u.id})">Redefinir Senha</button>
+      </div>
+      <div id="resetPasswordBox" style="display:none;margin-bottom:16px;padding:12px;background:var(--bg);border-radius:var(--radius)">
+        <div class="form-group">
+          <label>Nova Senha (mín. 8 caracteres)</label>
+          <input type="password" id="newUserPassword" class="form-control" placeholder="Nova senha">
+        </div>
+        <button class="btn btn-primary" onclick="resetUserPassword(${u.id})" style="margin-top:8px">Confirmar Redefinição</button>
+      </div>
+      <hr style="border-color:var(--border);margin:16px 0">
+      <div class="form-grid mb-16" style="opacity:.7">
         <div><strong>ID:</strong> ${u.id}</div>
-        <div><strong>Nome:</strong> ${esc(u.name)}</div>
-        <div><strong>Email:</strong> ${esc(u.email)}</div>
-        <div><strong>Telefone:</strong> ${esc(u.phone || '—')}</div>
-        <div><strong>Papel:</strong> ${roleName(u.role)}</div>
-        <div><strong>Assinatura:</strong> ${subName(u.subscription)}</div>
         <div><strong>Código de Link:</strong> ${u.link_code || '—'}</div>
-        <div><strong>Idoso Vinculado:</strong> ${u.linked_elder_id || '—'}</div>
         <div><strong>Código de Indicação:</strong> ${u.referral_code || '—'}</div>
         <div><strong>Indicado por:</strong> ${u.referred_by || '—'}</div>
         <div><strong>Sequência:</strong> ${u.streak_days || 0} dias</div>
@@ -1811,6 +1853,46 @@ async function showUserDetail(id) {
     `;
   } catch (e) {
     el.innerHTML = '<div class="empty-state">Não foi possível carregar detalhes.</div>';
+  }
+}
+
+function toggleResetPassword() {
+  const box = document.getElementById('resetPasswordBox');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveUser(id) {
+  try {
+    await apiFetch(`/admin/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: document.getElementById('editUserName').value,
+        email: document.getElementById('editUserEmail').value,
+        phone: document.getElementById('editUserPhone').value,
+        role: document.getElementById('editUserRole').value,
+        subscription: document.getElementById('editUserSub').value,
+        linked_elder_id: document.getElementById('editUserLinked').value || null
+      })
+    });
+    showToast('Usuário atualizado com sucesso', 'success');
+    loadUsers();
+  } catch (e) {
+    showToast('Erro ao atualizar: ' + (e.message || e), 'error');
+  }
+}
+
+async function resetUserPassword(id) {
+  const pw = document.getElementById('newUserPassword').value;
+  if (!pw || pw.length < 8) { showToast('Senha deve ter pelo menos 8 caracteres', 'error'); return; }
+  try {
+    await apiFetch(`/admin/users/${id}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ new_password: pw })
+    });
+    showToast('Senha redefinida com sucesso', 'success');
+    document.getElementById('resetPasswordBox').style.display = 'none';
+  } catch (e) {
+    showToast('Erro ao redefinir senha: ' + (e.message || e), 'error');
   }
 }
 
