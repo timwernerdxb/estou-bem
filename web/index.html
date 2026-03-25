@@ -3440,7 +3440,8 @@ async function loadReferralInfo() {
     document.getElementById('referral-info').style.display = 'block';
     document.getElementById('referral-loading').style.display = 'none';
   } catch (e) {
-    document.getElementById('referral-loading').textContent = 'Erro ao carregar';
+    const card = document.getElementById('referral-card');
+    if (card) card.style.display = 'none';
   }
 }
 
