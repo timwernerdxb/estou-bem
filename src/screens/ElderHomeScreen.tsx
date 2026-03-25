@@ -39,6 +39,8 @@ export function ElderHomeScreen() {
   const [checkinDisplayState, setCheckinDisplayState] = useState<CheckinDisplayState>("pending");
   const [confirmedTime, setConfirmedTime] = useState<string | null>(null);
   const [nextCheckinTime, setNextCheckinTime] = useState<string | null>(null);
+  const [isNapping, setIsNapping] = useState(false);
+  const [napUntil, setNapUntil] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const elderName = state.elderProfile?.name || state.currentUser?.name || "Voce";
@@ -193,6 +195,45 @@ export function ElderHomeScreen() {
 
   const streak = (state as any).gamification?.streak || 0;
 
+  const handleNap = async (minutes: number) => {
+    try {
+      const API_URL = state.currentUser?.apiUrl || process.env.EXPO_PUBLIC_API_URL || "";
+      const token = state.currentUser?.token;
+      if (!API_URL || !token) return;
+      const res = await fetch(`${API_URL}/api/nap`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ minutes }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsNapping(true);
+        setNapUntil(data.nap_until);
+        Vibration.vibrate(100);
+        // Auto-cancel after duration
+        setTimeout(() => { setIsNapping(false); setNapUntil(null); }, minutes * 60 * 1000);
+      }
+    } catch (e) {
+      console.error("Nap error:", e);
+    }
+  };
+
+  const cancelNap = async () => {
+    try {
+      const API_URL = state.currentUser?.apiUrl || process.env.EXPO_PUBLIC_API_URL || "";
+      const token = state.currentUser?.token;
+      if (!API_URL || !token) return;
+      await fetch(`${API_URL}/api/nap`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setIsNapping(false);
+      setNapUntil(null);
+    } catch (e) {
+      console.error("Cancel nap error:", e);
+    }
+  };
+
   const renderCheckinArea = () => {
     if (isConfirming) {
       // Show brief confirmation animation
@@ -301,6 +342,36 @@ export function ElderHomeScreen() {
         <View style={styles.checkinContainer}>
           {renderCheckinArea()}
         </View>
+
+        {/* Nap Mode */}
+        {isNapping ? (
+          <TouchableOpacity
+            onPress={cancelNap}
+            style={{
+              flexDirection: "row", alignItems: "center", justifyContent: "center",
+              backgroundColor: SH_GOLD, borderRadius: 12, padding: 14, marginBottom: 16,
+            }}
+          >
+            <Ionicons name="moon" size={20} color="#FFF" style={{ marginRight: 8 }} />
+            <Text style={{ color: "#FFF", fontFamily: serifFont, fontSize: 15 }}>
+              Cochilando ate {napUntil ? new Date(napUntil).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""} — toque para acordar
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={() => handleNap(60)}
+            style={{
+              flexDirection: "row", alignItems: "center", justifyContent: "center",
+              backgroundColor: "#FFF", borderRadius: 12, padding: 14, marginBottom: 16,
+              borderWidth: 1, borderColor: SH_GOLD,
+            }}
+          >
+            <Ionicons name="moon-outline" size={20} color={SH_GOLD} style={{ marginRight: 8 }} />
+            <Text style={{ color: SH_GREEN, fontFamily: serifFont, fontSize: 15 }}>
+              Vou cochilar (pausar 1 hora)
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Today's Status */}
         <Card style={styles.statusCard}>

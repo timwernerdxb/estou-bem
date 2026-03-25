@@ -2050,6 +2050,33 @@ app.get('/api/checkin-status/:userId', async (req, res) => {
   }
 });
 
+// ── Nap mode — pause escalations for up to 1 hour ──
+const napUsers = new Map(); // userId -> { until: Date }
+
+app.post('/api/nap', authMiddleware, async (req, res) => {
+  const minutes = Math.min(parseInt(req.body.minutes) || 60, 60); // max 1 hour
+  const until = new Date(Date.now() + minutes * 60 * 1000);
+  napUsers.set(req.userId, { until });
+  console.log(`[Nap] User ${req.userId} napping until ${until.toISOString()} (${minutes} min)`);
+  res.json({ success: true, nap_until: until.toISOString(), minutes });
+});
+
+app.delete('/api/nap', authMiddleware, async (req, res) => {
+  napUsers.delete(req.userId);
+  console.log(`[Nap] User ${req.userId} woke up (nap cancelled)`);
+  res.json({ success: true });
+});
+
+app.get('/api/nap', authMiddleware, async (req, res) => {
+  const nap = napUsers.get(req.userId);
+  if (nap && nap.until > new Date()) {
+    res.json({ napping: true, nap_until: nap.until.toISOString() });
+  } else {
+    napUsers.delete(req.userId);
+    res.json({ napping: false });
+  }
+});
+
 app.post('/api/checkins', authMiddleware, async (req, res) => {
   const { time, status, date } = req.body;
   const result = await pool.query(
@@ -4916,6 +4943,14 @@ async function checkMissedCheckins() {
     `);
 
     for (const elder of elders.rows) {
+      // Skip if user is napping
+      const nap = napUsers.get(elder.id);
+      if (nap && nap.until > now) {
+        continue;
+      } else if (nap) {
+        napUsers.delete(elder.id); // expired
+      }
+
       const mode = elder.checkin_mode || 'scheduled';
       const windowStart = elder.checkin_window_start || '07:00';
       const windowEnd = elder.checkin_window_end || '22:00';
