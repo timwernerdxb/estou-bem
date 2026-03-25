@@ -78,7 +78,7 @@ export default ({ config }) => ({
     ["expo-task-manager"],
     ["@bacons/apple-targets"],
     ["./plugins/withAsyncStorageRepo"],
-    ["./plugins/withWearOS"],
+    // ["./plugins/withWearOS"], // Wear OS built separately via GitHub Actions
   ],
   extra: {
     revenueCatAppleApiKey:
