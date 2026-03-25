@@ -2091,16 +2091,19 @@ function renderSettings() {
         <h2>${t('settings_referral')}</h2>
         <p style="font-size:13px;color:var(--text2);margin-bottom:12px">${t('settings_referral_desc')}</p>
         <div id="referral-info" style="display:none">
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
-            <input type="text" id="referral-link" readonly style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:monospace;background:var(--bg);color:var(--text)">
-            <button class="btn btn-sm" onclick="copyReferralLink()" id="copy-referral-btn" style="padding:10px 16px;white-space:nowrap">${t('settings_referral_share')}</button>
+          <div style="text-align:center;padding:12px;background:var(--bg);border-radius:var(--radius);margin-bottom:12px">
+            <div style="font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Seu código</div>
+            <div id="referral-code-display" style="font-family:monospace;font-size:24px;font-weight:700;color:var(--primary);letter-spacing:4px;margin-bottom:4px"></div>
+            <div id="referral-link-text" style="font-size:11px;color:var(--text3);word-break:break-all"></div>
           </div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap">
-            <div style="background:var(--bg);padding:8px 14px;border-radius:var(--radius);font-size:13px"><strong id="referral-count">0</strong> <span style="color:var(--text3)">indicações</span></div>
-            <div style="background:var(--gold-light,#FAF5EB);padding:8px 14px;border-radius:var(--radius);font-size:13px"><strong id="referral-earned">0</strong> <span style="color:var(--text3)">meses grátis</span></div>
-            <div style="background:var(--bg);padding:8px 14px;border-radius:var(--radius);font-size:13px">Próximo: <strong id="referral-next">5</strong> <span style="color:var(--text3)">indicações</span></div>
+          <input type="hidden" id="referral-link">
+          <button class="btn w100" onclick="copyReferralLink()" id="copy-referral-btn" style="margin-bottom:12px">${t('settings_referral_share')}</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <div style="flex:1;text-align:center;background:var(--bg);padding:8px 12px;border-radius:var(--radius);font-size:13px"><strong id="referral-count">0</strong><br><span style="color:var(--text3);font-size:11px">indicações</span></div>
+            <div style="flex:1;text-align:center;background:var(--gold-light,#FAF5EB);padding:8px 12px;border-radius:var(--radius);font-size:13px"><strong id="referral-earned">0</strong><br><span style="color:var(--text3);font-size:11px">meses grátis</span></div>
+            <div style="flex:1;text-align:center;background:var(--bg);padding:8px 12px;border-radius:var(--radius);font-size:13px"><strong id="referral-next">5</strong><br><span style="color:var(--text3);font-size:11px">faltam</span></div>
           </div>
-          <div style="margin-top:12px;display:flex;gap:8px">
+          <div style="display:flex;gap:8px">
             <button class="btn btn-sm btn-outline" onclick="shareReferralWhatsApp()" style="flex:1;padding:10px">📱 WhatsApp</button>
             <button class="btn btn-sm btn-outline" onclick="shareReferralEmail()" style="flex:1;padding:10px">📧 Email</button>
           </div>
@@ -3426,6 +3429,12 @@ async function loadReferralInfo() {
     const link = `${baseUrl}/?ref=${code}`;
     const linkEl = document.getElementById('referral-link');
     if (linkEl) linkEl.value = link;
+    const codeDisplay = document.getElementById('referral-code-display');
+    if (codeDisplay) codeDisplay.textContent = code;
+    const linkText = document.getElementById('referral-link-text');
+    if (linkText) linkText.textContent = link;
+    // Remove own ref code from localStorage to prevent self-referral
+    if (localStorage.getItem('estoubem_ref') === code) localStorage.removeItem('estoubem_ref');
 
     const referralCount = res.data.referral_count || 0;
     const freeMonths = res.data.free_months_earned || 0;
@@ -3510,9 +3519,13 @@ settingsObserver.observe(document.body, { childList: true, subtree: true });
   const urlParams = new URLSearchParams(window.location.search);
   const refCode = urlParams.get('ref');
   if (refCode) {
-    localStorage.setItem('estoubem_ref', refCode);
-    // Show toast after first render
-    setTimeout(() => toast('✅ Código de indicação aplicado: ' + refCode), 500);
+    // Only save and show toast if user is not already logged in (new visitor)
+    if (!localStorage.getItem('estoubem_token')) {
+      localStorage.setItem('estoubem_ref', refCode);
+      setTimeout(() => toast('✅ Código de indicação aplicado: ' + refCode), 500);
+    }
+    // Clean the URL without reload
+    window.history.replaceState({}, '', window.location.pathname);
   }
 })();
 
