@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
 
     <application
         android:allowBackup="true"
@@ -19,6 +22,7 @@
             android:name="com.google.android.wearable.standalone"
             android:value="true" />
 
+        <!-- Main activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -28,6 +32,53 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Health monitoring foreground service -->
+        <service
+            android:name=".services.HealthService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- Fall detection foreground service -->
+        <service
+            android:name=".services.FallDetectionService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- Motion detection foreground service -->
+        <service
+            android:name=".services.MotionDetectionService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- Wearable listener service — receives messages from phone -->
+        <service
+            android:name=".services.PhoneConnectionService"
+            android:exported="true"
+            android:permission="com.google.android.gms.permission.BIND_LISTENER">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/settings" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/checkin" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/settings" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/health_data" />
+            </intent-filter>
+        </service>
 
     </application>
 
