@@ -415,11 +415,11 @@ p { color: #4A4A4A; font-size: 1.05rem; }
   animation: float 4s ease-in-out infinite 1s;
 }
 .watch-frame {
-  width: 160px;
-  height: 190px;
+  width: 140px;
+  height: 168px;
   background: #1A1A1A;
-  border-radius: 40px;
-  padding: 10px;
+  border-radius: 36px;
+  padding: 8px;
   box-shadow: 0 30px 60px rgba(26,26,26,0.12), 0 0 0 1px rgba(255,255,255,0.1) inset;
   position: relative;
 }
@@ -437,14 +437,14 @@ p { color: #4A4A4A; font-size: 1.05rem; }
   width: 100%;
   height: 100%;
   background: #0A0A0A;
-  border-radius: 32px;
+  border-radius: 28px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 .watch-band-top, .watch-band-bottom {
-  width: 80px;
-  height: 40px;
+  width: 70px;
+  height: 32px;
   background: linear-gradient(180deg, #2A2A2A, #1A1A1A);
   margin: 0 auto;
   border-radius: 4px;
@@ -457,27 +457,35 @@ p { color: #4A4A4A; font-size: 1.05rem; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  padding: 4px;
   text-align: center;
+  overflow: hidden;
+}
+.watch-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 .watch-hr-ring {
-  width: 70px;
-  height: 70px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  border: 3px solid #2D4A3E;
+  border: 2px solid #2D4A3E;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   position: relative;
 }
 .watch-hr-ring::after {
   content: '';
   position: absolute;
-  inset: -3px;
+  inset: -2px;
   border-radius: 50%;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   border-top-color: #C9A96E;
   animation: watch-ring-spin 3s linear infinite;
 }
@@ -486,7 +494,7 @@ p { color: #4A4A4A; font-size: 1.05rem; }
 }
 .watch-hr-value {
   font-family: 'Inter', sans-serif;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   color: #fff;
   line-height: 1;
@@ -538,12 +546,17 @@ p { color: #4A4A4A; font-size: 1.05rem; }
   .hero-subtitle { margin-left: auto; margin-right: auto; }
   .hero-buttons { justify-content: center; }
   .hero-trust { justify-content: center; }
-  .watch-frame { width: 120px; height: 145px; border-radius: 30px; }
-  .watch-screen { border-radius: 24px; }
-  .watch-hr-ring { width: 50px; height: 50px; }
-  .watch-hr-value { font-size: 16px; }
-  .watch-band-top, .watch-band-bottom { width: 60px; height: 30px; }
-  .watch-metrics { gap: 8px; }
+  .devices-group { gap: 12px; }
+  .watch-frame { width: 110px; height: 132px; border-radius: 28px; padding: 6px; }
+  .watch-screen { border-radius: 22px; }
+  .watch-hr-ring { width: 42px; height: 42px; }
+  .watch-hr-value { font-size: 14px; }
+  .watch-hr-label { font-size: 6px; }
+  .watch-band-top, .watch-band-bottom { width: 50px; height: 24px; }
+  .watch-metrics { gap: 6px; }
+  .watch-metric-value { font-size: 10px; }
+  .watch-metric-label { font-size: 5px; }
+  .watch-status { font-size: 6px; padding: 2px 6px; }
 }
 
 /* ── How It Works ──────────────────────────────────────── */
@@ -1397,20 +1410,20 @@ p { color: #4A4A4A; font-size: 1.05rem; }
               </div>
               <!-- Watch Screen 2: Check-in -->
               <div class="watch-view" id="watch-checkin" style="display:none">
-                <div style="font-size:9px;color:#C9A96E;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Check-in</div>
-                <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#2D4A3E,#3B5E4F);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;cursor:pointer;box-shadow:0 4px 16px rgba(45,74,62,0.4)" onclick="watchCheckin()">
-                  <span style="font-size:10px;color:#F5F0EB;font-weight:600;text-align:center;line-height:1.2">Estou<br>Bem</span>
+                <div style="font-size:7px;color:#C9A96E;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Check-in</div>
+                <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#2D4A3E,#3B5E4F);display:flex;align-items:center;justify-content:center;margin:0 auto 6px;cursor:pointer;box-shadow:0 4px 12px rgba(45,74,62,0.4)" onclick="watchCheckin()">
+                  <span style="font-size:9px;color:#F5F0EB;font-weight:600;text-align:center;line-height:1.2">Estou<br>Bem</span>
                 </div>
-                <div style="font-size:8px;color:#666">Toque para confirmar</div>
+                <div style="font-size:7px;color:#666">Toque para confirmar</div>
               </div>
               <!-- Watch Screen 3: Confirmed -->
               <div class="watch-view" id="watch-confirmed" style="display:none">
-                <div style="width:50px;height:50px;border-radius:50%;background:#2D4A3E;display:flex;align-items:center;justify-content:center;margin:0 auto 8px">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C9A96E" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <div style="width:40px;height:40px;border-radius:50%;background:#2D4A3E;display:flex;align-items:center;justify-content:center;margin:0 auto 6px">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9A96E" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
-                <div style="font-size:11px;color:#fff;font-weight:600">Confirmado!</div>
-                <div style="font-size:7px;color:#666;margin-top:4px">Família notificada</div>
-                <div class="watch-status" style="margin-top:8px">13 dias 🔥</div>
+                <div style="font-size:10px;color:#fff;font-weight:600">Confirmado!</div>
+                <div style="font-size:7px;color:#666;margin-top:2px">Família notificada</div>
+                <div class="watch-status" style="margin-top:4px">13 dias 🔥</div>
               </div>
             </div>
           </div>
