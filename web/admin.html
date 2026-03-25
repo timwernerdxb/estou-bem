@@ -693,6 +693,27 @@ tr.aff-pending:hover { background: #FEF3C7; }
 
         <!-- Inline Edit Row (hidden template) -->
         <div id="affiliateEditRow" style="display:none"></div>
+
+        <!-- Referral Rewards Section -->
+        <div class="panel" style="margin-top:20px">
+          <div class="panel-header">
+            <h3>Recompensas de Indicacao</h3>
+            <button class="btn btn-sm" onclick="loadReferralRewards()">Atualizar</button>
+          </div>
+          <div class="panel-body">
+            <p style="font-size:13px;color:var(--text2);margin:12px 16px">Usuarios que ganharam meses gratis por indicar novos usuarios (1 mes gratis a cada 5 indicacoes).</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Usuario</th><th>Email</th><th>Indicacoes</th><th>Meses Gratis</th><th>Tipo</th><th>Data</th></tr>
+                </thead>
+                <tbody id="referralRewardsBody">
+                  <tr><td colspan="6" class="empty-state">Clique em "Atualizar" para carregar.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ═══ COMMISSIONS ═══ -->
@@ -2004,13 +2025,41 @@ function renderAffiliates() {
                 <input type="text" id="affEditPix_${a.id}" value="${esc(a.pix_key || '')}" placeholder="CPF, email, telefone ou chave aleatoria">
               </div>
               <div class="aff-edit-field full-width">
-                <label>Taxas de Comissao</label>
+                <label>Modelo de Comissao</label>
+                <select id="affEditModel_${a.id}" onchange="toggleCommModelFields(${a.id}, this.value)">
+                  <option value="percentage" ${(a.commission_model||'percentage')==='percentage'?'selected':''}>Percentual / Fixo por evento</option>
+                  <option value="fixed_fee" ${a.commission_model==='fixed_fee'?'selected':''}>Taxa Fixa por Conversao</option>
+                  <option value="hybrid" ${a.commission_model==='hybrid'?'selected':''}>Hibrido (Taxa Fixa + Por Evento)</option>
+                  <option value="ramp_up" ${a.commission_model==='ramp_up'?'selected':''}>Escalonado (Ramp-Up)</option>
+                </select>
+              </div>
+              <div class="aff-edit-field full-width" id="affFixedFeeField_${a.id}" style="display:${['fixed_fee','hybrid'].includes(a.commission_model)?'block':'none'}">
+                <label>Taxa Fixa por Conversao (R$)</label>
+                <input type="number" step="0.01" id="affEditFixedFee_${a.id}" value="${a.fixed_fee || 0}">
+              </div>
+              <div class="aff-edit-field full-width" id="affPercentFields_${a.id}" style="display:${a.commission_model==='fixed_fee'||a.commission_model==='ramp_up'?'none':'block'}">
+                <label>Taxas de Comissao por Evento</label>
                 <div class="aff-comm-grid">
                   <div class="aff-edit-field"><label>Trial R$</label><input type="number" step="0.01" id="affEditCR_ts_${a.id}" value="${cr.trial_started || cr.register || 0}"></div>
                   <div class="aff-edit-field"><label>Familia R$</label><input type="number" step="0.01" id="affEditCR_sf_${a.id}" value="${cr.subscription_familia || cr.subscription || 0}"></div>
                   <div class="aff-edit-field"><label>Central R$</label><input type="number" step="0.01" id="affEditCR_sc_${a.id}" value="${cr.subscription_central || cr.purchase || 0}"></div>
                   <div class="aff-edit-field"><label>Rec. %</label><input type="number" step="0.01" id="affEditCR_rm_${a.id}" value="${cr.recurring_monthly || 0}"></div>
                 </div>
+              </div>
+              <div class="aff-edit-field full-width" id="affRampUpFields_${a.id}" style="display:${a.commission_model==='ramp_up'?'block':'none'}">
+                <label>Faixas Escalonadas (Ramp-Up)</label>
+                <div id="affRampTiers_${a.id}">
+                  ${((a.ramp_up_tiers && a.ramp_up_tiers.length > 0) ? a.ramp_up_tiers : [{min_sales:0,max_sales:10,rate:0.10},{min_sales:11,max_sales:50,rate:0.15},{min_sales:51,max_sales:null,rate:0.20}]).map((tier, i) => `
+                    <div class="aff-comm-grid" style="margin-bottom:6px" data-tier="${i}">
+                      <div class="aff-edit-field"><label>Min Vendas</label><input type="number" class="rampMin_${a.id}" value="${tier.min_sales || 0}"></div>
+                      <div class="aff-edit-field"><label>Max Vendas</label><input type="number" class="rampMax_${a.id}" value="${tier.max_sales || ''}" placeholder="ilimitado"></div>
+                      <div class="aff-edit-field"><label>Taxa %</label><input type="number" step="0.01" class="rampRate_${a.id}" value="${((tier.rate || 0) * 100).toFixed(1)}"></div>
+                      <div class="aff-edit-field" style="align-self:end"><button class="btn btn-sm btn-outline" onclick="this.closest('[data-tier]').remove()" style="padding:4px 8px;font-size:11px">&times;</button></div>
+                    </div>
+                  `).join('')}
+                </div>
+                <button class="btn btn-sm btn-outline" onclick="addRampTier(${a.id})" style="margin-top:6px;font-size:11px">+ Adicionar Faixa</button>
+                <p style="font-size:11px;color:var(--text3);margin-top:4px">Vendas no periodo atual: ${a.period_sales || 0}</p>
               </div>
               <div class="aff-edit-actions">
                 <button class="btn btn-sm btn-outline" onclick="cancelInlineEdit()">Cancelar</button>
@@ -2058,19 +2107,41 @@ function cancelInlineEdit() {
 }
 
 async function saveInlineAffiliate(id) {
+  const commModel = document.getElementById('affEditModel_' + id).value;
   const body = {
     name: document.getElementById('affEditName_' + id).value.trim(),
     email: document.getElementById('affEditEmail_' + id).value.trim(),
     channel: document.getElementById('affEditChannel_' + id).value,
     is_active: document.getElementById('affEditActive_' + id).checked,
     pix_key: document.getElementById('affEditPix_' + id).value.trim() || null,
+    commission_model: commModel,
+    fixed_fee: parseFloat(document.getElementById('affEditFixedFee_' + id)?.value) || 0,
     commission_rate: {
-      trial_started: parseFloat(document.getElementById('affEditCR_ts_' + id).value) || 0,
-      subscription_familia: parseFloat(document.getElementById('affEditCR_sf_' + id).value) || 0,
-      subscription_central: parseFloat(document.getElementById('affEditCR_sc_' + id).value) || 0,
-      recurring_monthly: parseFloat(document.getElementById('affEditCR_rm_' + id).value) || 0,
+      trial_started: parseFloat(document.getElementById('affEditCR_ts_' + id)?.value) || 0,
+      subscription_familia: parseFloat(document.getElementById('affEditCR_sf_' + id)?.value) || 0,
+      subscription_central: parseFloat(document.getElementById('affEditCR_sc_' + id)?.value) || 0,
+      recurring_monthly: parseFloat(document.getElementById('affEditCR_rm_' + id)?.value) || 0,
     },
   };
+
+  // Collect ramp-up tiers if applicable
+  if (commModel === 'ramp_up') {
+    const mins = document.querySelectorAll('.rampMin_' + id);
+    const maxs = document.querySelectorAll('.rampMax_' + id);
+    const rates = document.querySelectorAll('.rampRate_' + id);
+    const tiers = [];
+    for (let i = 0; i < mins.length; i++) {
+      const tier = {
+        min_sales: parseInt(mins[i].value) || 0,
+        rate: (parseFloat(rates[i].value) || 0) / 100,
+      };
+      const maxVal = parseInt(maxs[i].value);
+      if (!isNaN(maxVal) && maxVal > 0) tier.max_sales = maxVal;
+      tiers.push(tier);
+    }
+    body.ramp_up_tiers = tiers;
+  }
+
   if (!body.name) { toast('Nome e obrigatorio', 'error'); return; }
   try {
     await apiFetch(`/admin/affiliates/${id}`, { method: 'PUT', body });
@@ -2080,6 +2151,32 @@ async function saveInlineAffiliate(id) {
   } catch (e) {
     toast('Erro: ' + e.message, 'error');
   }
+}
+
+function toggleCommModelFields(id, model) {
+  const fixedEl = document.getElementById('affFixedFeeField_' + id);
+  const percentEl = document.getElementById('affPercentFields_' + id);
+  const rampEl = document.getElementById('affRampUpFields_' + id);
+  if (fixedEl) fixedEl.style.display = ['fixed_fee', 'hybrid'].includes(model) ? 'block' : 'none';
+  if (percentEl) percentEl.style.display = (model === 'fixed_fee' || model === 'ramp_up') ? 'none' : 'block';
+  if (rampEl) rampEl.style.display = model === 'ramp_up' ? 'block' : 'none';
+}
+
+function addRampTier(id) {
+  const container = document.getElementById('affRampTiers_' + id);
+  if (!container) return;
+  const idx = container.querySelectorAll('[data-tier]').length;
+  const div = document.createElement('div');
+  div.className = 'aff-comm-grid';
+  div.style.marginBottom = '6px';
+  div.setAttribute('data-tier', idx);
+  div.innerHTML = `
+    <div class="aff-edit-field"><label>Min Vendas</label><input type="number" class="rampMin_${id}" value="0"></div>
+    <div class="aff-edit-field"><label>Max Vendas</label><input type="number" class="rampMax_${id}" value="" placeholder="ilimitado"></div>
+    <div class="aff-edit-field"><label>Taxa %</label><input type="number" step="0.01" class="rampRate_${id}" value="0"></div>
+    <div class="aff-edit-field" style="align-self:end"><button class="btn btn-sm btn-outline" onclick="this.closest('[data-tier]').remove()" style="padding:4px 8px;font-size:11px">&times;</button></div>
+  `;
+  container.appendChild(div);
 }
 
 function toggleAffiliateSelect(id, checked) {
@@ -2179,6 +2276,30 @@ async function viewAffiliateDash(code) {
     `;
   } catch (e) {
     el.innerHTML = '<div class="empty-state">Não foi possível carregar dashboard do afiliado.</div>';
+  }
+}
+
+async function loadReferralRewards() {
+  const tbody = document.getElementById('referralRewardsBody');
+  tbody.innerHTML = '<tr><td colspan="6" class="loading">Carregando...</td></tr>';
+  try {
+    const rewards = await apiFetch('/admin/referral-rewards');
+    if (!rewards.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhuma recompensa registrada ainda.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rewards.map(r => `
+      <tr>
+        <td>${esc(r.name || '—')}</td>
+        <td>${esc(r.email || '—')}</td>
+        <td>${r.referral_count}</td>
+        <td><strong>${r.free_months_earned || 0}</strong></td>
+        <td><span class="badge badge-success">${r.reward_type === 'free_month' ? 'Mes Gratis' : r.reward_type}</span></td>
+        <td>${formatDate(r.created_at)}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Erro ao carregar recompensas.</td></tr>';
   }
 }
 

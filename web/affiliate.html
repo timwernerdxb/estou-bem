@@ -191,6 +191,7 @@ const translations = {
     af_badge_paid: 'Pago', af_badge_pending: 'Pendente',
     af_pix_enter: 'Informe sua chave PIX', af_pix_success: 'Chave PIX salva com sucesso!',
     af_pix_error: 'Erro ao salvar. Tente novamente.', af_conn_error: 'Erro de conexão.',
+    af_model_percentage: 'Percentual', af_model_fixed: 'Taxa Fixa', af_model_hybrid: 'Hibrido', af_model_rampup: 'Escalonado',
     lang_label: 'Idioma',
   },
   'en': {
@@ -604,13 +605,14 @@ function renderDashboard() {
         </div>
       </div>
 
-      <!-- Commission Rates -->
+      <!-- Commission Model & Rates -->
       <div class="section">
         <div class="section-header">
           <span class="section-title">${t('af_rates')}</span>
-          <span class="section-sub">Canal: ${af.channel || 'influencer'}</span>
+          <span class="section-sub">${renderModelBadge(af.commission_model)} &bull; Canal: ${af.channel || 'influencer'}</span>
         </div>
-        <div class="table-wrap">
+        ${renderCommissionModelInfo(af)}
+        <div class="table-wrap" style="${af.commission_model === 'ramp_up' || af.commission_model === 'fixed_fee' ? 'display:none' : ''}">
           <table>
             <thead><tr><th>${t('af_event')}</th><th>${t('af_commission')}</th></tr></thead>
             <tbody>
@@ -686,6 +688,80 @@ function renderCommissionRates(ratesOrChannel) {
     const value = typeof v === 'string' ? v : (v >= 1 ? formatCurrency(v) : `${(v * 100).toFixed(0)}%`);
     return `<tr><td>${label}</td><td><strong>${value}</strong></td></tr>`;
   }).join('');
+}
+
+function renderModelBadge(model) {
+  const labels = {
+    percentage: 'Percentual',
+    fixed_fee: 'Taxa Fixa',
+    hybrid: 'Hibrido',
+    ramp_up: 'Escalonado',
+  };
+  return labels[model] || labels.percentage;
+}
+
+function renderCommissionModelInfo(af) {
+  const model = af.commission_model || 'percentage';
+
+  if (model === 'fixed_fee') {
+    return `
+      <div class="share-box" style="margin-bottom:0">
+        <h3 style="font-family:var(--serif);font-size:16px;font-weight:400;margin-bottom:8px">Taxa Fixa por Conversao</h3>
+        <p style="font-size:14px;color:var(--text)">Cada conversao gera uma comissao fixa de <strong>${formatCurrency(af.fixed_fee || 0)}</strong>.</p>
+      </div>
+    `;
+  }
+
+  if (model === 'hybrid') {
+    return `
+      <div class="share-box" style="margin-bottom:12px">
+        <h3 style="font-family:var(--serif);font-size:16px;font-weight:400;margin-bottom:8px">Modelo Hibrido</h3>
+        <p style="font-size:14px;color:var(--text)">Taxa fixa de <strong>${formatCurrency(af.fixed_fee || 0)}</strong> por conversao + taxas por evento abaixo.</p>
+      </div>
+    `;
+  }
+
+  if (model === 'ramp_up') {
+    const tiers = af.ramp_up_tiers || [];
+    const periodSales = af.period_sales || 0;
+    // Find current tier
+    let currentTierIdx = 0;
+    for (let i = 0; i < tiers.length; i++) {
+      if (periodSales >= tiers[i].min_sales && (!tiers[i].max_sales || periodSales <= tiers[i].max_sales)) {
+        currentTierIdx = i;
+      }
+    }
+
+    return `
+      <div class="share-box" style="margin-bottom:0">
+        <h3 style="font-family:var(--serif);font-size:16px;font-weight:400;margin-bottom:8px">Comissao Escalonada (Ramp-Up)</h3>
+        <p style="font-size:13px;color:var(--text3);margin-bottom:12px">Suas taxas aumentam conforme voce atinge mais vendas no periodo.</p>
+        <div style="margin-bottom:12px;padding:10px 14px;background:var(--success-light);border-radius:var(--radius);font-size:14px">
+          Vendas no periodo atual: <strong>${periodSales}</strong>
+          ${tiers[currentTierIdx] ? ` &bull; Taxa atual: <strong>${((tiers[currentTierIdx].rate || 0) * 100).toFixed(1)}%</strong>` : ''}
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Faixa de Vendas</th><th>Taxa</th><th>Status</th></tr></thead>
+            <tbody>
+              ${tiers.map((tier, i) => {
+                const isActive = periodSales >= tier.min_sales && (!tier.max_sales || periodSales <= tier.max_sales);
+                const maxLabel = tier.max_sales ? tier.max_sales : '+';
+                return `<tr style="${isActive ? 'background:var(--success-light)' : ''}">
+                  <td>${tier.min_sales} - ${maxLabel}</td>
+                  <td><strong>${((tier.rate || 0) * 100).toFixed(1)}%</strong></td>
+                  <td>${isActive ? '<span class="badge badge-success">ATUAL</span>' : '<span class="badge badge-pending">-</span>'}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // Default percentage: no extra info needed
+  return '';
 }
 
 function translateEvent(event) {

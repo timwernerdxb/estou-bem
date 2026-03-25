@@ -452,10 +452,29 @@ async function initDB() {
       ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS applied_at TIMESTAMPTZ DEFAULT NOW();
       ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS pix_key TEXT;
 
+      -- Flexible commission models
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS commission_model TEXT DEFAULT 'percentage' CHECK (commission_model IN ('percentage','fixed_fee','hybrid','ramp_up'));
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS fixed_fee REAL DEFAULT 0;
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS ramp_up_tiers JSONB DEFAULT '[]';
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS period_start TIMESTAMPTZ DEFAULT NOW();
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS period_sales INTEGER DEFAULT 0;
+
+      -- Referral rewards
+      CREATE TABLE IF NOT EXISTS referral_rewards (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        reward_type TEXT DEFAULT 'free_month',
+        referral_count INTEGER DEFAULT 0,
+        applied_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       -- User referral codes
       ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by INTEGER REFERENCES users(id);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS affiliate_id INTEGER REFERENCES affiliates(id);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_reward_count INTEGER DEFAULT 0;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS free_months_earned INTEGER DEFAULT 0;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_source TEXT;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_medium TEXT;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_campaign TEXT;
@@ -1057,9 +1076,13 @@ app.post('/api/register', rateLimiter, async (req, res) => {
 
     // Check referral
     let referredBy = null;
+    let referrerId = null;
     if (referral_code) {
       const referrer = await pool.query(`SELECT id FROM users WHERE referral_code = $1`, [referral_code]);
-      if (referrer.rows[0]) referredBy = referrer.rows[0].id;
+      if (referrer.rows[0]) {
+        referredBy = referrer.rows[0].id;
+        referrerId = referrer.rows[0].id;
+      }
     }
 
     const userRefCode = 'EB' + Math.random().toString(36).toUpperCase().slice(2, 6);
@@ -1074,6 +1097,19 @@ app.post('/api/register', rateLimiter, async (req, res) => {
 
     // Create default settings
     await pool.query(`INSERT INTO settings (user_id) VALUES ($1)`, [user.id]);
+
+    // Check if referrer earned a free month (every 5 referrals)
+    if (referrerId) {
+      const referralCount = await pool.query('SELECT COUNT(*) FROM users WHERE referred_by = $1', [referrerId]);
+      const count = parseInt(referralCount.rows[0].count);
+      if (count > 0 && count % 5 === 0) {
+        await pool.query('UPDATE users SET free_months_earned = free_months_earned + 1 WHERE id = $1', [referrerId]);
+        await pool.query(
+          'INSERT INTO referral_rewards (user_id, reward_type, referral_count) VALUES ($1, $2, $3)',
+          [referrerId, 'free_month', count]
+        );
+      }
+    }
 
     // Create initial pending checkin for elder
     if (role === 'elder') {
@@ -2664,6 +2700,44 @@ async function getEffectiveSub(userId) {
   return user.subscription;
 }
 
+// ── Commission Calculation Helper ─────────────────────────
+async function calculateCommission(pool, affiliate, event, revenue) {
+  const model = affiliate.commission_model || 'percentage';
+  const rates = affiliate.commission_rate || {};
+
+  if (model === 'fixed_fee') {
+    return affiliate.fixed_fee || 0;
+  }
+
+  if (model === 'hybrid') {
+    // Fixed fee + percentage
+    const percentage = rates[event] || 0;
+    return (affiliate.fixed_fee || 0) + percentage;
+  }
+
+  if (model === 'ramp_up') {
+    // Get current period sales count
+    const tiers = affiliate.ramp_up_tiers || [];
+    const periodSales = affiliate.period_sales || 0;
+
+    // Find applicable tier
+    let applicableRate = 0;
+    for (const tier of tiers) {
+      if (periodSales >= tier.min_sales && (!tier.max_sales || periodSales <= tier.max_sales)) {
+        applicableRate = tier.rate || 0;
+      }
+    }
+
+    // Increment period sales
+    await pool.query('UPDATE affiliates SET period_sales = period_sales + 1 WHERE id = $1', [affiliate.id]);
+
+    return revenue ? revenue * applicableRate : applicableRate;
+  }
+
+  // Default: percentage model
+  return rates[event] || 0;
+}
+
 // ── Conversion Tracking Routes ────────────────────────────
 // Public conversion endpoint (for mobile app affiliate tracking without auth)
 app.post('/api/conversions/track', async (req, res) => {
@@ -2680,10 +2754,9 @@ app.post('/api/conversions/track', async (req, res) => {
 
     // Auto-create commission if affiliate exists
     if (affiliate_code) {
-      const affiliate = await pool.query(`SELECT id, commission_rate FROM affiliates WHERE code = $1 AND is_active = true`, [affiliate_code]);
+      const affiliate = await pool.query(`SELECT id, commission_rate, commission_model, fixed_fee, ramp_up_tiers, period_sales FROM affiliates WHERE code = $1 AND is_active = true`, [affiliate_code]);
       if (affiliate.rows[0]) {
-        const rates = affiliate.rows[0].commission_rate || {};
-        const commissionAmount = rates[event] || 0;
+        const commissionAmount = await calculateCommission(pool, affiliate.rows[0], event, revenue || 0);
         if (commissionAmount > 0) {
           await pool.query(
             `INSERT INTO commissions (affiliate_id, conversion_id, amount) VALUES ($1, $2, $3)`,
@@ -2716,10 +2789,9 @@ app.post('/api/conversions', authMiddleware, async (req, res) => {
 
   // Auto-create commission if affiliate exists
   if (affiliate_code) {
-    const affiliate = await pool.query(`SELECT id, commission_rate FROM affiliates WHERE code = $1 AND is_active = true`, [affiliate_code]);
+    const affiliate = await pool.query(`SELECT id, commission_rate, commission_model, fixed_fee, ramp_up_tiers, period_sales FROM affiliates WHERE code = $1 AND is_active = true`, [affiliate_code]);
     if (affiliate.rows[0]) {
-      const rates = affiliate.rows[0].commission_rate || {};
-      const commissionAmount = rates[event] || 0;
+      const commissionAmount = await calculateCommission(pool, affiliate.rows[0], event, revenue || 0);
       if (commissionAmount > 0) {
         await pool.query(
           `INSERT INTO commissions (affiliate_id, conversion_id, amount) VALUES ($1, $2, $3)`,
@@ -3881,7 +3953,7 @@ app.get('/api/admin/affiliates', adminAuth, async (req, res) => {
 // PUT /api/admin/affiliates/:id - update affiliate
 app.put('/api/admin/affiliates/:id', adminAuth, async (req, res) => {
   try {
-    const { is_active, name, email, phone, channel, commission_rate, pix_key } = req.body;
+    const { is_active, name, email, phone, channel, commission_rate, pix_key, commission_model, fixed_fee, ramp_up_tiers } = req.body;
     const result = await pool.query(
       `UPDATE affiliates SET
         is_active = COALESCE($1, is_active),
@@ -3890,15 +3962,55 @@ app.put('/api/admin/affiliates/:id', adminAuth, async (req, res) => {
         phone = COALESCE($4, phone),
         channel = COALESCE($5, channel),
         commission_rate = COALESCE($6, commission_rate),
-        pix_key = COALESCE($7, pix_key)
-      WHERE id = $8 RETURNING *`,
-      [is_active, name, email, phone, channel, commission_rate ? JSON.stringify(commission_rate) : null, pix_key !== undefined ? pix_key : null, req.params.id]
+        pix_key = COALESCE($7, pix_key),
+        commission_model = COALESCE($8, commission_model),
+        fixed_fee = COALESCE($9, fixed_fee),
+        ramp_up_tiers = COALESCE($10, ramp_up_tiers)
+      WHERE id = $11 RETURNING *`,
+      [is_active, name, email, phone, channel, commission_rate ? JSON.stringify(commission_rate) : null, pix_key !== undefined ? pix_key : null, commission_model || null, fixed_fee !== undefined ? fixed_fee : null, ramp_up_tiers ? JSON.stringify(ramp_up_tiers) : null, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Affiliate not found' });
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Admin update affiliate error:', err);
     res.status(500).json({ error: 'Failed to update affiliate' });
+  }
+});
+
+// PUT /api/admin/affiliates/:id/commission-model - update commission model
+app.put('/api/admin/affiliates/:id/commission-model', adminAuth, async (req, res) => {
+  const { commission_model, fixed_fee, commission_rate, ramp_up_tiers } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE affiliates SET
+        commission_model = COALESCE($1, commission_model),
+        fixed_fee = COALESCE($2, fixed_fee),
+        commission_rate = COALESCE($3, commission_rate),
+        ramp_up_tiers = COALESCE($4, ramp_up_tiers)
+      WHERE id = $5 RETURNING *`,
+      [commission_model, fixed_fee, commission_rate ? JSON.stringify(commission_rate) : null, ramp_up_tiers ? JSON.stringify(ramp_up_tiers) : null, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Affiliate not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Admin update commission model error:', err);
+    res.status(500).json({ error: 'Failed to update commission model' });
+  }
+});
+
+// GET /api/admin/referral-rewards - see users who earned free months
+app.get('/api/admin/referral-rewards', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT rr.*, u.name, u.email, u.free_months_earned
+       FROM referral_rewards rr
+       JOIN users u ON rr.user_id = u.id
+       ORDER BY rr.created_at DESC LIMIT 200`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin referral rewards error:', err);
+    res.status(500).json({ error: 'Failed to fetch referral rewards' });
   }
 });
 
