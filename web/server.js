@@ -1,8 +1,11 @@
 const express = require('express');
 const { Pool, Client } = require('pg');
 const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const path = require('path');
 const http = require('http');
+
+const BCRYPT_ROUNDS = 12;
 
 // WebSocket — graceful fallback if not installed
 let WebSocket;
@@ -568,6 +571,30 @@ async function initDB() {
       );
       CREATE INDEX IF NOT EXISTS idx_email_alerts_user ON email_alerts(related_user_id);
 
+      -- Sessions table (DB-based token store)
+      CREATE TABLE IF NOT EXISTS sessions (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ,
+        ip_address VARCHAR(50)
+      );
+      CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+      CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+      -- Password reset tokens
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_password_reset_token ON password_reset_tokens(token);
+
       -- Fall detection events
       CREATE TABLE IF NOT EXISTS fall_events (
         id SERIAL PRIMARY KEY,
@@ -664,45 +691,154 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Auth helper
-function hashPassword(pw) {
-  return crypto.createHash('sha256').update(pw).digest('hex');
+// Auth helper — bcrypt for password hashing
+async function hashPassword(pw) {
+  return bcrypt.hash(pw, BCRYPT_ROUNDS);
+}
+
+async function verifyPassword(pw, hash) {
+  // Support legacy SHA-256 hashes (64 hex chars) for migration
+  if (hash && hash.length === 64 && /^[a-f0-9]+$/.test(hash)) {
+    const sha256 = crypto.createHash('sha256').update(pw).digest('hex');
+    return sha256 === hash;
+  }
+  return bcrypt.compare(pw, hash);
 }
 
 function generateToken(userId) {
   return crypto.createHmac('sha256', process.env.JWT_SECRET || 'estoubem-secret-key-change-in-prod')
-    .update(String(userId) + Date.now())
+    .update(String(userId) + Date.now() + crypto.randomBytes(16).toString('hex'))
     .digest('hex');
 }
 
-// Simple token store (in production, use JWT or sessions)
-const tokens = new Map(); // token -> userId
+// ── Rate Limiter (in-memory, IP-based) ───────────────────
+const rateLimitMap = new Map(); // ip -> { count, resetAt }
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX = 5; // 5 attempts per minute
 
-function authMiddleware(req, res, next) {
+function rateLimiter(req, res, next) {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection?.remoteAddress || 'unknown';
+  const now = Date.now();
+  let entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+    rateLimitMap.set(ip, entry);
+  }
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX) {
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+    res.set('Retry-After', String(retryAfter));
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+  next();
+}
+
+// Clean up rate limit map every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap) {
+    if (now > entry.resetAt) rateLimitMap.delete(ip);
+  }
+}, 5 * 60 * 1000);
+
+// ── DB-based session tokens ──────────────────────────────
+// Legacy in-memory fallback removed — all tokens stored in sessions table
+async function storeToken(token, userId, ipAddress) {
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+  try {
+    await pool.query(
+      `INSERT INTO sessions (user_id, token, expires_at, ip_address) VALUES ($1, $2, $3, $4)`,
+      [String(userId), token, expiresAt, ipAddress || null]
+    );
+  } catch (err) {
+    console.error('[Sessions] Failed to store token:', err.message);
+  }
+}
+
+async function getTokenUserId(token) {
+  try {
+    const result = await pool.query(
+      `SELECT user_id FROM sessions WHERE token = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
+      [token]
+    );
+    if (result.rows.length === 0) return null;
+    const uid = result.rows[0].user_id;
+    // Return as number if it's a numeric user ID, else as string (e.g. 'af_123')
+    return /^\d+$/.test(uid) ? parseInt(uid, 10) : uid;
+  } catch (err) {
+    console.error('[Sessions] Failed to get token:', err.message);
+    return null;
+  }
+}
+
+async function deleteToken(token) {
+  try {
+    await pool.query(`DELETE FROM sessions WHERE token = $1`, [token]);
+  } catch (err) {
+    console.error('[Sessions] Failed to delete token:', err.message);
+  }
+}
+
+// Clean up expired sessions every hour
+setInterval(async () => {
+  try {
+    const result = await pool.query(`DELETE FROM sessions WHERE expires_at < NOW()`);
+    if (result.rowCount > 0) console.log(`[Sessions] Cleaned up ${result.rowCount} expired sessions`);
+  } catch (err) {
+    // Ignore — table may not exist yet at startup
+  }
+}, 60 * 60 * 1000);
+
+// ── Input Validation Helpers ─────────────────────────────
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidPhone(phone) {
+  // Allow empty, or digits with optional +, (), -, spaces — 7 to 20 chars
+  if (!phone || phone.trim() === '') return true; // phone is optional
+  const cleaned = phone.replace(/[\s()\-+]/g, '');
+  return /^\d{7,20}$/.test(cleaned);
+}
+
+function sanitizeString(str) {
+  if (typeof str !== 'string') return str;
+  // Strip null bytes and trim
+  return str.replace(/\0/g, '').trim();
+}
+
+async function authMiddleware(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   const token = auth.slice(7);
-  const userId = tokens.get(token);
+  const userId = await getTokenUserId(token);
   if (!userId) return res.status(401).json({ error: 'Invalid token' });
   req.userId = userId;
   next();
 }
 
 // ── Auth Routes ───────────────────────────────────────────
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', rateLimiter, async (req, res) => {
   const { email, password, name, phone, role, referral_code, utm_source, utm_medium, utm_campaign } = req.body;
   if (!email || !password || !name || !role) {
     return res.status(400).json({ error: 'email, password, name, and role are required' });
   }
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+  if (!isValidPhone(phone)) {
+    return res.status(400).json({ error: 'Invalid phone number format' });
   }
   if (!['elder', 'family', 'caregiver'].includes(role)) {
     return res.status(400).json({ error: 'Invalid role' });
   }
 
-  const hash = hashPassword(password);
+  const hash = await hashPassword(password);
   const linkCode = Math.random().toString().slice(2, 8);
+  const sanitizedName = sanitizeString(name);
 
   try {
     // Check referral
@@ -717,7 +853,7 @@ app.post('/api/register', async (req, res) => {
       `INSERT INTO users (email, password_hash, name, phone, role, link_code, trial_start, referral_code, referred_by, utm_source, utm_medium, utm_campaign)
        VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11)
        RETURNING id, email, name, phone, role, link_code, subscription, trial_start, referral_code`,
-      [email.toLowerCase(), hash, name, phone || '', role, linkCode, userRefCode, referredBy, utm_source, utm_medium, utm_campaign]
+      [email.toLowerCase().trim(), hash, sanitizedName, phone || '', role, linkCode, userRefCode, referredBy, utm_source, utm_medium, utm_campaign]
     );
 
     const user = result.rows[0];
@@ -734,7 +870,8 @@ app.post('/api/register', async (req, res) => {
     }
 
     const token = generateToken(user.id);
-    tokens.set(token, user.id);
+    const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
+    await storeToken(token, user.id, ipAddress);
 
     res.json({ ok: true, token, user });
   } catch (err) {
@@ -746,23 +883,124 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', rateLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
 
-  const hash = hashPassword(password);
-  const result = await pool.query(
-    `SELECT id, email, name, phone, role, link_code, subscription, trial_start, linked_elder_id FROM users WHERE email = $1 AND password_hash = $2`,
-    [email.toLowerCase(), hash]
-  );
+  try {
+    const result = await pool.query(
+      `SELECT id, email, name, phone, role, link_code, subscription, trial_start, linked_elder_id, password_hash FROM users WHERE email = $1`,
+      [email.toLowerCase().trim()]
+    );
 
-  if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
+    if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
 
-  const user = result.rows[0];
-  const token = generateToken(user.id);
-  tokens.set(token, user.id);
+    const user = result.rows[0];
+    const passwordValid = await verifyPassword(password, user.password_hash);
+    if (!passwordValid) return res.status(401).json({ error: 'Invalid email or password' });
 
-  res.json({ ok: true, token, user });
+    // If password was stored as legacy SHA-256, upgrade to bcrypt
+    if (user.password_hash && user.password_hash.length === 64 && /^[a-f0-9]+$/.test(user.password_hash)) {
+      const newHash = await hashPassword(password);
+      await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [newHash, user.id]);
+      console.log(`[Auth] Upgraded password hash for user ${user.id} from SHA-256 to bcrypt`);
+    }
+
+    const token = generateToken(user.id);
+    const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
+    await storeToken(token, user.id, ipAddress);
+
+    // Remove password_hash from response
+    delete user.password_hash;
+    res.json({ ok: true, token, user });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// ── Logout ────────────────────────────────────────────────
+app.post('/api/logout', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith('Bearer ')) {
+    const token = auth.slice(7);
+    await deleteToken(token);
+  }
+  res.json({ ok: true });
+});
+
+// ── Password Reset Flow ──────────────────────────────────
+app.post('/api/forgot-password', rateLimiter, async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  try {
+    const user = await pool.query(`SELECT id, name FROM users WHERE email = $1`, [email.toLowerCase().trim()]);
+    // Always return success to prevent email enumeration
+    if (user.rows.length === 0) {
+      return res.json({ ok: true, message: 'If an account with that email exists, a reset link has been sent.' });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await pool.query(
+      `INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
+      [user.rows[0].id, resetToken, expiresAt]
+    );
+
+    // Send reset email
+    const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
+    await sendEmail(email.toLowerCase().trim(), 'Estou Bem - Redefinir Senha', `
+      <div style="font-family:'Inter',sans-serif;max-width:500px;margin:0 auto;padding:24px;background:#F5F0EB;border-radius:8px">
+        <div style="text-align:center;margin-bottom:20px">
+          <span style="font-family:Georgia,serif;font-size:24px;color:#2D4A3E">Estou Bem</span>
+        </div>
+        <div style="background:white;padding:24px;border-radius:4px;border:1px solid #E5DDD3">
+          <h2 style="color:#2D4A3E;margin:0 0 12px">Redefinir Senha</h2>
+          <p style="color:#5C5549;line-height:1.6">Ola ${user.rows[0].name}, voce solicitou a redefinicao da sua senha.</p>
+          <p style="color:#5C5549;line-height:1.6">Clique no link abaixo para redefinir:</p>
+          <a href="${resetUrl}" style="display:inline-block;background:#2D4A3E;color:white;padding:12px 24px;border-radius:4px;text-decoration:none;margin:16px 0">Redefinir Senha</a>
+          <p style="color:#9A9189;font-size:13px;margin-top:16px">Este link expira em 1 hora. Se voce nao solicitou isso, ignore este email.</p>
+        </div>
+      </div>
+    `);
+
+    res.json({ ok: true, message: 'If an account with that email exists, a reset link has been sent.' });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ error: 'Failed to process request' });
+  }
+});
+
+app.post('/api/reset-password', rateLimiter, async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+  try {
+    const result = await pool.query(
+      `SELECT user_id FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW() AND used = false`,
+      [token]
+    );
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    const userId = result.rows[0].user_id;
+    const newHash = await hashPassword(password);
+
+    await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [newHash, userId]);
+    await pool.query(`UPDATE password_reset_tokens SET used = true WHERE token = $1`, [token]);
+
+    // Invalidate all existing sessions for this user
+    await pool.query(`DELETE FROM sessions WHERE user_id = $1`, [String(userId)]);
+
+    res.json({ ok: true, message: 'Password has been reset successfully' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
 });
 
 // ── Push Notification Helper ─────────────────────────────
@@ -1701,7 +1939,7 @@ app.post('/api/health', authMiddleware, async (req, res) => {
 // ── Activity & Health Readings from Watch ─────────────────
 
 // POST /api/activity-update — receives movement + health data from Apple Watch
-app.post('/api/activity-update', async (req, res) => {
+app.post('/api/activity-update', authMiddleware, async (req, res) => {
   const { user_id, movement_detected, heart_rate, spo2, sleep_hours } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
@@ -1874,7 +2112,7 @@ app.post('/api/activity-update', async (req, res) => {
 
 // POST /api/fall-detected — Apple Watch detected a fall
 // Immediately escalates: Level 2 (voice call to elder), then Level 3 (SAMU) if no response in 60s
-app.post('/api/fall-detected', async (req, res) => {
+app.post('/api/fall-detected', authMiddleware, async (req, res) => {
   const { user_id, timestamp, location, heart_rate } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
@@ -2033,7 +2271,7 @@ app.post('/api/fall-detected', async (req, res) => {
 });
 
 // POST /api/fall-cancelled — Elder cancelled the fall alert (false alarm)
-app.post('/api/fall-cancelled', async (req, res) => {
+app.post('/api/fall-cancelled', authMiddleware, async (req, res) => {
   const { user_id } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
@@ -2254,7 +2492,7 @@ app.post('/api/affiliates', async (req, res) => {
   const { code, channel, name, email, phone, password, commission_rate } = req.body;
   if (!code || !channel || !name) return res.status(400).json({ error: 'code, channel, and name are required' });
 
-  const pwHash = password ? hashPassword(password) : null;
+  const pwHash = password ? await hashPassword(password) : null;
   try {
     const result = await pool.query(
       `INSERT INTO affiliates (code, channel, name, email, phone, password_hash, commission_rate)
@@ -2272,7 +2510,8 @@ app.post('/api/affiliates', async (req, res) => {
 app.post('/api/affiliates/register', async (req, res) => {
   const { name, email, password, phone, channel = 'influencer', company, website, social_media } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'name, email, and password are required' });
-  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'Invalid email format' });
 
   const validChannels = ['influencer', 'paid_media', 'ad_network', 'b2b_partner'];
   const ch = validChannels.includes(channel) ? channel : 'influencer';
@@ -2282,7 +2521,7 @@ app.post('/api/affiliates/register', async (req, res) => {
   const randomChars = crypto.randomBytes(3).toString('hex').slice(0, 4).toUpperCase();
   let code = prefix + randomChars;
 
-  const pwHash = hashPassword(password);
+  const pwHash = await hashPassword(password);
 
   try {
     // Ensure code uniqueness (retry once if collision)
@@ -2312,21 +2551,35 @@ app.post('/api/affiliates/register', async (req, res) => {
 });
 
 // Affiliate login with email + password
-app.post('/api/affiliates/login', async (req, res) => {
+app.post('/api/affiliates/login', rateLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
 
-  const hash = hashPassword(password);
-  const affiliate = await pool.query(
-    `SELECT * FROM affiliates WHERE email = $1 AND password_hash = $2 AND is_active = true`,
-    [email.toLowerCase(), hash]
-  );
-  if (affiliate.rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
+  try {
+    const affiliate = await pool.query(
+      `SELECT * FROM affiliates WHERE email = $1 AND is_active = true`,
+      [email.toLowerCase().trim()]
+    );
+    if (affiliate.rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
 
-  const token = generateToken('af_' + affiliate.rows[0].id);
-  tokens.set(token, 'af_' + affiliate.rows[0].id);
+    const passwordValid = await verifyPassword(password, affiliate.rows[0].password_hash);
+    if (!passwordValid) return res.status(401).json({ error: 'Invalid email or password' });
 
-  res.json({ ok: true, token, affiliate: { id: affiliate.rows[0].id, code: affiliate.rows[0].code, name: affiliate.rows[0].name, channel: affiliate.rows[0].channel } });
+    // Upgrade legacy hash if needed
+    if (affiliate.rows[0].password_hash && affiliate.rows[0].password_hash.length === 64 && /^[a-f0-9]+$/.test(affiliate.rows[0].password_hash)) {
+      const newHash = await hashPassword(password);
+      await pool.query(`UPDATE affiliates SET password_hash = $1 WHERE id = $2`, [newHash, affiliate.rows[0].id]);
+    }
+
+    const token = generateToken('af_' + affiliate.rows[0].id);
+    const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
+    await storeToken(token, 'af_' + affiliate.rows[0].id, ipAddress);
+
+    res.json({ ok: true, token, affiliate: { id: affiliate.rows[0].id, code: affiliate.rows[0].code, name: affiliate.rows[0].name, channel: affiliate.rows[0].channel } });
+  } catch (err) {
+    console.error('Affiliate login error:', err);
+    res.status(500).json({ error: 'Login failed' });
+  }
 });
 
 // Authenticated affiliate dashboard
@@ -2334,7 +2587,7 @@ app.get('/api/affiliates/me/dashboard', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   const token = auth.slice(7);
-  const userId = tokens.get(token);
+  const userId = await getTokenUserId(token);
   if (!userId || !String(userId).startsWith('af_')) return res.status(401).json({ error: 'Invalid token' });
 
   const affiliateId = String(userId).replace('af_', '');
@@ -2368,7 +2621,7 @@ app.put('/api/affiliates/me', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   const token = auth.slice(7);
-  const userId = tokens.get(token);
+  const userId = await getTokenUserId(token);
   if (!userId || !String(userId).startsWith('af_')) return res.status(401).json({ error: 'Invalid token' });
 
   const affiliateId = String(userId).replace('af_', '');
@@ -2394,7 +2647,7 @@ app.post('/api/affiliates/me/payout', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   const token = auth.slice(7);
-  const userId = tokens.get(token);
+  const userId = await getTokenUserId(token);
   if (!userId || !String(userId).startsWith('af_')) return res.status(401).json({ error: 'Invalid token' });
 
   const affiliateId = String(userId).replace('af_', '');
@@ -2445,7 +2698,7 @@ app.get('/api/affiliates/me/payouts', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   const token = auth.slice(7);
-  const userId = tokens.get(token);
+  const userId = await getTokenUserId(token);
   if (!userId || !String(userId).startsWith('af_')) return res.status(401).json({ error: 'Invalid token' });
 
   const affiliateId = String(userId).replace('af_', '');
