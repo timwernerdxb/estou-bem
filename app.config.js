@@ -45,7 +45,7 @@ export default ({ config }) => ({
       backgroundColor: "#F5F0EB",
     },
     package: "com.twerner.estoubem",
-    versionCode: 23,
+    versionCode: 24,
     permissions: [
       "ACTIVITY_RECOGNITION",
       "RECEIVE_BOOT_COMPLETED",
@@ -78,7 +78,7 @@ export default ({ config }) => ({
     ["expo-task-manager"],
     ["@bacons/apple-targets"],
     ["./plugins/withAsyncStorageRepo"],
-    // ["./plugins/withWearOS"], // TODO: re-enable after fixing Wear OS Kotlin compile errors
+    ["./plugins/withWearOS"],
   ],
   extra: {
     revenueCatAppleApiKey:

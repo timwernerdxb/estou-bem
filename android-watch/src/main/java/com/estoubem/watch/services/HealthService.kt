@@ -84,7 +84,7 @@ class HealthService : Service() {
         }
 
         override fun onDataReceived(data: DataPointContainer) {
-            val spo2Points = data.getData(DataType.SPO2)
+            val spo2Points = data.getData(DataType.OXYGEN_SATURATION)
             for (point in spo2Points) {
                 currentSpO2 = point.value.toFloat()
                 Log.d(TAG, "SpO2: $currentSpO2%")
@@ -176,8 +176,8 @@ class HealthService : Service() {
                 }
 
                 // Register SpO2 if supported
-                if (DataType.SPO2 in capabilities.supportedDataTypesMeasure) {
-                    measureClient.registerMeasureCallback(DataType.SPO2, spo2Callback)
+                if (DataType.OXYGEN_SATURATION in capabilities.supportedDataTypesMeasure) {
+                    measureClient.registerMeasureCallback(DataType.OXYGEN_SATURATION, spo2Callback)
                     Log.d(TAG, "SpO2 monitoring registered")
                 } else {
                     Log.w(TAG, "SpO2 not supported on this device")
@@ -202,12 +202,12 @@ class HealthService : Service() {
     private fun stopHealthMonitoring() {
         serviceScope.launch {
             try {
-                measureClient.unregisterMeasureCallback(DataType.HEART_RATE_BPM, heartRateCallback)
+                measureClient.unregisterMeasureCallbackAsync(DataType.HEART_RATE_BPM, heartRateCallback)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to unregister heart rate callback", e)
             }
             try {
-                measureClient.unregisterMeasureCallback(DataType.SPO2, spo2Callback)
+                measureClient.unregisterMeasureCallbackAsync(DataType.OXYGEN_SATURATION, spo2Callback)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to unregister SpO2 callback", e)
             }
