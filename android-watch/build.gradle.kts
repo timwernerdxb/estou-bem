@@ -8,7 +8,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.twerner.estoubem"
+        applicationId = "com.twerner.estoubem.wear"
         minSdk = 30
         targetSdk = 34
         versionCode = 1
