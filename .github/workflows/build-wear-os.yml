@@ -1,4 +1,4 @@
-name: Build Wear OS APK
+name: Build Wear OS AAB
 
 on:
   workflow_dispatch:
@@ -25,16 +25,27 @@ jobs:
     - name: Create local.properties
       run: echo "sdk.dir=$ANDROID_HOME" > android-watch/local.properties
 
-    - name: Setup Gradle wrapper
+    - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
-    - name: Build Debug APK
+    - name: Build Release AAB
       working-directory: android-watch
-      run: gradle assembleDebug
+      run: gradle bundleRelease --no-daemon
 
-    - name: Upload APK
+    - name: Upload AAB
       uses: actions/upload-artifact@v4
       with:
-        name: wear-os-apk
-        path: android-watch/build/outputs/apk/debug/*.apk
+        name: wear-os-aab
+        path: android-watch/build/outputs/bundle/release/*.aab
         if-no-files-found: error
+
+    - name: Also build Debug APK (for testing)
+      working-directory: android-watch
+      run: gradle assembleDebug --no-daemon
+
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: wear-os-debug-apk
+        path: android-watch/build/outputs/apk/debug/*.apk
+        if-no-files-found: warn

@@ -139,10 +139,9 @@ class PhoneConnectionService : WearableListenerService() {
             sendMessage(context, PATH_FALL_CANCELLED, json.toString())
         }
 
-        fun sendHealthData(context: Context, heartRate: Float, spo2: Float, steps: Long) {
+        fun sendHealthData(context: Context, heartRate: Float, steps: Long) {
             val data = mapOf<String, Any>(
                 "heart_rate" to heartRate,
-                "spo2" to spo2,
                 "steps" to steps,
                 "measured_at" to System.currentTimeMillis()
             )

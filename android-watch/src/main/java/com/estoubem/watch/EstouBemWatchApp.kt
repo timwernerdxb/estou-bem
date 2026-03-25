@@ -13,6 +13,7 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
+import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.estoubem.watch.presentation.CheckInScreen
@@ -95,11 +96,18 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
-        registerReceiver(
-            fallReceiver,
-            IntentFilter(FallDetectionService.ACTION_FALL_DETECTED),
-            RECEIVER_NOT_EXPORTED
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                fallReceiver,
+                IntentFilter(FallDetectionService.ACTION_FALL_DETECTED),
+                RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            registerReceiver(
+                fallReceiver,
+                IntentFilter(FallDetectionService.ACTION_FALL_DETECTED)
+            )
+        }
     }
 
     override fun onStop() {

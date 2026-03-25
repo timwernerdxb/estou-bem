@@ -144,9 +144,9 @@ async function sendWsAlertToFamily(elderId, alert) {
 
 // ── Email Notifications via Resend ────────────────────────
 async function sendEmail(to, subject, html) {
-  const RESEND_API_KEY = process.env.RESEND_API_KEY;
+  const RESEND_API_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
   if (!RESEND_API_KEY) {
-    console.log(`[Email] No RESEND_API_KEY set. Would send to ${to}: ${subject}`);
+    console.log(`[Email] No RESEND_API_KEY/RESEND_KEY set. Would send to ${to}: ${subject}`);
     return false;
   }
 
@@ -4166,6 +4166,63 @@ app.get('/invite', (req, res) => {
 // Marketing landing page
 app.get('/landing', (req, res) => {
   res.sendFile(path.join(__dirname, 'landing.html'));
+});
+
+// Password reset page
+app.get('/reset-password', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Estou Bem — Redefinir Senha</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#F5F0EB;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#fff;border:1px solid #E5DDD3;border-radius:4px;padding:40px;max-width:400px;width:100%;text-align:center}
+h1{font-family:'Playfair Display',serif;color:#2D4A3E;font-size:24px;margin-bottom:8px}
+p{color:#5C5549;font-size:14px;margin-bottom:24px;line-height:1.5}
+label{display:block;text-align:left;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#9A9189;margin-bottom:6px}
+input{width:100%;padding:12px;border:none;border-bottom:2px solid #E5DDD3;font-size:16px;background:transparent;outline:none;margin-bottom:16px;transition:border-color .2s}
+input:focus{border-color:#C9A96E}
+button{width:100%;padding:14px;background:#2D4A3E;color:#F5F0EB;border:none;border-radius:4px;font-size:13px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:500}
+button:hover{background:#1E352B}
+.msg{margin-top:16px;padding:12px;border-radius:4px;font-size:13px}
+.msg.ok{background:#E8F0EC;color:#2D4A3E}.msg.err{background:#F5E8E8;color:#8B3A3A}
+.logo{font-family:'Playfair Display',serif;color:#2D4A3E;font-size:28px;margin-bottom:24px}
+.divider{width:40px;height:2px;background:#C9A96E;margin:0 auto 24px}
+</style></head><body>
+<div class="card">
+  <div class="logo">Estou Bem</div>
+  <h1>Redefinir Senha</h1>
+  <div class="divider"></div>
+  <p>Digite sua nova senha abaixo.</p>
+  <div id="form">
+    <label>NOVA SENHA</label>
+    <input type="password" id="pw1" placeholder="Mínimo 8 caracteres" minlength="8">
+    <label>CONFIRMAR SENHA</label>
+    <input type="password" id="pw2" placeholder="Repita a senha" minlength="8">
+    <button onclick="doReset()">REDEFINIR SENHA</button>
+  </div>
+  <div id="msg" class="msg" style="display:none"></div>
+</div>
+<script>
+async function doReset(){
+  const pw1=document.getElementById('pw1').value;
+  const pw2=document.getElementById('pw2').value;
+  const msg=document.getElementById('msg');
+  if(pw1.length<8){msg.className='msg err';msg.textContent='A senha deve ter no mínimo 8 caracteres.';msg.style.display='block';return}
+  if(pw1!==pw2){msg.className='msg err';msg.textContent='As senhas não coincidem.';msg.style.display='block';return}
+  const token=new URLSearchParams(window.location.search).get('token');
+  if(!token){msg.className='msg err';msg.textContent='Token inválido.';msg.style.display='block';return}
+  try{
+    const r=await fetch('/api/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,password:pw1})});
+    const d=await r.json();
+    if(r.ok){
+      document.getElementById('form').style.display='none';
+      msg.className='msg ok';msg.innerHTML='Senha redefinida com sucesso!<br><br><a href="/" style="color:#2D4A3E;font-weight:600">Fazer login →</a>';msg.style.display='block';
+    } else {
+      msg.className='msg err';msg.textContent=d.error||'Erro ao redefinir senha.';msg.style.display='block';
+    }
+  }catch(e){msg.className='msg err';msg.textContent='Erro de conexão.';msg.style.display='block'}
+}
+</script></body></html>`);
 });
 
 // SPA fallback

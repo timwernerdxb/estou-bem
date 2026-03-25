@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.VibrationEffect
@@ -165,11 +166,18 @@ object CheckInScreen {
                 streakText.text = if (s > 0) "$s dias seguidos" else ""
             }
         }
-        context.registerReceiver(
-            receiver,
-            IntentFilter(PhoneConnectionService.ACTION_SETTINGS_UPDATED),
-            Context.RECEIVER_NOT_EXPORTED
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(
+                receiver,
+                IntentFilter(PhoneConnectionService.ACTION_SETTINGS_UPDATED),
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            context.registerReceiver(
+                receiver,
+                IntentFilter(PhoneConnectionService.ACTION_SETTINGS_UPDATED)
+            )
+        }
 
         return root
     }

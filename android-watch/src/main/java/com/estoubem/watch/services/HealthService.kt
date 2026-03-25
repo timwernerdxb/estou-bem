@@ -93,7 +93,7 @@ class HealthService : Service() {
         override fun run() {
             Log.d(TAG, "Syncing health data to phone: HR=$currentHeartRate, steps=$currentSteps")
             PhoneConnectionService.sendHealthData(
-                this@HealthService, currentHeartRate, 0f, currentSteps
+                this@HealthService, currentHeartRate, currentSteps
             )
             handler.postDelayed(this, PHONE_SYNC_INTERVAL_MS)
         }

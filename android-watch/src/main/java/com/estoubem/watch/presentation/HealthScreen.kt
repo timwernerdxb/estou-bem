@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import android.graphics.Color
 import android.graphics.Typeface
 import android.util.TypedValue
@@ -17,7 +18,6 @@ import com.estoubem.watch.services.HealthService
 /**
  * Health screen showing real-time data from HealthService:
  * - Heart rate (bpm)
- * - SpO2 (%)
  * - Steps
  *
  * Observes HealthService.PREFS_NAME SharedPreferences via broadcast.
@@ -63,26 +63,31 @@ object HealthScreen {
 
         // Heart rate row
         val hrValue = createMetricRow(context, container, "Batimentos", "--", "bpm")
-        // SpO2 row
-        val spo2Value = createMetricRow(context, container, "Oxigenio", "--", "%")
         // Steps row
         val stepsValue = createMetricRow(context, container, "Passos", "--", "")
 
         // Load initial values
-        updateValues(prefs, hrValue, spo2Value, stepsValue)
+        updateValues(prefs, hrValue, stepsValue)
 
         // Listen for updates
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
                 val p = ctx.getSharedPreferences(HealthService.PREFS_NAME, Context.MODE_PRIVATE)
-                updateValues(p, hrValue, spo2Value, stepsValue)
+                updateValues(p, hrValue, stepsValue)
             }
         }
-        context.registerReceiver(
-            receiver,
-            IntentFilter(HealthService.ACTION_HEALTH_UPDATED),
-            Context.RECEIVER_NOT_EXPORTED
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(
+                receiver,
+                IntentFilter(HealthService.ACTION_HEALTH_UPDATED),
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            context.registerReceiver(
+                receiver,
+                IntentFilter(HealthService.ACTION_HEALTH_UPDATED)
+            )
+        }
 
         root.addView(container)
         return root
@@ -143,22 +148,12 @@ object HealthScreen {
     private fun updateValues(
         prefs: android.content.SharedPreferences,
         hrView: TextView,
-        spo2View: TextView,
         stepsView: TextView
     ) {
         val hr = prefs.getFloat("heart_rate", 0f)
-        val spo2 = prefs.getFloat("spo2", 0f)
         val steps = prefs.getFloat("steps", 0f)
 
         hrView.text = if (hr > 0) "${hr.toInt()}" else "--"
-        spo2View.text = if (spo2 > 0) "${spo2.toInt()}" else "--"
         stepsView.text = if (steps > 0) "${steps.toLong()}" else "--"
-
-        // Highlight low SpO2 in red
-        if (spo2 > 0 && spo2 < 90) {
-            spo2View.setTextColor(Color.parseColor("#D32F2F"))
-        } else {
-            spo2View.setTextColor(Color.parseColor("#2D4A3E"))
-        }
     }
 }
