@@ -3420,14 +3420,15 @@ async function loadReferralInfo() {
   if (!card || !authToken) return;
   try {
     const res = await api('GET', '/api/referral-code');
-    const code = res.code;
+    if (!res.ok || !res.data?.code) throw new Error('No code');
+    const code = res.data.code;
     const baseUrl = window.location.origin;
     const link = `${baseUrl}/?ref=${code}`;
     const linkEl = document.getElementById('referral-link');
     if (linkEl) linkEl.value = link;
 
-    const referralCount = res.referral_count || 0;
-    const freeMonths = res.free_months_earned || 0;
+    const referralCount = res.data.referral_count || 0;
+    const freeMonths = res.data.free_months_earned || 0;
     const nextMilestone = (Math.floor(referralCount / 5) + 1) * 5;
 
     const countEl = document.getElementById('referral-count');
