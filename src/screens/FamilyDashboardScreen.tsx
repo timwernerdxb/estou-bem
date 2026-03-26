@@ -240,14 +240,32 @@ export function FamilyDashboardScreen() {
       >
         {/* Header */}
         <Text style={styles.title}>Painel Familiar</Text>
-        <View style={styles.subtitleRow}>
-          <Text style={styles.subtitle}>Acompanhando: {elderName}</Text>
-          {lastActivityText && (
-            <Text style={styles.lastActivity}>
-              Última atividade: {lastActivityText}
-            </Text>
-          )}
-        </View>
+
+        {/* Elder Profile Card - tappable */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("MedicalProfile" as any, { userId: elderData?.elderId })}
+          activeOpacity={0.7}
+        >
+          <Card style={styles.elderProfileCard}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={styles.elderAvatar}>
+                <Text style={styles.elderAvatarText}>
+                  {elderName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.elderProfileName}>{elderName}</Text>
+                <Text style={styles.elderProfileRole}>Pessoa Assistida</Text>
+                {lastActivityText && (
+                  <Text style={styles.elderProfileActivity}>
+                    Última atividade: {lastActivityText}
+                  </Text>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+            </View>
+          </Card>
+        </TouchableOpacity>
 
         {/* Overall Status Card */}
         <Card
@@ -483,6 +501,21 @@ const styles = StyleSheet.create({
   subtitleRow: { marginBottom: SPACING.lg },
   subtitle: { ...FONTS.caption },
   lastActivity: { ...FONTS.small, color: COLORS.primary, marginTop: 2 },
+  elderProfileCard: { marginBottom: SPACING.md, padding: SPACING.md },
+  elderAvatar: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: COLORS.primary, justifyContent: "center", alignItems: "center",
+  },
+  elderAvatarText: {
+    color: "#fff", fontSize: 20, fontWeight: "700",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+  },
+  elderProfileName: {
+    fontSize: 18, fontWeight: "600", color: COLORS.text,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+  },
+  elderProfileRole: { fontSize: 13, color: COLORS.textLight, marginTop: 2 },
+  elderProfileActivity: { fontSize: 12, color: COLORS.primary, marginTop: 2 },
   statusCard: { marginBottom: SPACING.md },
   statusHeader: { flexDirection: "row", alignItems: "center", gap: SPACING.md },
   statusInfo: { flex: 1 },
