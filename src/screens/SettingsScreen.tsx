@@ -173,6 +173,13 @@ export function SettingsScreen() {
       if (!res.ok) {
         Alert.alert("Erro", data.error || "Codigo invalido.");
       } else {
+        // Update local state with linked elder info
+        if (data.elderId && state.currentUser) {
+          dispatch({
+            type: "SET_USER",
+            payload: { ...state.currentUser, linked_elder_id: String(data.elderId) },
+          });
+        }
         Alert.alert("Vinculado!", `Voce foi vinculado(a) a ${data.elderName}.`);
         setLinkCode("");
       }

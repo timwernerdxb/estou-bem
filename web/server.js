@@ -1858,6 +1858,63 @@ app.post('/api/link-elder', authMiddleware, async (req, res) => {
   res.json({ ok: true, elderName: elder.rows[0].name, elderId: elder.rows[0].id });
 });
 
+// ── Family Elder Status ──────────────────────────────────
+app.get('/api/family/elder-status', authMiddleware, async (req, res) => {
+  try {
+    const user = await pool.query(`SELECT linked_elder_id FROM users WHERE id = $1`, [req.userId]);
+    const elderId = user.rows[0]?.linked_elder_id;
+    if (!elderId) return res.json({ linked: false });
+
+    // Elder info
+    const elder = await pool.query(`SELECT id, name, phone, email, created_at FROM users WHERE id = $1`, [elderId]);
+    if (elder.rows.length === 0) return res.json({ linked: false });
+
+    const elderName = elder.rows[0].name;
+
+    // Today's check-ins
+    const today = new Date().toISOString().slice(0, 10);
+    const checkins = await pool.query(
+      `SELECT id, time, status, date, confirmed_at, created_at FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
+      [elderId]
+    );
+
+    // Medications
+    const medications = await pool.query(
+      `SELECT id, name, dosage, frequency, time, stock, unit, low_threshold FROM medications WHERE user_id = $1`,
+      [elderId]
+    );
+
+    // Recent health entries (last 30)
+    const health = await pool.query(
+      `SELECT id, type, value, unit, time, date, notes, created_at FROM health_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 30`,
+      [elderId]
+    );
+
+    // Last activity: most recent check-in confirmation or health entry
+    const lastCheckin = checkins.rows.find(c => c.status === 'confirmed' || c.status === 'auto_confirmed');
+    const lastHealth = health.rows[0];
+    let lastActivity = null;
+    if (lastCheckin?.confirmed_at) lastActivity = lastCheckin.confirmed_at;
+    else if (lastCheckin?.created_at) lastActivity = lastCheckin.created_at;
+    if (lastHealth?.created_at && (!lastActivity || new Date(lastHealth.created_at) > new Date(lastActivity))) {
+      lastActivity = lastHealth.created_at;
+    }
+
+    res.json({
+      linked: true,
+      elderId,
+      elderName,
+      checkins: checkins.rows,
+      medications: medications.rows,
+      health: health.rows,
+      lastActivity,
+    });
+  } catch (err) {
+    console.error('[elder-status] Error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ── Settings Routes ───────────────────────────────────────
 app.get('/api/settings', authMiddleware, async (req, res) => {
   const result = await pool.query(`SELECT * FROM settings WHERE user_id = $1`, [req.userId]);

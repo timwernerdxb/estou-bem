@@ -241,6 +241,20 @@ export async function postFallCancelled(
   return res.json();
 }
 
+// ─── Family Elder Status ──────────────────────────────────────
+
+export async function fetchElderStatus(
+  user: { apiUrl?: string; token?: string } | null
+): Promise<any | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/family/elder-status`, {
+    method: "GET",
+    headers: getHeaders(user.token),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
 // ─── Settings ─────────────────────────────────────────────────
 
 export async function fetchSettings(
