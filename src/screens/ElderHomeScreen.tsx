@@ -261,11 +261,15 @@ export function ElderHomeScreen() {
               activeOpacity={0.8}
               style={[
                 styles.checkinButton,
-                { backgroundColor: SH_GREEN },
+                styles.pendingButton,
               ]}
             >
-              <Ionicons name="hand-left" size={80} color={COLORS.white} />
-              <Text style={styles.checkinButtonText}>TOQUE AQUI</Text>
+              <View style={styles.checkinButtonInner}>
+                <Text style={styles.checkinButtonTitle}>ESTOU BEM</Text>
+                <View style={styles.checkinDivider} />
+                <Ionicons name="finger-print" size={48} color={COLORS.white} />
+                <Text style={styles.checkinButtonSub}>Toque para confirmar</Text>
+              </View>
             </TouchableOpacity>
           </Animated.View>
           <Text style={styles.pendingText}>
@@ -306,10 +310,14 @@ export function ElderHomeScreen() {
             styles.waitingButton,
           ]}
         >
-          <Ionicons name="hand-left" size={80} color={COLORS.white} style={{ opacity: 0.6 }} />
-          <Text style={[styles.checkinButtonText, { opacity: 0.8 }]}>
-            {`Pr\u00F3ximo check-in`}
-          </Text>
+          <View style={styles.checkinButtonInner}>
+            <Text style={[styles.checkinButtonTitle, { opacity: 0.6 }]}>ESTOU BEM</Text>
+            <View style={[styles.checkinDivider, { opacity: 0.3 }]} />
+            <Ionicons name="finger-print" size={48} color={COLORS.white} style={{ opacity: 0.5 }} />
+            <Text style={[styles.checkinButtonSub, { opacity: 0.6 }]}>
+              {`Pr\u00F3ximo check-in`}
+            </Text>
+          </View>
         </View>
         {nextCheckinTime && (
           <Text style={styles.waitingTimeText}>
@@ -465,10 +473,44 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_SIZE / 2,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  pendingButton: {
+    backgroundColor: SH_GREEN,
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.3)",
   },
   waitingButton: {
     backgroundColor: SH_GRAY,
     opacity: 0.85,
+  },
+  checkinButtonInner: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkinButtonTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: COLORS.white,
+    letterSpacing: 3,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+  },
+  checkinDivider: {
+    width: 40,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    marginVertical: 10,
+  },
+  checkinButtonSub: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.85)",
+    marginTop: 8,
+    letterSpacing: 1,
+    textTransform: "uppercase",
   },
   checkinButtonText: {
     ...FONTS.elderButton,
