@@ -24,17 +24,21 @@ class RevenueCatService {
 
     const apiKey = Platform.OS === "ios" ? APPLE_API_KEY : GOOGLE_API_KEY;
 
-    if (!apiKey || apiKey.includes("YOUR_KEY") || apiKey === "placeholder") {
+    if (!apiKey || apiKey.includes("YOUR_KEY") || apiKey === "placeholder" || apiKey.startsWith("test_")) {
       console.warn(
-        "[RevenueCat] No API key configured. Subscriptions will not work."
+        "[RevenueCat] No valid API key configured. Subscriptions will not work."
       );
       return;
     }
 
-    Purchases.setLogLevel(LOG_LEVEL.DEBUG);
-    await Purchases.configure({ apiKey, appUserID: userId });
-    this.initialized = true;
-    console.log("[RevenueCat] Initialized successfully");
+    try {
+      Purchases.setLogLevel(LOG_LEVEL.DEBUG);
+      await Purchases.configure({ apiKey, appUserID: userId });
+      this.initialized = true;
+      console.log("[RevenueCat] Initialized successfully");
+    } catch (error) {
+      console.error("[RevenueCat] Failed to initialize:", error);
+    }
   }
 
   isInitialized(): boolean {
