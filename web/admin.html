@@ -639,11 +639,11 @@ tr.aff-pending:hover { background: var(--gold-light); }
             <table>
               <thead>
                 <tr>
-                  <th>ID</th><th>Nome</th><th>Email</th><th>Papel</th><th>Assinatura</th><th>Sequência</th><th>Pontos</th><th>Criado em</th>
+                  <th>ID</th><th>Nome</th><th>Email</th><th>Papel</th><th>Conexões</th><th>Assinatura</th><th>Sequência</th><th>Pontos</th><th>Criado em</th>
                 </tr>
               </thead>
               <tbody id="usersTableBody">
-                <tr><td colspan="8" class="loading">Carregando...</td></tr>
+                <tr><td colspan="9" class="loading">Carregando...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1787,13 +1787,25 @@ async function loadDashboard() {
 // ═══════════════════════════════════════════════════════════
 async function loadUsers() {
   const tbody = document.getElementById('usersTableBody');
-  tbody.innerHTML = '<tr><td colspan="8" class="loading">Carregando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" class="loading">Carregando...</td></tr>';
   try {
     allUsers = await apiFetch('/admin/users');
     renderUsers();
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Não foi possível carregar usuários.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Não foi possível carregar usuários.</td></tr>';
   }
+}
+
+function userConnectionBadge(u) {
+  if (u.role === 'elder') {
+    const count = (u.linked_family || []).length;
+    if (count > 0) return '<span title="' + count + ' familiar(es) conectado(s)" style="cursor:help">\u{1F517} ' + count + '</span>';
+    return '<span style="opacity:.4">—</span>';
+  }
+  if (u.linked_elder_id) {
+    return '<span title="Conectado com ' + esc(u.elder_name || 'ID ' + u.linked_elder_id) + '" style="cursor:help">\u{1F517} ' + esc(u.elder_name || 'ID ' + u.linked_elder_id) + '</span>';
+  }
+  return '<span style="opacity:.4">—</span>';
 }
 
 function filterUsers() {
@@ -1808,7 +1820,7 @@ function renderUsers() {
   if (search) filtered = filtered.filter(u => (u.name || '').toLowerCase().includes(search) || (u.email || '').toLowerCase().includes(search));
   if (role) filtered = filtered.filter(u => u.role === role);
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Nenhum usuário encontrado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Nenhum usuário encontrado.</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(u => `
@@ -1817,6 +1829,7 @@ function renderUsers() {
       <td class="clickable" onclick="showUserDetail(${u.id})">${esc(u.name)}</td>
       <td>${esc(u.email)}</td>
       <td><span class="badge badge-info">${roleName(u.role)}</span></td>
+      <td>${userConnectionBadge(u)}</td>
       <td>${subName(u.subscription)}</td>
       <td>${u.streak_days || 0} dias</td>
       <td>${u.total_points || 0}</td>
@@ -1893,6 +1906,20 @@ async function showUserDetail(id) {
         <div><strong>Criado em:</strong> ${formatDate(u.created_at)}</div>
         <div><strong>Início Trial:</strong> ${formatDate(u.trial_start)}</div>
       </div>
+      <hr style="border-color:var(--border);margin:16px 0">
+      <h4 style="margin-bottom:8px">Conexões</h4>
+      ${u.role === 'elder' ? `
+        <div style="margin-bottom:8px"><strong>Familiares conectados:</strong>
+          ${(u.linked_family || []).length > 0
+            ? (u.linked_family || []).map(f => '<span class="badge badge-info" style="margin-right:4px;cursor:pointer" onclick="showUserDetail(' + f.id + ')">' + esc(f.name) + '</span>').join('')
+            : '<span style="opacity:.5">Nenhum familiar vinculado</span>'}
+        </div>
+      ` : ''}
+      ${u.linked_elder_id ? `
+        <div style="margin-bottom:8px"><strong>Conectado com:</strong>
+          <span class="badge badge-info" style="cursor:pointer" onclick="showUserDetail(${u.linked_elder_id})">${esc(u.elder_name || 'ID ' + u.linked_elder_id)}</span>
+        </div>
+      ` : (u.role !== 'elder' ? '<div style="opacity:.5">Não está vinculado a nenhum idoso</div>' : '')}
     `;
   } catch (e) {
     el.innerHTML = '<div class="empty-state">Não foi possível carregar detalhes.</div>';

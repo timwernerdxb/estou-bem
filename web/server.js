@@ -482,6 +482,10 @@ async function initDB() {
       -- Auto-checkin settings
       ALTER TABLE settings ADD COLUMN IF NOT EXISTS auto_checkin_mode TEXT DEFAULT 'manual';
 
+      -- Escalation settings
+      ALTER TABLE settings ADD COLUMN IF NOT EXISTS escalation_minutes INTEGER DEFAULT 30;
+      ALTER TABLE settings ADD COLUMN IF NOT EXISTS samu_auto_call BOOLEAN DEFAULT true;
+
       -- Contact type unification (family, emergency, caregiver)
       ALTER TABLE emergency_contacts ADD COLUMN IF NOT EXISTS contact_type TEXT DEFAULT 'emergency';
       ALTER TABLE family_contacts ADD COLUMN IF NOT EXISTS contact_type TEXT DEFAULT 'family';
@@ -1922,17 +1926,19 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
 });
 
 app.put('/api/settings', authMiddleware, async (req, res) => {
-  const { checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end } = req.body;
+  const { checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes, samu_auto_call } = req.body;
   await pool.query(
-    `INSERT INTO settings (user_id, checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO settings (user_id, checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes, samu_auto_call)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (user_id) DO UPDATE SET
        checkin_times = COALESCE($2, settings.checkin_times),
        checkin_mode = COALESCE($3, settings.checkin_mode),
        checkin_interval_hours = COALESCE($4, settings.checkin_interval_hours),
        checkin_window_start = COALESCE($5, settings.checkin_window_start),
-       checkin_window_end = COALESCE($6, settings.checkin_window_end)`,
-    [req.userId, checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end]
+       checkin_window_end = COALESCE($6, settings.checkin_window_end),
+       escalation_minutes = COALESCE($7, settings.escalation_minutes),
+       samu_auto_call = COALESCE($8, settings.samu_auto_call)`,
+    [req.userId, checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes ?? null, samu_auto_call ?? null]
   );
   res.json({ ok: true });
 });
@@ -3888,25 +3894,45 @@ app.get('/api/admin/stats', adminAuth, async (req, res) => {
   }
 });
 
-// GET /api/admin/users - all users with gamification data
+// GET /api/admin/users - all users with gamification data + linked relationships
 app.get('/api/admin/users', adminAuth, async (req, res) => {
   try {
     const { search, role } = req.query;
-    let query = `SELECT id, email, name, phone, role, subscription, trial_start, streak_days, total_points, badges, referral_code, referred_by, created_at FROM users WHERE 1=1`;
+    let query = `SELECT u.id, u.email, u.name, u.phone, u.role, u.subscription, u.trial_start, u.streak_days, u.total_points, u.badges, u.referral_code, u.referred_by, u.linked_elder_id, e.name as elder_name, u.created_at FROM users u LEFT JOIN users e ON u.linked_elder_id = e.id WHERE 1=1`;
     const params = [];
 
     if (search) {
       params.push(`%${search}%`);
-      query += ` AND (name ILIKE $${params.length} OR email ILIKE $${params.length})`;
+      query += ` AND (u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`;
     }
     if (role) {
       params.push(role);
-      query += ` AND role = $${params.length}`;
+      query += ` AND u.role = $${params.length}`;
     }
 
-    query += ` ORDER BY created_at DESC`;
+    query += ` ORDER BY u.created_at DESC`;
     const result = await pool.query(query, params);
-    res.json(result.rows);
+
+    // For elder users, attach linked_family array
+    const elderIds = result.rows.filter(r => r.role === 'elder').map(r => r.id);
+    let familyMap = {};
+    if (elderIds.length > 0) {
+      const familyResult = await pool.query(
+        `SELECT id, name, linked_elder_id FROM users WHERE linked_elder_id = ANY($1)`,
+        [elderIds]
+      );
+      for (const f of familyResult.rows) {
+        if (!familyMap[f.linked_elder_id]) familyMap[f.linked_elder_id] = [];
+        familyMap[f.linked_elder_id].push({ id: f.id, name: f.name });
+      }
+    }
+
+    const rows = result.rows.map(r => ({
+      ...r,
+      linked_family: r.role === 'elder' ? (familyMap[r.id] || []) : undefined
+    }));
+
+    res.json(rows);
   } catch (err) {
     console.error('Admin users error:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -3917,17 +3943,19 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
 app.get('/api/admin/users/:id', adminAuth, async (req, res) => {
   try {
     const userId = req.params.id;
-    const [user, consent, conversions, referrals] = await Promise.all([
-      pool.query(`SELECT id, email, name, phone, role, subscription, trial_start, streak_days, total_points, badges, referral_code, referred_by, linked_elder_id, link_code, utm_source, utm_medium, utm_campaign, created_at FROM users WHERE id = $1`, [userId]),
+    const [user, consent, conversions, referrals, linkedFamily] = await Promise.all([
+      pool.query(`SELECT u.id, u.email, u.name, u.phone, u.role, u.subscription, u.trial_start, u.streak_days, u.total_points, u.badges, u.referral_code, u.referred_by, u.linked_elder_id, e.name as elder_name, u.link_code, u.utm_source, u.utm_medium, u.utm_campaign, u.created_at FROM users u LEFT JOIN users e ON u.linked_elder_id = e.id WHERE u.id = $1`, [userId]),
       pool.query(`SELECT * FROM consent_records WHERE user_id = $1 ORDER BY created_at DESC`, [userId]),
       pool.query(`SELECT * FROM conversions WHERE user_id = $1 ORDER BY created_at DESC`, [userId]),
-      pool.query(`SELECT id, name, email FROM users WHERE referred_by = $1`, [userId])
+      pool.query(`SELECT id, name, email FROM users WHERE referred_by = $1`, [userId]),
+      pool.query(`SELECT id, name FROM users WHERE linked_elder_id = $1`, [userId])
     ]);
 
     if (user.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
     res.json({
       ...user.rows[0],
+      linked_family: linkedFamily.rows,
       consent_records: consent.rows,
       conversions: conversions.rows,
       referrals: referrals.rows
