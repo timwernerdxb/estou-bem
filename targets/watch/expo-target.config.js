@@ -14,6 +14,7 @@ module.exports = {
     "com.apple.developer.healthkit": true,
     "com.apple.developer.healthkit.access": [],
   },
+  icon: "./Assets.xcassets/AppIcon.appiconset/icon-1024.png",
   colors: {
     $accent: "#2D4A3E",
   },
