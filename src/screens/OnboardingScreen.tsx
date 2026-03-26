@@ -181,6 +181,11 @@ export function OnboardingScreen() {
         dispatch({ type: "ADD_FAMILY_PROFILE", payload: profile });
       }
 
+      // Sync subscription from server
+      if (user.subscription) {
+        dispatch({ type: "SET_SUBSCRIPTION", payload: user.subscription });
+      }
+
       // Sync LGPD consent to server
       const userForApi = { apiUrl: API_URL, token };
       postConsent(userForApi, { type: "lgpd", accepted: true }).catch(() => {});
@@ -263,6 +268,11 @@ export function OnboardingScreen() {
           };
           dispatch({ type: "SET_USER", payload: profile });
           dispatch({ type: "ADD_FAMILY_PROFILE", payload: profile });
+        }
+
+        // Sync subscription from server
+        if (user.subscription) {
+          dispatch({ type: "SET_SUBSCRIPTION", payload: user.subscription });
         }
 
         // Track login
