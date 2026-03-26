@@ -3,7 +3,7 @@ module.exports = {
   type: "watch",
   name: "EstouBemWatch",
   bundleIdentifier: ".watchkitapp",
-  deploymentTarget: "10.0",
+  deploymentTarget: "9.0",
   frameworks: [
     "SwiftUI",
     "WatchConnectivity",

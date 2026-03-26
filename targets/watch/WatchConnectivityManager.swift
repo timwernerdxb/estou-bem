@@ -19,16 +19,22 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        if WCSession.isSupported() {
-            session = WCSession.default
-            session?.delegate = self
-            session?.activate()
+        guard WCSession.isSupported() else {
+            print("[Watch] WCSession is not supported on this device")
+            return
         }
+        let wcSession = WCSession.default
+        wcSession.delegate = self
+        wcSession.activate()
+        session = wcSession
     }
 
     // MARK: - Send check-in confirmation to iPhone
     func sendCheckin() {
-        guard let session = session else { return }
+        guard let session = session, session.activationState == .activated else {
+            print("[Watch] Session not activated, cannot send checkin")
+            return
+        }
 
         let message: [String: Any] = [
             "type": "checkin_confirmed",
@@ -36,24 +42,24 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         ]
 
         if session.isReachable {
-            // iPhone app is open — instant delivery
-            session.sendMessage(message, replyHandler: { reply in
+            // iPhone app is open -- instant delivery
+            session.sendMessage(message, replyHandler: { [weak self] reply in
                 DispatchQueue.main.async {
                     if let next = reply["nextCheckinTime"] as? String {
-                        self.nextCheckinTime = next
+                        self?.nextCheckinTime = next
                     }
-                    self.hasPendingCheckin = false
+                    self?.hasPendingCheckin = false
                     if let s = reply["streak"] as? Int {
-                        self.streak = s
+                        self?.streak = s
                     }
                 }
-            }, errorHandler: { error in
+            }, errorHandler: { [weak self] error in
                 print("[Watch] sendMessage error: \(error.localizedDescription)")
                 // Fall back to transferUserInfo for guaranteed delivery
-                self.session?.transferUserInfo(message)
+                self?.session?.transferUserInfo(message)
             })
         } else {
-            // iPhone not reachable — queue for delivery
+            // iPhone not reachable -- queue for delivery
             session.transferUserInfo(message)
         }
 
@@ -63,14 +69,17 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 
     // MARK: - Send SOS to iPhone
     func sendSOS() {
-        guard let session = session else { return }
+        guard let session = session, session.activationState == .activated else {
+            print("[Watch] Session not activated, cannot send SOS")
+            return
+        }
 
         let message: [String: Any] = [
             "type": "sos_activated",
             "timestamp": ISO8601DateFormatter().string(from: Date()),
         ]
 
-        // SOS is critical — try both channels
+        // SOS is critical -- try both channels
         if session.isReachable {
             session.sendMessage(message, replyHandler: nil) { error in
                 print("[Watch] SOS sendMessage error: \(error.localizedDescription)")
@@ -84,7 +93,10 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 
     // MARK: - Send fall alert to iPhone
     func sendFallAlert(timestamp: Date, heartRate: Double) {
-        guard let session = session else { return }
+        guard let session = session, session.activationState == .activated else {
+            print("[Watch] Session not activated, cannot send fall alert")
+            return
+        }
 
         let message: [String: Any] = [
             "type": "fall_detected",
@@ -92,7 +104,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             "heartRate": heartRate,
         ]
 
-        // Fall is critical — try both channels for guaranteed delivery
+        // Fall is critical -- try both channels for guaranteed delivery
         if session.isReachable {
             session.sendMessage(message, replyHandler: nil) { error in
                 print("[Watch] Fall alert sendMessage error: \(error.localizedDescription)")
@@ -106,7 +118,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 
     // MARK: - Send fall cancellation to iPhone
     func sendFallCancelled() {
-        guard let session = session else { return }
+        guard let session = session, session.activationState == .activated else { return }
 
         let message: [String: Any] = [
             "type": "fall_cancelled",
@@ -123,7 +135,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 
     // MARK: - Send movement status to iPhone
     func sendMovementUpdate(isMoving: Bool, magnitude: Double) {
-        guard let session = session else { return }
+        guard let session = session, session.activationState == .activated else { return }
 
         let context: [String: Any] = [
             "type": "movement_update",
@@ -132,13 +144,17 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             "timestamp": ISO8601DateFormatter().string(from: Date()),
         ]
 
-        // Use application context — only latest value matters
-        try? session.updateApplicationContext(context)
+        // Use application context -- only latest value matters
+        do {
+            try session.updateApplicationContext(context)
+        } catch {
+            print("[Watch] Failed to update application context (movement): \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Send heart rate to iPhone
     func sendHeartRate(_ bpm: Double) {
-        guard let session = session else { return }
+        guard let session = session, session.activationState == .activated else { return }
 
         let context: [String: Any] = [
             "type": "heart_rate_update",
@@ -146,11 +162,15 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             "timestamp": ISO8601DateFormatter().string(from: Date()),
         ]
 
-        try? session.updateApplicationContext(context)
+        do {
+            try session.updateApplicationContext(context)
+        } catch {
+            print("[Watch] Failed to update application context (heart rate): \(error.localizedDescription)")
+        }
     }
 
     func sendHealthData(type: String, value: Double) {
-        guard let session = session else { return }
+        guard let session = session, session.activationState == .activated else { return }
 
         let context: [String: Any] = [
             "type": "health_data",
@@ -159,28 +179,40 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             "timestamp": ISO8601DateFormatter().string(from: Date()),
         ]
 
-        try? session.updateApplicationContext(context)
+        do {
+            try session.updateApplicationContext(context)
+        } catch {
+            print("[Watch] Failed to update application context (health data): \(error.localizedDescription)")
+        }
     }
 
     func sendLowSpO2Alert(_ spo2: Double) {
-        guard let session = session, session.isReachable else { return }
+        guard let session = session,
+              session.activationState == .activated,
+              session.isReachable else { return }
 
         session.sendMessage([
             "type": "low_spo2_alert",
             "spo2": spo2,
             "timestamp": ISO8601DateFormatter().string(from: Date()),
-        ], replyHandler: nil, errorHandler: nil)
+        ], replyHandler: nil, errorHandler: { error in
+            print("[Watch] Low SpO2 alert sendMessage error: \(error.localizedDescription)")
+        })
     }
 
     // MARK: - Request sync from iPhone
     func requestSync() {
-        guard let session = session, session.isReachable else { return }
+        guard let session = session,
+              session.activationState == .activated,
+              session.isReachable else { return }
 
-        session.sendMessage(["type": "request_sync"], replyHandler: { reply in
+        session.sendMessage(["type": "request_sync"], replyHandler: { [weak self] reply in
             DispatchQueue.main.async {
-                self.processSettings(reply)
+                self?.processSettings(reply)
             }
-        }, errorHandler: nil)
+        }, errorHandler: { error in
+            print("[Watch] requestSync error: \(error.localizedDescription)")
+        })
     }
 
     private func processSettings(_ data: [String: Any]) {
@@ -195,7 +227,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 // MARK: - WCSessionDelegate
 extension WatchConnectivityManager: WCSessionDelegate {
 
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: (any Error)?) {
         DispatchQueue.main.async {
             self.isPhoneReachable = session.isReachable
         }

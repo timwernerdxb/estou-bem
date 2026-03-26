@@ -16,9 +16,9 @@ class FallDetectionManager: NSObject, ObservableObject {
     @Published var lastFallTime: Date?
 
     // MARK: - Configuration
-    /// Accelerometer impact threshold (g-force) — a sudden spike above this triggers fall candidate
+    /// Accelerometer impact threshold (g-force) -- a sudden spike above this triggers fall candidate
     private let impactThreshold: Double = 3.0
-    /// Stillness threshold after impact — below this for stillnessRequiredDuration confirms fall
+    /// Stillness threshold after impact -- below this for stillnessRequiredDuration confirms fall
     private let stillnessThreshold: Double = 0.2
     /// How long (seconds) of stillness after impact to confirm a fall
     private let stillnessRequiredDuration: TimeInterval = 3.0
@@ -49,9 +49,12 @@ class FallDetectionManager: NSObject, ObservableObject {
 
     private func setupNativeFallDetection() {
         if #available(watchOS 9.0, *) {
+            // Guard that CMFallDetectionManager class is actually available at runtime
             guard CMFallDetectionManager.isAvailable else {
                 print("[FallDetection] CMFallDetectionManager not available on this device")
-                fallDetectionAvailable = motionManager.isAccelerometerAvailable
+                DispatchQueue.main.async {
+                    self.fallDetectionAvailable = self.motionManager.isAccelerometerAvailable
+                }
                 return
             }
 
@@ -62,18 +65,26 @@ class FallDetectionManager: NSObject, ObservableObject {
             let authStatus = manager.authorizationStatus
             switch authStatus {
             case .authorized:
-                fallDetectionAvailable = true
+                DispatchQueue.main.async {
+                    self.fallDetectionAvailable = true
+                }
                 print("[FallDetection] CMFallDetectionManager authorized and active")
             case .notDetermined:
                 // Authorization is requested automatically when delegate is set
-                fallDetectionAvailable = true
+                DispatchQueue.main.async {
+                    self.fallDetectionAvailable = true
+                }
                 print("[FallDetection] CMFallDetectionManager authorization pending")
             default:
-                fallDetectionAvailable = motionManager.isAccelerometerAvailable
+                DispatchQueue.main.async {
+                    self.fallDetectionAvailable = self.motionManager.isAccelerometerAvailable
+                }
                 print("[FallDetection] CMFallDetectionManager not authorized, using accelerometer fallback")
             }
         } else {
-            fallDetectionAvailable = motionManager.isAccelerometerAvailable
+            DispatchQueue.main.async {
+                self.fallDetectionAvailable = self.motionManager.isAccelerometerAvailable
+            }
             print("[FallDetection] watchOS < 9, using accelerometer fallback only")
         }
     }
@@ -91,7 +102,12 @@ class FallDetectionManager: NSObject, ObservableObject {
         motionManager.accelerometerUpdateInterval = sampleInterval
 
         motionManager.startAccelerometerUpdates(to: OperationQueue()) { [weak self] data, error in
-            guard let self = self, let accel = data?.acceleration else { return }
+            guard let self = self else { return }
+            if let error = error {
+                print("[FallDetection] Accelerometer error: \(error.localizedDescription)")
+                return
+            }
+            guard let accel = data?.acceleration else { return }
             self.processAccelerometerForFall(x: accel.x, y: accel.y, z: accel.z)
         }
 
@@ -112,7 +128,8 @@ class FallDetectionManager: NSObject, ObservableObject {
         } else {
             // Phase 2: After impact, check for stillness
             let deviation = abs(magnitude - 1.0)  // deviation from gravity
-            let timeSinceImpact = Date().timeIntervalSince(impactDetectedTime ?? Date())
+            let now = Date()
+            let timeSinceImpact = now.timeIntervalSince(impactDetectedTime ?? now)
 
             if deviation < stillnessThreshold {
                 // Person is still
@@ -120,17 +137,19 @@ class FallDetectionManager: NSObject, ObservableObject {
                     stillnessStartTime = Date()
                 }
 
-                let stillnessDuration = Date().timeIntervalSince(stillnessStartTime ?? Date())
-                if stillnessDuration >= stillnessRequiredDuration {
-                    // Fall confirmed: high-g impact followed by sustained stillness
-                    DispatchQueue.main.async {
-                        self.handleFallDetected(source: "accelerometer")
+                if let start = stillnessStartTime {
+                    let stillnessDuration = now.timeIntervalSince(start)
+                    if stillnessDuration >= stillnessRequiredDuration {
+                        // Fall confirmed: high-g impact followed by sustained stillness
+                        DispatchQueue.main.async { [weak self] in
+                            self?.handleFallDetected(source: "accelerometer")
+                        }
+                        isMonitoringForStillness = false
+                        stillnessStartTime = nil
                     }
-                    isMonitoringForStillness = false
-                    stillnessStartTime = nil
                 }
             } else {
-                // Person moved — reset stillness timer but keep monitoring
+                // Person moved -- reset stillness timer but keep monitoring
                 stillnessStartTime = nil
             }
 
@@ -182,7 +201,7 @@ class FallDetectionManager: NSObject, ObservableObject {
 
     // MARK: - User Actions
 
-    /// User presses cancel — they're OK, dismiss the alert
+    /// User presses cancel -- they're OK, dismiss the alert
     func cancelFallAlert() {
         print("[FallDetection] Fall alert cancelled by user")
         countdownTimer?.invalidate()
@@ -198,15 +217,18 @@ class FallDetectionManager: NSObject, ObservableObject {
         WKInterfaceDevice.current().play(.success)
     }
 
-    /// Countdown expired — send fall alert to iPhone via WatchConnectivity
+    /// Countdown expired -- send fall alert to iPhone via WatchConnectivity
     private func escalateFallAlert() {
-        print("[FallDetection] Countdown expired — sending fall alert to iPhone")
+        print("[FallDetection] Countdown expired -- sending fall alert to iPhone")
         isCountingDown = false
+
+        // Safely read heart rate from HealthManager on main thread
+        let heartRate = HealthManager.shared.latestHeartRate
 
         // Send fall alert to iPhone
         WatchConnectivityManager.shared.sendFallAlert(
             timestamp: lastFallTime ?? Date(),
-            heartRate: HealthManager.shared.latestHeartRate
+            heartRate: heartRate
         )
 
         // Strong haptic to indicate alert was sent
@@ -235,9 +257,10 @@ extension FallDetectionManager: CMFallDetectionDelegate {
         didDetect event: CMFallDetectionEvent,
         completionHandler handler: @escaping () -> Void
     ) {
-        DispatchQueue.main.async {
-            self.handleFallDetected(source: "CMFallDetectionManager")
+        DispatchQueue.main.async { [weak self] in
+            self?.handleFallDetected(source: "CMFallDetectionManager")
         }
+        // Always call the completion handler
         handler()
     }
 }

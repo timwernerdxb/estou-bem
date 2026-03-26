@@ -180,7 +180,10 @@ class HealthManager: NSObject, ObservableObject {
         let calendar = Calendar.current
         let now = Date()
         // Look back 24 hours to capture overnight sleep
-        let startOfYesterday = calendar.date(byAdding: .hour, value: -24, to: now)!
+        guard let startOfYesterday = calendar.date(byAdding: .hour, value: -24, to: now) else {
+            print("[Health] Could not compute yesterday's date")
+            return
+        }
 
         let predicate = HKQuery.predicateForSamples(
             withStart: startOfYesterday,

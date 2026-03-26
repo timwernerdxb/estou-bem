@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Color Theme (Soho House–inspired)
+// MARK: - Color Theme (Soho House-inspired)
 extension Color {
     static let houseGreen = Color(red: 45/255, green: 74/255, blue: 62/255)     // #2D4A3E
     static let houseCream = Color(red: 245/255, green: 240/255, blue: 235/255)   // #F5F0EB
@@ -22,7 +22,9 @@ struct ContentView: View {
     @State private var showStatusDetail = false
 
     var body: some View {
-        NavigationStack {
+        // Use NavigationView for broad watchOS compatibility (watchOS 7+).
+        // NavigationStack requires watchOS 9+ and could crash on older devices.
+        NavigationView {
             ScrollView {
                 VStack(spacing: 16) {
                     // Header
@@ -55,12 +57,14 @@ struct ContentView: View {
             }
             .background(Color.houseDark)
             .navigationTitle("")
-            .toolbar(.hidden, for: .navigationBar)
-            .overlay {
-                if fallDetection.fallDetected {
-                    fallAlertOverlay
+            .navigationBarHidden(true)
+            .overlay(
+                Group {
+                    if fallDetection.fallDetected {
+                        fallAlertOverlay
+                    }
                 }
-            }
+            )
         }
     }
 
@@ -131,7 +135,6 @@ struct ContentView: View {
         }
         .buttonStyle(.plain)
         .frame(width: 110, height: 110)
-        .sensoryFeedback(.success, trigger: checkinConfirmed)
     }
 
     // MARK: - Status Row
@@ -400,6 +403,9 @@ struct ContentView: View {
         checkinConfirmed = true
         showingPulse = true
 
+        // Haptic feedback (safe for all watchOS versions)
+        WKInterfaceDevice.current().play(.success)
+
         // Send check-in to iPhone app
         connectivity.sendCheckin()
 
@@ -471,9 +477,11 @@ struct SOSView: View {
         holdTimer?.invalidate()
         holdProgress = 0
         holdTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
-            holdProgress += 0.05 / 3.0
-            if holdProgress >= 1.0 {
-                holdTimer?.invalidate()
+            DispatchQueue.main.async {
+                holdProgress += 0.05 / 3.0
+                if holdProgress >= 1.0 {
+                    holdTimer?.invalidate()
+                }
             }
         }
     }
