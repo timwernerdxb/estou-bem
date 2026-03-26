@@ -116,7 +116,18 @@ export function ElderHomeScreen() {
       return;
     }
 
-    // Waiting for next checkin
+    // Check if a scheduled time has passed but not yet confirmed — show as pending
+    if (pastTimes.length > 0 && confirmedCheckins.length < pastTimes.length) {
+      setCheckinDisplayState("pending");
+      const nextTime = scheduleTimes.find((t) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m > nowMins;
+      });
+      setNextCheckinTime(nextTime || null);
+      return;
+    }
+
+    // Waiting for next checkin (no scheduled time has passed yet)
     const nextTime = scheduleTimes.find((t) => {
       const [h, m] = t.split(":").map(Number);
       return h * 60 + m > nowMins;
@@ -126,7 +137,7 @@ export function ElderHomeScreen() {
       setCheckinDisplayState("waiting");
       setNextCheckinTime(nextTime);
     } else {
-      // All times passed, nothing confirmed, nothing pending
+      // All times passed and all confirmed
       setCheckinDisplayState("waiting");
       setNextCheckinTime(scheduleTimes[0] || "09:00");
     }
