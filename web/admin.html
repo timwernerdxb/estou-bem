@@ -1917,25 +1917,25 @@ async function saveUser(id) {
         linked_elder_id: document.getElementById('editUserLinked').value || null
       }
     });
-    showToast('Usuário atualizado com sucesso', 'success');
+    toast('Usuário atualizado com sucesso', 'success');
     loadUsers();
   } catch (e) {
-    showToast('Erro ao atualizar: ' + (e.message || e), 'error');
+    toast('Erro ao atualizar: ' + (e.message || e), 'error');
   }
 }
 
 async function resetUserPassword(id) {
   const pw = document.getElementById('newUserPassword').value;
-  if (!pw || pw.length < 8) { showToast('Senha deve ter pelo menos 8 caracteres', 'error'); return; }
+  if (!pw || pw.length < 8) { toast('Senha deve ter pelo menos 8 caracteres', 'error'); return; }
   try {
     await apiFetch(`/admin/users/${id}/reset-password`, {
       method: 'POST',
       body: { new_password: pw }
     });
-    showToast('Senha redefinida com sucesso', 'success');
+    toast('Senha redefinida com sucesso', 'success');
     document.getElementById('resetPasswordBox').style.display = 'none';
   } catch (e) {
-    showToast('Erro ao redefinir senha: ' + (e.message || e), 'error');
+    toast('Erro ao redefinir senha: ' + (e.message || e), 'error');
   }
 }
 
