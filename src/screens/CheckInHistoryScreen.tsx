@@ -1,6 +1,8 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { COLORS, FONTS, SPACING } from "../constants/theme";
 import { useApp } from "../store/AppContext";
 import { Card } from "../components/Card";
@@ -8,6 +10,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { CheckIn } from "../types";
 
 export function CheckInHistoryScreen() {
+  const navigation = useNavigation();
   const { state } = useApp();
 
   const renderItem = ({ item }: { item: CheckIn }) => (
@@ -47,7 +50,14 @@ export function CheckInHistoryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Histórico de Check-ins</Text>
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Historico de Check-ins</Text>
+        <View style={{ width: 32 }} />
+      </View>
+      <Text style={styles.title}>Historico de Check-ins</Text>
       <FlatList
         data={state.checkins}
         renderItem={renderItem}
@@ -63,6 +73,17 @@ export function CheckInHistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  backBtn: { padding: SPACING.xs },
+  headerTitle: { ...FONTS.subtitle, fontWeight: "600" },
   title: { ...FONTS.title, padding: SPACING.lg, paddingBottom: SPACING.sm },
   list: { padding: SPACING.md },
   card: { marginBottom: SPACING.sm },

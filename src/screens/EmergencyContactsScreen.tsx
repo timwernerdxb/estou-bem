@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import { useApp } from "../store/AppContext";
 import { Card } from "../components/Card";
@@ -19,6 +20,7 @@ import { Button } from "../components/Button";
 import { EmergencyContact } from "../types";
 
 export function EmergencyContactsScreen() {
+  const navigation = useNavigation();
   const { state, dispatch } = useApp();
   const [showAdd, setShowAdd] = useState(false);
   const [newContact, setNewContact] = useState({
@@ -63,8 +65,15 @@ export function EmergencyContactsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Contatos de Emergencia</Text>
+        <View style={{ width: 32 }} />
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>📞 Contatos de Emergência</Text>
+        <Text style={styles.title}>Contatos de Emergencia</Text>
         <Text style={styles.subtitle}>
           Essas pessoas serão notificadas quando um check-in for perdido ou o
           SOS for acionado
@@ -174,6 +183,17 @@ export function EmergencyContactsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  backBtn: { padding: SPACING.xs },
+  headerTitle: { ...FONTS.subtitle, fontWeight: "600" },
   content: { padding: SPACING.lg },
   title: { ...FONTS.elderTitle, marginBottom: SPACING.xs },
   subtitle: { ...FONTS.body, color: COLORS.textSecondary, marginBottom: SPACING.lg },

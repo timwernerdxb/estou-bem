@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { COLORS, FONTS, SPACING, RADIUS } from "../constants/theme";
 import { useApp } from "../store/AppContext";
 import { Card } from "../components/Card";
@@ -31,6 +32,7 @@ const METRIC_CONFIG: Record<
 };
 
 export function HealthLogScreen() {
+  const navigation = useNavigation();
   const { state, dispatch } = useApp();
   const [showAdd, setShowAdd] = useState(false);
   const [selectedType, setSelectedType] = useState<HealthMetricType>("blood_pressure_systolic");
@@ -70,8 +72,15 @@ export function HealthLogScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Diario de Saude</Text>
+        <View style={{ width: 32 }} />
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>📊 Diário de Saúde</Text>
+        <Text style={styles.title}>Diario de Saude</Text>
 
         {Object.keys(groupedEntries).length === 0 ? (
           <Card style={styles.emptyCard}>
@@ -200,6 +209,17 @@ export function HealthLogScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  backBtn: { padding: SPACING.xs },
+  headerTitle: { ...FONTS.subtitle, fontWeight: "600" },
   content: { padding: SPACING.lg },
   title: { ...FONTS.title, marginBottom: SPACING.lg },
   emptyCard: { alignItems: "center", paddingVertical: SPACING.xxl },

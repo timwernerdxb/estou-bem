@@ -5,8 +5,8 @@ import HealthKit
 /// Reads heart rate, step count, SpO2, and sleep data to monitor elderly well-being.
 class HealthManager: NSObject, ObservableObject {
 
-    // MARK: - Shared reference (for FallDetectionManager access)
-    static weak var shared: HealthManager?
+    // MARK: - Singleton
+    static let shared = HealthManager()
 
     // MARK: - Published state
     @Published var latestHeartRate: Double = 0
@@ -16,21 +16,44 @@ class HealthManager: NSObject, ObservableObject {
     @Published var isAuthorized: Bool = false
 
     // MARK: - Private
-    private let healthStore = HKHealthStore()
+    private let healthStore: HKHealthStore?
     private var heartRateQuery: HKAnchoredObjectQuery?
     private var stepsQuery: HKStatisticsCollectionQuery?
     private var spo2Query: HKAnchoredObjectQuery?
+    private var hasRequestedAuth = false
 
-    // MARK: - Health data types
-    private let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
-    private let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
-    private let spo2Type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation)!
-    private let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!
+    // MARK: - Health data types (lazy to avoid crash if HealthKit unavailable)
+    private lazy var heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)
+    private lazy var stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount)
+    private lazy var spo2Type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation)
+    private lazy var sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)
+
+    // MARK: - Init
+    override init() {
+        if HKHealthStore.isHealthDataAvailable() {
+            self.healthStore = HKHealthStore()
+        } else {
+            self.healthStore = nil
+        }
+        super.init()
+    }
 
     // MARK: - Authorization
     func requestAuthorization() {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
+        guard !hasRequestedAuth else { return }
+        guard let healthStore = healthStore else {
+            print("[Health] HealthKit not available on this device")
+            return
+        }
+        guard let heartRateType = heartRateType,
+              let stepsType = stepsType,
+              let spo2Type = spo2Type,
+              let sleepType = sleepType else {
+            print("[Health] Could not create HealthKit types")
+            return
+        }
 
+        hasRequestedAuth = true
         let readTypes: Set<HKObjectType> = [heartRateType, stepsType, spo2Type, sleepType]
 
         healthStore.requestAuthorization(toShare: nil, read: readTypes) { [weak self] success, error in
@@ -54,6 +77,8 @@ class HealthManager: NSObject, ObservableObject {
     /// On Apple Watch, heart rate is sampled automatically every ~5 minutes
     /// and more frequently during workouts.
     private func startHeartRateObserver() {
+        guard let healthStore = healthStore, let heartRateType = heartRateType else { return }
+
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: Date())
         let predicate = HKQuery.predicateForSamples(
@@ -100,6 +125,8 @@ class HealthManager: NSObject, ObservableObject {
     /// Apple Watch measures blood oxygen periodically in the background
     /// and on-demand via the Blood Oxygen app.
     private func startSpO2Observer() {
+        guard let healthStore = healthStore, let spo2Type = spo2Type else { return }
+
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: Date())
         let predicate = HKQuery.predicateForSamples(
@@ -130,7 +157,7 @@ class HealthManager: NSObject, ObservableObject {
         guard let quantitySamples = samples as? [HKQuantitySample],
               let latest = quantitySamples.last else { return }
 
-        // SpO2 is stored as a fraction (0.0–1.0), convert to percentage
+        // SpO2 is stored as a fraction (0.0-1.0), convert to percentage
         let spo2 = latest.quantity.doubleValue(for: HKUnit.percent()) * 100.0
 
         DispatchQueue.main.async {
@@ -148,6 +175,8 @@ class HealthManager: NSObject, ObservableObject {
     // MARK: - Sleep Analysis
     /// Queries sleep data for the last 24 hours and calculates total sleep duration.
     private func fetchTodaySleep() {
+        guard let healthStore = healthStore, let sleepType = sleepType else { return }
+
         let calendar = Calendar.current
         let now = Date()
         // Look back 24 hours to capture overnight sleep
@@ -190,6 +219,8 @@ class HealthManager: NSObject, ObservableObject {
 
     // MARK: - Steps
     private func fetchTodaySteps() {
+        guard let healthStore = healthStore, let stepsType = stepsType else { return }
+
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: Date())
 
@@ -217,10 +248,10 @@ class HealthManager: NSObject, ObservableObject {
     // MARK: - Cleanup
     func stopObserving() {
         if let query = heartRateQuery {
-            healthStore.stop(query)
+            healthStore?.stop(query)
         }
         if let query = spo2Query {
-            healthStore.stop(query)
+            healthStore?.stop(query)
         }
     }
 

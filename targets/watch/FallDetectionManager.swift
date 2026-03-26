@@ -37,8 +37,12 @@ class FallDetectionManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        setupNativeFallDetection()
-        startAccelerometerFallback()
+        // Defer setup to avoid accessing HealthManager or other shared
+        // resources that may not be ready during @StateObject initialization
+        DispatchQueue.main.async { [weak self] in
+            self?.setupNativeFallDetection()
+            self?.startAccelerometerFallback()
+        }
     }
 
     // MARK: - Native Fall Detection (watchOS 9+)
@@ -202,7 +206,7 @@ class FallDetectionManager: NSObject, ObservableObject {
         // Send fall alert to iPhone
         WatchConnectivityManager.shared.sendFallAlert(
             timestamp: lastFallTime ?? Date(),
-            heartRate: HealthManager.shared?.latestHeartRate ?? 0
+            heartRate: HealthManager.shared.latestHeartRate
         )
 
         // Strong haptic to indicate alert was sent

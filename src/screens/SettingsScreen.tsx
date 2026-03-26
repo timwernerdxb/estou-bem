@@ -42,6 +42,8 @@ export function SettingsScreen() {
   const [autoCheckinMode, setAutoCheckinMode] = useState<CheckinMode>("manual");
   const [healthConnected, setHealthConnected] = useState(false);
   const [myReferralCode, setMyReferralCode] = useState("");
+  const [linkCode, setLinkCode] = useState("");
+  const [linkLoading, setLinkLoading] = useState(false);
 
   React.useEffect(() => {
     setAutoCheckinMode(autoCheckinService.getMode());
@@ -108,6 +110,48 @@ export function SettingsScreen() {
     setCheckinTimes(updated);
     dispatch({ type: "SET_CHECKIN_TIMES", payload: updated });
     await checkInService.scheduleCheckinAlarms(updated);
+  };
+
+  const handleLinkElder = async () => {
+    const code = linkCode.trim().toUpperCase();
+    if (!code) {
+      Alert.alert("Erro", "Digite o codigo de vinculacao do idoso.");
+      return;
+    }
+    setLinkLoading(true);
+    try {
+      const API_URL = state.currentUser?.apiUrl || process.env.EXPO_PUBLIC_API_URL || "";
+      const token = state.currentUser?.token;
+      if (!API_URL || !token) {
+        Alert.alert("Erro", "Nao foi possivel conectar ao servidor.");
+        setLinkLoading(false);
+        return;
+      }
+      const res = await fetch(`${API_URL}/api/link-elder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        Alert.alert("Erro", data.error || "Codigo invalido.");
+      } else {
+        Alert.alert("Vinculado!", `Voce foi vinculado(a) a ${data.elderName}.`);
+        setLinkCode("");
+      }
+    } catch {
+      Alert.alert("Erro", "Nao foi possivel conectar ao servidor.");
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  const handleShareLinkCode = () => {
+    const code = state.currentUser?.link_code;
+    if (!code) return;
+    Share.share({
+      message: `Use meu codigo de vinculacao no Estou Bem para acompanhar meu bem-estar: ${code}`,
+    });
   };
 
   const handleLogout = () => {
@@ -279,6 +323,58 @@ export function SettingsScreen() {
             </TouchableOpacity>
           </Card>
         )}
+
+        {/* Vincular */}
+        <Card style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            {isElder ? t("settings_link_family") : t("settings_link_elder")}
+          </Text>
+          {isElder ? (
+            <>
+              <Text style={styles.sectionSubtitle}>
+                Compartilhe este codigo com seus familiares para que eles possam acompanhar seu bem-estar
+              </Text>
+              {state.currentUser?.link_code ? (
+                <View style={styles.referralRow}>
+                  <View style={styles.referralCodeBox}>
+                    <Text style={styles.referralCode}>{state.currentUser.link_code}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.shareBtn} onPress={handleShareLinkCode}>
+                    <Ionicons name="share-social" size={20} color={COLORS.white} />
+                    <Text style={styles.shareBtnText}>ENVIAR</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <Text style={styles.sectionSubtitle}>Codigo de vinculacao nao disponivel.</Text>
+              )}
+            </>
+          ) : (
+            <>
+              <Text style={styles.sectionSubtitle}>
+                Digite o codigo de vinculacao do idoso para acompanhar seu bem-estar
+              </Text>
+              <View style={styles.addTimeRow}>
+                <TextInput
+                  style={styles.timeInput}
+                  placeholder="Codigo"
+                  value={linkCode}
+                  onChangeText={setLinkCode}
+                  autoCapitalize="characters"
+                  placeholderTextColor={COLORS.textLight}
+                />
+                <TouchableOpacity
+                  style={[styles.planBtn, { paddingVertical: SPACING.md }]}
+                  onPress={handleLinkElder}
+                  disabled={linkLoading}
+                >
+                  <Text style={styles.planBtnText}>
+                    {linkLoading ? "..." : "VINCULAR"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </Card>
 
         {/* Subscription */}
         <Card style={styles.section}>

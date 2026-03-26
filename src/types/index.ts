@@ -11,6 +11,10 @@ export interface User {
   role: UserRole;
   avatarUrl?: string;
   createdAt: string;
+  link_code?: string;
+  linked_elder_id?: string;
+  apiUrl?: string;
+  token?: string;
 }
 
 export interface ElderProfile extends User {
