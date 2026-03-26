@@ -15,6 +15,7 @@ export default ({ config }) => ({
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.twerner.estoubem",
+    appleTeamId: "7Q97Z7U42U",
     buildNumber: "1",
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
