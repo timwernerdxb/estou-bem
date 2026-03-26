@@ -13,6 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, FONTS, SPACING, SHADOWS, RADIUS, SCREEN } from "../constants/theme";
 import { useApp, useSubscription } from "../store/AppContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation } from "@react-navigation/native";
 import { checkInService } from "../services/CheckInService";
 import { fallDetectionService } from "../services/FallDetectionService";
 import { postCheckin, fetchCheckins, postFallDetected } from "../services/ApiService";
@@ -47,6 +49,37 @@ export function ElderHomeScreen() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const elderName = state.elderProfile?.name || state.currentUser?.name || "Voce";
+  const [scheduleTimes, setScheduleTimes] = useState<string[]>(["09:00"]);
+
+  // Load check-in times from settings
+  useEffect(() => {
+    const loadTimes = async () => {
+      try {
+        const stored = await AsyncStorage.getItem("checkin_times");
+        if (stored) {
+          const times = JSON.parse(stored);
+          if (Array.isArray(times) && times.length > 0) setScheduleTimes(times);
+        }
+      } catch {}
+    };
+    loadTimes();
+  }, []);
+
+  // Re-read times when screen comes into focus
+  const navigation = useNavigation();
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", async () => {
+      try {
+        const stored = await AsyncStorage.getItem("checkin_times");
+        if (stored) {
+          const times = JSON.parse(stored);
+          if (Array.isArray(times) && times.length > 0) setScheduleTimes(times);
+        }
+      } catch {}
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   const todayCheckins = state.checkins.filter((c) => {
     const today = new Date().toDateString();
     return new Date(c.scheduledAt).toDateString() === today;
@@ -62,8 +95,7 @@ export function ElderHomeScreen() {
     const now = new Date();
     const nowMins = now.getHours() * 60 + now.getMinutes();
 
-    // Default schedule times — ideally these come from settings
-    const scheduleTimes = ["09:00", "18:00"];
+    // scheduleTimes comes from state (loaded from AsyncStorage)
 
     if (pendingCheckin) {
       setCheckinDisplayState("pending");
@@ -411,15 +443,10 @@ export function ElderHomeScreen() {
             <View style={[styles.checkinDivider, { opacity: 0.3 }]} />
             <Ionicons name="finger-print" size={48} color={COLORS.white} style={{ opacity: 0.5 }} />
             <Text style={[styles.checkinButtonSub, { opacity: 0.6 }]}>
-              {`Pr\u00F3ximo check-in`}
+              {nextCheckinTime ? `Pr\u00F3ximo \u00E0s ${nextCheckinTime}` : `Pr\u00F3ximo check-in`}
             </Text>
           </View>
         </View>
-        {nextCheckinTime && (
-          <Text style={styles.waitingTimeText}>
-            {`\u00C0s ${nextCheckinTime}`}
-          </Text>
-        )}
       </>
     );
   };
