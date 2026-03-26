@@ -3987,10 +3987,11 @@ app.put('/api/admin/users/:id', adminAuth, async (req, res) => {
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
-    // Audit log
+    // Audit log (non-blocking - don't fail the update if audit fails)
     if (req.adminUser) {
-      await pool.query(`INSERT INTO admin_audit_log (admin_user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)`,
-        [req.adminUser.id, 'update_user', 'user', req.params.id, JSON.stringify(req.body)]);
+      pool.query(`INSERT INTO admin_audit_log (admin_user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)`,
+        [req.adminUser.id, 'update_user', 'user', req.params.id, JSON.stringify(req.body)])
+        .catch(e => console.warn('Audit log failed:', e.message));
     }
 
     res.json(result.rows[0]);
