@@ -211,6 +211,36 @@ export async function postHealth(
   return res.json();
 }
 
+// ─── Fall Detection ──────────────────────────────────────────
+
+export async function postFallDetected(
+  user: { apiUrl?: string; token?: string } | null,
+  body: { user_id: number; timestamp: string; heart_rate?: number; location?: { lat: number; lng: number } }
+): Promise<any | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/fall-detected`, {
+    method: "POST",
+    headers: getHeaders(user.token),
+    body: JSON.stringify(body),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
+export async function postFallCancelled(
+  user: { apiUrl?: string; token?: string } | null,
+  body: { user_id: number }
+): Promise<any | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/fall-cancelled`, {
+    method: "POST",
+    headers: getHeaders(user.token),
+    body: JSON.stringify(body),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
 // ─── Settings ─────────────────────────────────────────────────
 
 export async function fetchSettings(

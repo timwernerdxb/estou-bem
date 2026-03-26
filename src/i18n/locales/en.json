@@ -206,5 +206,19 @@
   "lang_pt_BR": "Portugues (Brasil)",
   "lang_en": "English",
   "lang_es": "Espanol",
-  "lang_de": "Deutsch"
+  "lang_de": "Deutsch",
+
+  "register_health_share": "I authorize sharing my health data in accordance with LGPD (General Data Protection Law) for monitoring and emergency alert purposes.",
+  "register_email": "Email",
+  "register_password": "Password",
+  "register_password_placeholder": "Minimum 8 characters",
+  "register_creating": "Creating account...",
+  "register_create": "Create account",
+  "register_error_email": "Enter a valid email",
+  "register_error_password": "Password must be at least 8 characters",
+  "register_error_lgpd": "You must accept the terms to continue",
+  "settings_fall_detection": "Fall Detection",
+  "settings_fall_detection_desc": "Monitors the accelerometer to automatically detect falls",
+  "settings_fall_detection_active": "Active",
+  "settings_fall_detection_inactive": "Inactive"
 }

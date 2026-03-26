@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,6 +24,8 @@ import { UserRole, ElderProfile, FamilyProfile, RootStackParamList } from "../ty
 import { notificationService } from "../services/NotificationService";
 import { checkInService } from "../services/CheckInService";
 import { affiliateService } from "../services/AffiliateService";
+
+const API_URL = "https://estou-bem-web-production.up.railway.app";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -65,9 +68,14 @@ export function OnboardingScreen() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [referralCode, setReferralCode] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [lgpdConsent, setLgpdConsent] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const handleNext = () => {
     if (currentSlide < ONBOARDING_SLIDES.length - 1) {
@@ -87,53 +95,104 @@ export function OnboardingScreen() {
       Alert.alert("Erro", "Selecione seu perfil");
       return;
     }
-
-    const userId =
-      Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
-
-    if (role === "elder") {
-      const profile: ElderProfile = {
-        id: userId,
-        name: name.trim(),
-        phone: phone.trim(),
-        role: "elder",
-        allergies: [],
-        conditions: [],
-        createdAt: new Date().toISOString(),
-      };
-      dispatch({ type: "SET_USER", payload: profile });
-      dispatch({ type: "SET_ELDER_PROFILE", payload: profile });
-    } else {
-      const profile: FamilyProfile = {
-        id: userId,
-        name: name.trim(),
-        phone: phone.trim(),
-        role: role,
-        elderIds: [],
-        isEmergencyContact: true,
-        notifyOnMissedCheckin: true,
-        notifyOnSOS: true,
-        notifyOnGeofence: true,
-        createdAt: new Date().toISOString(),
-      };
-      dispatch({ type: "SET_USER", payload: profile });
-      dispatch({ type: "ADD_FAMILY_PROFILE", payload: profile });
+    if (!email.trim() || !email.includes("@")) {
+      Alert.alert("Erro", "Digite um e-mail valido");
+      return;
+    }
+    if (!password || password.length < 8) {
+      Alert.alert("Erro", "A senha deve ter no minimo 8 caracteres");
+      return;
+    }
+    if (!lgpdConsent) {
+      Alert.alert("Erro", "Voce precisa aceitar os termos de uso para continuar");
+      return;
     }
 
-    // Initialize notifications
-    await notificationService.initialize();
+    setIsRegistering(true);
 
-    // Process referral code if entered
-    if (referralCode.trim()) {
-      await affiliateService.processReferralCode(referralCode.trim(), "", "");
+    try {
+      const res = await fetch(`${API_URL}/api/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+          name: name.trim(),
+          phone: phone.trim(),
+          role,
+          referral_code: referralCode.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        // Handle specific server errors
+        const errorMsg =
+          data.error === "Email already registered"
+            ? "Este e-mail ja esta cadastrado. Use a opcao Entrar."
+            : data.error === "phone_exists"
+            ? data.message || "Este numero ja esta cadastrado."
+            : data.error || "Erro ao criar conta. Tente novamente.";
+        Alert.alert("Erro", errorMsg);
+        setIsRegistering(false);
+        return;
+      }
+
+      const user = data.user;
+      const token = data.token;
+
+      if (role === "elder") {
+        const profile: ElderProfile = {
+          id: String(user.id),
+          name: user.name,
+          phone: user.phone || "",
+          email: user.email,
+          role: "elder",
+          allergies: [],
+          conditions: [],
+          createdAt: new Date().toISOString(),
+          link_code: user.link_code,
+          apiUrl: API_URL,
+          token,
+        };
+        dispatch({ type: "SET_USER", payload: profile });
+        dispatch({ type: "SET_ELDER_PROFILE", payload: profile });
+      } else {
+        const profile: FamilyProfile = {
+          id: String(user.id),
+          name: user.name,
+          phone: user.phone || "",
+          email: user.email,
+          role: role,
+          elderIds: [],
+          isEmergencyContact: true,
+          notifyOnMissedCheckin: true,
+          notifyOnSOS: true,
+          notifyOnGeofence: true,
+          createdAt: new Date().toISOString(),
+          link_code: user.link_code,
+          apiUrl: API_URL,
+          token,
+        };
+        dispatch({ type: "SET_USER", payload: profile });
+        dispatch({ type: "ADD_FAMILY_PROFILE", payload: profile });
+      }
+
+      // Initialize notifications
+      await notificationService.initialize();
+
+      // Schedule default check-in if elder
+      if (role === "elder") {
+        await checkInService.scheduleCheckinAlarms(["09:00"]);
+      }
+
+      dispatch({ type: "SET_ONBOARDED", payload: true });
+    } catch (e) {
+      Alert.alert("Erro", "Nao foi possivel conectar ao servidor. Verifique sua conexao.");
+    } finally {
+      setIsRegistering(false);
     }
-
-    // Schedule default check-in if elder
-    if (role === "elder") {
-      await checkInService.scheduleCheckinAlarms(["09:00"]);
-    }
-
-    dispatch({ type: "SET_ONBOARDED", payload: true });
   };
 
   const handleLogin = async () => {
@@ -141,8 +200,8 @@ export function OnboardingScreen() {
       Alert.alert("Erro", "Digite e-mail e senha");
       return;
     }
+    setIsLoggingIn(true);
     try {
-      const API_URL = "https://estou-bem-web-production.up.railway.app";
       const res = await fetch(`${API_URL}/api/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,20 +209,59 @@ export function OnboardingScreen() {
       });
       const data = await res.json();
       if (data.ok && data.user) {
-        const profile = {
-          id: String(data.user.id),
-          name: data.user.name,
-          phone: data.user.phone || "",
-          role: data.user.role || "elder",
-          createdAt: new Date().toISOString(),
-        };
-        dispatch({ type: "SET_USER", payload: profile as any });
+        const user = data.user;
+        const token = data.token;
+        const userRole = user.role || "elder";
+
+        if (userRole === "elder") {
+          const profile: ElderProfile = {
+            id: String(user.id),
+            name: user.name,
+            phone: user.phone || "",
+            email: user.email,
+            role: "elder",
+            allergies: [],
+            conditions: [],
+            createdAt: new Date().toISOString(),
+            link_code: user.link_code,
+            apiUrl: API_URL,
+            token,
+          };
+          dispatch({ type: "SET_USER", payload: profile });
+          dispatch({ type: "SET_ELDER_PROFILE", payload: profile });
+        } else {
+          const profile: FamilyProfile = {
+            id: String(user.id),
+            name: user.name,
+            phone: user.phone || "",
+            email: user.email,
+            role: userRole as "family" | "caregiver",
+            elderIds: user.linked_elder_id ? [String(user.linked_elder_id)] : [],
+            isEmergencyContact: true,
+            notifyOnMissedCheckin: true,
+            notifyOnSOS: true,
+            notifyOnGeofence: true,
+            createdAt: new Date().toISOString(),
+            link_code: user.link_code,
+            apiUrl: API_URL,
+            token,
+          };
+          dispatch({ type: "SET_USER", payload: profile });
+          dispatch({ type: "ADD_FAMILY_PROFILE", payload: profile });
+        }
+
+        await notificationService.initialize();
+        if (userRole === "elder") {
+          await checkInService.scheduleCheckinAlarms(["09:00"]);
+        }
         dispatch({ type: "SET_ONBOARDED", payload: true });
       } else {
         Alert.alert("Erro", data.error || "E-mail ou senha incorretos");
       }
     } catch (e) {
-      Alert.alert("Erro", "Não foi possível conectar ao servidor");
+      Alert.alert("Erro", "Nao foi possivel conectar ao servidor");
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -202,18 +300,22 @@ export function OnboardingScreen() {
           />
 
           <Button
-            title="Entrar"
+            title={isLoggingIn ? "Entrando..." : "Entrar"}
             onPress={handleLogin}
             size="elder"
+            disabled={isLoggingIn}
             style={{ marginTop: SPACING.xl, width: "100%" }}
           />
+          {isLoggingIn && (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: SPACING.md }} />
+          )}
 
           <TouchableOpacity
             onPress={() => setShowLogin(false)}
             style={{ marginTop: SPACING.lg, alignItems: "center" }}
           >
             <Text style={{ color: COLORS.textSecondary, fontSize: 14 }}>
-              Não tem conta?{" "}
+              Nao tem conta?{" "}
               <Text style={{ color: COLORS.accent, fontWeight: "500" }}>Criar conta</Text>
             </Text>
           </TouchableOpacity>
@@ -326,8 +428,31 @@ export function OnboardingScreen() {
             placeholderTextColor={COLORS.textLight}
           />
 
+          {/* Email */}
+          <Text style={styles.label}>E-mail</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="seu@email.com"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            placeholderTextColor={COLORS.textLight}
+          />
+
+          {/* Password */}
+          <Text style={styles.label}>Senha</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Minimo 8 caracteres"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholderTextColor={COLORS.textLight}
+          />
+
           {/* Referral Code */}
-          <Text style={styles.label}>Código de indicação (opcional)</Text>
+          <Text style={styles.label}>Codigo de indicacao (opcional)</Text>
           <TextInput
             style={styles.input}
             placeholder="Ex: EB4K2A"
@@ -338,19 +463,39 @@ export function OnboardingScreen() {
             placeholderTextColor={COLORS.textLight}
           />
 
+          {/* LGPD Consent */}
+          <TouchableOpacity
+            style={styles.lgpdRow}
+            onPress={() => setLgpdConsent(!lgpdConsent)}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={lgpdConsent ? "checkbox" : "square-outline"}
+              size={24}
+              color={lgpdConsent ? COLORS.primary : COLORS.textLight}
+            />
+            <Text style={styles.lgpdText}>
+              Autorizo o compartilhamento dos meus dados de saude conforme a LGPD para fins de monitoramento e alertas de emergencia.
+            </Text>
+          </TouchableOpacity>
+
           <Button
-            title="Começar"
+            title={isRegistering ? "Criando conta..." : "Criar conta"}
             onPress={handleComplete}
             size="elder"
+            disabled={isRegistering}
             style={{ marginTop: SPACING.xl, width: "100%" }}
           />
+          {isRegistering && (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: SPACING.md }} />
+          )}
 
           <TouchableOpacity
             onPress={() => setShowLogin(true)}
             style={{ marginTop: SPACING.lg, alignItems: "center" }}
           >
             <Text style={{ color: COLORS.textSecondary, fontSize: 14 }}>
-              Já tem conta?{" "}
+              Ja tem conta?{" "}
               <Text style={{ color: COLORS.accent, fontWeight: "500" }}>Entrar</Text>
             </Text>
           </TouchableOpacity>
@@ -526,5 +671,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     backgroundColor: COLORS.white,
     color: COLORS.textPrimary,
+  },
+  lgpdRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: SPACING.sm,
+    marginTop: SPACING.lg,
+    paddingRight: SPACING.md,
+  },
+  lgpdText: {
+    ...FONTS.caption,
+    flex: 1,
+    lineHeight: 18,
+    color: COLORS.textSecondary,
   },
 });

@@ -15,7 +15,7 @@ import { COLORS, FONTS, SPACING, SHADOWS, RADIUS, SCREEN } from "../constants/th
 import { useApp, useSubscription } from "../store/AppContext";
 import { checkInService } from "../services/CheckInService";
 import { fallDetectionService } from "../services/FallDetectionService";
-import { postCheckin, fetchCheckins } from "../services/ApiService";
+import { postCheckin, fetchCheckins, postFallDetected } from "../services/ApiService";
 import { autoCheckinService } from "../services/AutoCheckinService";
 import { notificationService } from "../services/NotificationService";
 import { StatusBadge } from "../components/StatusBadge";
@@ -191,6 +191,51 @@ export function ElderHomeScreen() {
       pulseAnim.setValue(1);
     }
   }, [checkinDisplayState]);
+
+  // Start fall detection monitoring for elder users
+  useEffect(() => {
+    if (state.currentUser?.role !== "elder") return;
+
+    const handleFallDetected = async (snapshot: SensorSnapshot) => {
+      const name = state.elderProfile?.name || state.currentUser?.name || "Idoso";
+
+      // Notify family via local notification
+      await notificationService.sendFallDetectedNotification(name, snapshot.heartRate);
+
+      // Report fall to server
+      await postFallDetected(state.currentUser, {
+        user_id: state.currentUser?.id ? Number(state.currentUser.id) : 0,
+        timestamp: new Date().toISOString(),
+        heart_rate: snapshot.heartRate,
+      });
+    };
+
+    fallDetectionService.startMonitoring(handleFallDetected);
+
+    return () => {
+      fallDetectionService.stopMonitoring();
+    };
+  }, [state.currentUser?.id]);
+
+  // Auto check-in: when a pending check-in exists and mode is not manual, try auto-confirm
+  useEffect(() => {
+    if (!pendingCheckin) return;
+    if (autoCheckinService.getMode() === "manual") return;
+
+    const tryAutoCheckin = async () => {
+      const result = await autoCheckinService.processCheckin(pendingCheckin);
+      if (result) {
+        dispatch({ type: "UPDATE_CHECKIN", payload: result });
+        autoCheckinService.resetMovementCounter();
+        computeDisplayState();
+      }
+    };
+
+    // Try immediately, then every 60 seconds
+    tryAutoCheckin();
+    const autoInterval = setInterval(tryAutoCheckin, 60000);
+    return () => clearInterval(autoInterval);
+  }, [pendingCheckin?.id]);
 
   const handleCheckin = useCallback(async () => {
     // Only allow check-in when in pending state

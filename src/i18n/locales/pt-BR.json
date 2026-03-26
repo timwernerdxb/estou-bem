@@ -206,5 +206,19 @@
   "lang_pt_BR": "Portugues (Brasil)",
   "lang_en": "English",
   "lang_es": "Espanol",
-  "lang_de": "Deutsch"
+  "lang_de": "Deutsch",
+
+  "register_health_share": "Autorizo o compartilhamento dos meus dados de saude conforme a LGPD (Lei Geral de Protecao de Dados) para fins de monitoramento e alertas de emergencia.",
+  "register_email": "E-mail",
+  "register_password": "Senha",
+  "register_password_placeholder": "Minimo 8 caracteres",
+  "register_creating": "Criando conta...",
+  "register_create": "Criar conta",
+  "register_error_email": "Digite um e-mail valido",
+  "register_error_password": "A senha deve ter no minimo 8 caracteres",
+  "register_error_lgpd": "Voce precisa aceitar os termos de uso para continuar",
+  "settings_fall_detection": "Deteccao de Quedas",
+  "settings_fall_detection_desc": "Monitora o acelerometro para detectar quedas automaticamente",
+  "settings_fall_detection_active": "Ativa",
+  "settings_fall_detection_inactive": "Inativa"
 }
