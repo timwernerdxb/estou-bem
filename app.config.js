@@ -45,7 +45,7 @@ export default ({ config }) => ({
       backgroundColor: "#F5F0EB",
     },
     package: "com.twerner.estoubem",
-    versionCode: 26,
+    versionCode: 27,
     permissions: [
       "ACTIVITY_RECOGNITION",
       "RECEIVE_BOOT_COMPLETED",
