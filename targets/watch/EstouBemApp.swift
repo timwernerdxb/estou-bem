@@ -21,8 +21,9 @@ struct EstouBemWatchApp: App {
                 .onAppear {
                     // Request HealthKit authorization after the app UI is ready
                     healthManager.requestAuthorization()
-                    // Start motion monitoring after UI is ready
+                    // Start motion & fall detection after UI is ready
                     motionManager.startMonitoring()
+                    fallDetectionManager.startMonitoring()
                 }
         }
     }

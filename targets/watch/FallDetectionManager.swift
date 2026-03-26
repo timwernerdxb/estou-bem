@@ -37,12 +37,13 @@ class FallDetectionManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        // Defer setup to avoid accessing HealthManager or other shared
-        // resources that may not be ready during @StateObject initialization
-        DispatchQueue.main.async { [weak self] in
-            self?.setupNativeFallDetection()
-            self?.startAccelerometerFallback()
-        }
+        // Do NOT start CoreMotion here - crashes on watchOS during app init
+    }
+
+    /// Call from view onAppear to start fall detection safely after UI is ready
+    func startMonitoring() {
+        setupNativeFallDetection()
+        startAccelerometerFallback()
     }
 
     // MARK: - Native Fall Detection (watchOS 9+)
