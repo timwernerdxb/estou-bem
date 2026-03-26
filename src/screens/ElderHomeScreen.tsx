@@ -578,11 +578,12 @@ const styles = StyleSheet.create({
   pendingButton: {
     backgroundColor: SH_GREEN,
     borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.3)",
+    borderColor: SH_GOLD,
   },
   waitingButton: {
-    backgroundColor: SH_GRAY,
-    opacity: 0.85,
+    backgroundColor: "#3D5A4E",
+    borderWidth: 2,
+    borderColor: "rgba(201,169,110,0.3)",
   },
   checkinButtonInner: {
     alignItems: "center",
