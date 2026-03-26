@@ -16,7 +16,6 @@ export default ({ config }) => ({
     supportsTablet: false,
     bundleIdentifier: "com.twerner.estoubem",
     appleTeamId: "7Q97Z7U42U",
-    buildNumber: "5",
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
         "Estou Bem usa sua localização para notificar familiares em caso de emergência.",

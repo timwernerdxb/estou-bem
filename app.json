@@ -27,7 +27,7 @@
         "com.apple.developer.healthkit": true,
         "com.apple.developer.healthkit.access": []
       },
-      "buildNumber": "6"
+      "buildNumber": "100"
     },
     "android": {
       "package": "com.twerner.estoubem",
