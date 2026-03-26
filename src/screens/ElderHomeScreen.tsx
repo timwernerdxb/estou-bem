@@ -49,36 +49,9 @@ export function ElderHomeScreen() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const elderName = state.elderProfile?.name || state.currentUser?.name || "Voce";
-  const [scheduleTimes, setScheduleTimes] = useState<string[]>(["09:00"]);
 
-  // Load check-in times from settings
-  useEffect(() => {
-    const loadTimes = async () => {
-      try {
-        const stored = await AsyncStorage.getItem("checkin_times");
-        if (stored) {
-          const times = JSON.parse(stored);
-          if (Array.isArray(times) && times.length > 0) setScheduleTimes(times);
-        }
-      } catch {}
-    };
-    loadTimes();
-  }, []);
-
-  // Re-read times when screen comes into focus
-  const navigation = useNavigation();
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", async () => {
-      try {
-        const stored = await AsyncStorage.getItem("checkin_times");
-        if (stored) {
-          const times = JSON.parse(stored);
-          if (Array.isArray(times) && times.length > 0) setScheduleTimes(times);
-        }
-      } catch {}
-    });
-    return unsubscribe;
-  }, [navigation]);
+  // Read check-in times directly from state (set by SettingsScreen dispatch)
+  const scheduleTimes = state.checkinTimes && state.checkinTimes.length > 0 ? state.checkinTimes : ["09:00"];
 
   const todayCheckins = state.checkins.filter((c) => {
     const today = new Date().toDateString();
