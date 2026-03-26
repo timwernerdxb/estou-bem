@@ -3888,6 +3888,7 @@ app.put('/api/admin/users/:id', adminAuth, async (req, res) => {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     const { name, email, phone, role, subscription, linked_elder_id } = req.body;
+    const linkedId = linked_elder_id === '' || linked_elder_id === undefined ? null : linked_elder_id;
     const result = await pool.query(
       `UPDATE users SET
         name = COALESCE($1, name),
@@ -3895,9 +3896,9 @@ app.put('/api/admin/users/:id', adminAuth, async (req, res) => {
         phone = COALESCE($3, phone),
         role = COALESCE($4, role),
         subscription = COALESCE($5, subscription),
-        linked_elder_id = COALESCE($6, linked_elder_id)
+        linked_elder_id = $6
       WHERE id = $7 RETURNING id, name, email, phone, role, subscription, linked_elder_id`,
-      [name, email, phone, role, subscription, linked_elder_id, req.params.id]
+      [name || null, email || null, phone || null, role || null, subscription || null, linkedId, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
