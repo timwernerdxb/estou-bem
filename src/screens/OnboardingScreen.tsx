@@ -257,6 +257,7 @@ export function OnboardingScreen() {
             email: user.email,
             role: userRole as "family" | "caregiver",
             elderIds: user.linked_elder_id ? [String(user.linked_elder_id)] : [],
+            linked_elder_id: user.linked_elder_id ? String(user.linked_elder_id) : undefined,
             isEmergencyContact: true,
             notifyOnMissedCheckin: true,
             notifyOnSOS: true,
@@ -265,7 +266,7 @@ export function OnboardingScreen() {
             link_code: user.link_code,
             apiUrl: API_URL,
             token,
-          };
+          } as any;
           dispatch({ type: "SET_USER", payload: profile });
           dispatch({ type: "ADD_FAMILY_PROFILE", payload: profile });
         }
