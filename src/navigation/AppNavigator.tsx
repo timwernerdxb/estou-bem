@@ -24,6 +24,9 @@ import { PaywallScreen } from "../screens/PaywallScreen";
 import { CustomerCenterScreen } from "../screens/CustomerCenterScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { CheckInHistoryScreen } from "../screens/CheckInHistoryScreen";
+import { GamificationScreen } from "../screens/GamificationScreen";
+import { HealthReportScreen } from "../screens/HealthReportScreen";
+import { MedicalProfileScreen } from "../screens/MedicalProfileScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const ElderTab = createBottomTabNavigator<ElderTabParamList>();
@@ -224,6 +227,9 @@ export function AppNavigator() {
               name="CheckInHistory"
               component={CheckInHistoryScreen}
             />
+            <Stack.Screen name="Gamification" component={GamificationScreen} />
+            <Stack.Screen name="HealthReport" component={HealthReportScreen} />
+            <Stack.Screen name="MedicalProfile" component={MedicalProfileScreen} />
           </>
         ) : (
           <>
@@ -248,6 +254,9 @@ export function AppNavigator() {
               name="CheckInHistory"
               component={CheckInHistoryScreen}
             />
+            <Stack.Screen name="Gamification" component={GamificationScreen} />
+            <Stack.Screen name="HealthReport" component={HealthReportScreen} />
+            <Stack.Screen name="MedicalProfile" component={MedicalProfileScreen} />
           </>
         )}
       </Stack.Navigator>

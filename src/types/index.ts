@@ -173,6 +173,9 @@ export type RootStackParamList = {
   EmergencyContacts: undefined;
   HealthLog: undefined;
   CheckInHistory: undefined;
+  Gamification: undefined;
+  HealthReport: undefined;
+  MedicalProfile: undefined;
 };
 
 export type ElderTabParamList = {

@@ -23,9 +23,11 @@ import { Button } from "../components/Button";
 import { checkInService } from "../services/CheckInService";
 import { autoCheckinService, CheckinMode } from "../services/AutoCheckinService";
 import { healthIntegrationService } from "../services/HealthIntegrationService";
-import { RootStackParamList } from "../types";
+import { RootStackParamList, SensorSnapshot } from "../types";
 import { affiliateService } from "../services/AffiliateService";
-import { putSettings, fetchSettings } from "../services/ApiService";
+import { fallDetectionService } from "../services/FallDetectionService";
+import { notificationService } from "../services/NotificationService";
+import { putSettings, fetchSettings, postFallDetected } from "../services/ApiService";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -47,6 +49,7 @@ export function SettingsScreen() {
   const [linkLoading, setLinkLoading] = useState(false);
   const [escalationMinutes, setEscalationMinutes] = useState("30");
   const [samuAutoCall, setSamuAutoCall] = useState(true);
+  const [fallDetectionEnabled, setFallDetectionEnabled] = useState(fallDetectionService.isActive());
 
   const trialStart = (state.currentUser as any)?.trial_start as string | undefined;
   const trialDaysLeft = (() => {
@@ -186,6 +189,25 @@ export function SettingsScreen() {
     Share.share({
       message: `Use meu codigo de vinculacao no Estou Bem para acompanhar meu bem-estar: ${code}`,
     });
+  };
+
+  const handleToggleFallDetection = async (enabled: boolean) => {
+    if (enabled) {
+      const handleFall = async (snapshot: SensorSnapshot) => {
+        const name = state.elderProfile?.name || state.currentUser?.name || "Idoso";
+        await notificationService.sendFallDetectedNotification(name, snapshot.heartRate);
+        await postFallDetected(state.currentUser, {
+          user_id: state.currentUser?.id ? Number(state.currentUser.id) : 0,
+          timestamp: new Date().toISOString(),
+          heart_rate: snapshot.heartRate,
+        });
+      };
+      await fallDetectionService.startMonitoring(handleFall);
+      setFallDetectionEnabled(true);
+    } else {
+      fallDetectionService.stopMonitoring();
+      setFallDetectionEnabled(false);
+    }
   };
 
   const handleLogout = () => {
@@ -388,6 +410,36 @@ export function SettingsScreen() {
                 color={healthConnected ? COLORS.primary : COLORS.textLight}
               />
             </TouchableOpacity>
+          </Card>
+        )}
+
+        {/* Fall Detection Toggle */}
+        {isElder && (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>{t("settings_fall_detection")}</Text>
+            <Text style={styles.sectionSubtitle}>
+              {t("settings_fall_detection_desc")}
+            </Text>
+            <View style={styles.menuRow}>
+              <Ionicons
+                name="fitness"
+                size={22}
+                color={fallDetectionEnabled ? COLORS.primary : COLORS.textLight}
+              />
+              <View style={{ flex: 1, marginLeft: SPACING.sm }}>
+                <Text style={styles.menuText}>
+                  {fallDetectionEnabled
+                    ? t("settings_fall_detection_active")
+                    : t("settings_fall_detection_inactive")}
+                </Text>
+              </View>
+              <Switch
+                value={fallDetectionEnabled}
+                onValueChange={handleToggleFallDetection}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor={COLORS.white}
+              />
+            </View>
           </Card>
         )}
 
