@@ -20,6 +20,8 @@
     <string>Estou Bem registra dados de saude para acompanhamento familiar.</string>
     <key>NSMotionUsageDescription</key>
     <string>Estou Bem detecta movimento para saber se voce esta ativo e adiar alertas desnecessarios.</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>WKApplication</key>
     <true/>
 </dict>
