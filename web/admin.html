@@ -1908,14 +1908,14 @@ async function saveUser(id) {
   try {
     await apiFetch(`/admin/users/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({
+      body: {
         name: document.getElementById('editUserName').value,
         email: document.getElementById('editUserEmail').value,
         phone: document.getElementById('editUserPhone').value,
         role: document.getElementById('editUserRole').value,
         subscription: document.getElementById('editUserSub').value,
         linked_elder_id: document.getElementById('editUserLinked').value || null
-      })
+      }
     });
     showToast('Usuário atualizado com sucesso', 'success');
     loadUsers();
@@ -1930,7 +1930,7 @@ async function resetUserPassword(id) {
   try {
     await apiFetch(`/admin/users/${id}/reset-password`, {
       method: 'POST',
-      body: JSON.stringify({ new_password: pw })
+      body: { new_password: pw }
     });
     showToast('Senha redefinida com sucesso', 'success');
     document.getElementById('resetPasswordBox').style.display = 'none';
