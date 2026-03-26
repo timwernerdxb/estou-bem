@@ -55,7 +55,7 @@ class FallDetectionManager: NSObject, ObservableObject {
             manager.delegate = self
             cmFallManager = manager
 
-            let authStatus = CMFallDetectionManager.authorizationStatus
+            let authStatus = manager.authorizationStatus
             switch authStatus {
             case .authorized:
                 fallDetectionAvailable = true

@@ -149,6 +149,29 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         try? session.updateApplicationContext(context)
     }
 
+    func sendHealthData(type: String, value: Double) {
+        guard let session = session else { return }
+
+        let context: [String: Any] = [
+            "type": "health_data",
+            "dataType": type,
+            "value": value,
+            "timestamp": ISO8601DateFormatter().string(from: Date()),
+        ]
+
+        try? session.updateApplicationContext(context)
+    }
+
+    func sendLowSpO2Alert(_ spo2: Double) {
+        guard let session = session, session.isReachable else { return }
+
+        session.sendMessage([
+            "type": "low_spo2_alert",
+            "spo2": spo2,
+            "timestamp": ISO8601DateFormatter().string(from: Date()),
+        ], replyHandler: nil, errorHandler: nil)
+    }
+
     // MARK: - Request sync from iPhone
     func requestSync() {
         guard let session = session, session.isReachable else { return }
