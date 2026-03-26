@@ -1,7 +1,7 @@
 /** @type {import('@bacons/apple-targets').Config} */
 module.exports = {
   type: "watch",
-  name: "Estou Bem Watch",
+  name: "EstouBemWatch",
   bundleIdentifier: ".watchkitapp",
   deploymentTarget: "10.0",
   frameworks: [
