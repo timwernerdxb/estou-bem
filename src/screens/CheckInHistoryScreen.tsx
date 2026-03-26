@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,10 +8,41 @@ import { useApp } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { StatusBadge } from "../components/StatusBadge";
 import { CheckIn } from "../types";
+import { fetchCheckins } from "../services/ApiService";
 
 export function CheckInHistoryScreen() {
   const navigation = useNavigation();
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
+
+  // Fetch check-ins from server on mount and merge with local state
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await fetchCheckins(state.currentUser, { limit: 100 });
+        if (rows && rows.length > 0) {
+          for (const row of rows) {
+            const mapped: CheckIn = {
+              id: String(row.id),
+              elderId: String(row.user_id),
+              scheduledAt: row.created_at || new Date().toISOString(),
+              respondedAt: row.confirmed_at || undefined,
+              status: row.status === "confirmed" || row.status === "auto_confirmed"
+                ? row.status
+                : row.status === "missed"
+                ? "missed"
+                : "pending",
+            };
+            const exists = state.checkins.some((c) => c.id === mapped.id);
+            if (!exists) {
+              dispatch({ type: "ADD_CHECKIN", payload: mapped });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[CheckInHistory] Failed to fetch checkins:", e);
+      }
+    })();
+  }, []);
 
   const renderItem = ({ item }: { item: CheckIn }) => (
     <Card style={styles.card}>

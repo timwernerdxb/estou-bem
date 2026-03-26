@@ -17,7 +17,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { checkInService } from "../services/CheckInService";
 import { fallDetectionService } from "../services/FallDetectionService";
-import { postCheckin, fetchCheckins, postFallDetected } from "../services/ApiService";
+import { postCheckin, fetchCheckins, postFallDetected, postCheckinReward, fetchNapStatus, postActivityUpdate } from "../services/ApiService";
 import { autoCheckinService } from "../services/AutoCheckinService";
 import { notificationService } from "../services/NotificationService";
 import { StatusBadge } from "../components/StatusBadge";
@@ -191,6 +191,23 @@ export function ElderHomeScreen() {
     })();
   }, []); // run once on mount
 
+  // Check nap status from server on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const nap = await fetchNapStatus(state.currentUser);
+        if (nap && nap.napping && nap.nap_until) {
+          setIsNapping(true);
+          setNapUntil(nap.nap_until);
+          const remaining = new Date(nap.nap_until).getTime() - Date.now();
+          if (remaining > 0) {
+            setTimeout(() => { setIsNapping(false); setNapUntil(null); }, remaining);
+          }
+        }
+      } catch {}
+    })();
+  }, []);
+
   // Compute state on mount and every 30 seconds
   useEffect(() => {
     computeDisplayState();
@@ -244,8 +261,21 @@ export function ElderHomeScreen() {
 
     fallDetectionService.startMonitoring(handleFallDetected);
 
+    // Periodically send wearable health data to server
+    const healthInterval = setInterval(() => {
+      const snapshot = fallDetectionService.getCurrentSnapshot();
+      if (snapshot && (snapshot.heartRate || snapshot.lastMovementAt)) {
+        postActivityUpdate(state.currentUser, {
+          user_id: state.currentUser?.id ? Number(state.currentUser.id) : 0,
+          movement_detected: !!snapshot.lastMovementAt,
+          heart_rate: snapshot.heartRate,
+        }).catch(() => {});
+      }
+    }, 5 * 60 * 1000); // every 5 minutes
+
     return () => {
       fallDetectionService.stopMonitoring();
+      clearInterval(healthInterval);
     };
   }, [state.currentUser?.id]);
 
@@ -306,6 +336,9 @@ export function ElderHomeScreen() {
         date: now.toISOString().slice(0, 10),
       }).catch(() => {});
     }
+
+    // Award gamification points for check-in (fire-and-forget)
+    postCheckinReward(state.currentUser).catch(() => {});
 
     // Recompute state after confirming
     setTimeout(() => {

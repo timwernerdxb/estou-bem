@@ -48,6 +48,7 @@ export function SettingsScreen() {
   const [myReferralCode, setMyReferralCode] = useState("");
   const [linkCode, setLinkCode] = useState("");
   const [linkLoading, setLinkLoading] = useState(false);
+  const [linkedElderName, setLinkedElderName] = useState<string | null>(null);
   const [escalationMinutes, setEscalationMinutes] = useState("30");
   const [samuAutoCall, setSamuAutoCall] = useState(true);
   const [fallDetectionEnabled, setFallDetectionEnabled] = useState(fallDetectionService.isActive());
@@ -75,6 +76,13 @@ export function SettingsScreen() {
             setCheckinTimes(serverTimes);
             dispatch({ type: "SET_CHECKIN_TIMES", payload: serverTimes });
           }
+        }
+        // Load escalation settings from server
+        if (serverSettings?.escalation_minutes != null) {
+          setEscalationMinutes(String(serverSettings.escalation_minutes));
+        }
+        if (serverSettings?.samu_auto_call != null) {
+          setSamuAutoCall(serverSettings.samu_auto_call);
         }
       } catch (e) {
         console.warn("[Settings] Failed to fetch settings from server:", e);
@@ -180,6 +188,9 @@ export function SettingsScreen() {
             type: "SET_USER",
             payload: { ...state.currentUser, linked_elder_id: String(data.elderId) },
           });
+        }
+        if (data.elderName) {
+          setLinkedElderName(data.elderName);
         }
         Alert.alert("Vinculado!", `Voce foi vinculado(a) a ${data.elderName}.`);
         setLinkCode("");
@@ -477,6 +488,13 @@ export function SettingsScreen() {
             </>
           ) : (
             <>
+              {(linkedElderName || state.currentUser?.linked_elder_id) && (
+                <View style={{ backgroundColor: COLORS.successLight, padding: SPACING.md, borderRadius: RADIUS.md, marginBottom: SPACING.sm }}>
+                  <Text style={{ ...FONTS.body, color: COLORS.primary, fontWeight: "500" }}>
+                    Conectado com: {linkedElderName || `Idoso #${state.currentUser?.linked_elder_id}`}
+                  </Text>
+                </View>
+              )}
               <Text style={styles.sectionSubtitle}>
                 Digite o codigo de vinculacao do idoso para acompanhar seu bem-estar
               </Text>
@@ -626,7 +644,13 @@ export function SettingsScreen() {
               <TextInput
                 style={styles.escalationInput}
                 value={escalationMinutes}
-                onChangeText={setEscalationMinutes}
+                onChangeText={(val) => {
+                  setEscalationMinutes(val);
+                  const num = parseInt(val);
+                  if (!isNaN(num) && num > 0) {
+                    putSettings(state.currentUser, { escalation_minutes: num }).catch(() => {});
+                  }
+                }}
                 keyboardType="numeric"
                 maxLength={3}
                 placeholderTextColor={COLORS.textLight}
@@ -643,7 +667,10 @@ export function SettingsScreen() {
               </View>
               <Switch
                 value={samuAutoCall}
-                onValueChange={setSamuAutoCall}
+                onValueChange={(val) => {
+                  setSamuAutoCall(val);
+                  putSettings(state.currentUser, { samu_auto_call: val }).catch(() => {});
+                }}
                 trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
                 thumbColor={samuAutoCall ? COLORS.primary : COLORS.disabled}
               />

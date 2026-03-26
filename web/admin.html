@@ -1880,6 +1880,8 @@ async function showUserDetail(id) {
           <input type="text" id="editUserLinked" value="${u.linked_elder_id || ''}" class="form-control">
         </div>
       </div>
+      ${u.linked_elder_id && u.elder_name ? `<div style="padding:10px 14px;background:#e8f0ec;border-radius:8px;margin-bottom:16px;font-weight:500;color:#2D4A3E">Conectado com: ${esc(u.elder_name)}</div>` : ''}
+      ${u.linked_family && u.linked_family.length > 0 ? `<div style="padding:10px 14px;background:#e8f0ec;border-radius:8px;margin-bottom:16px;color:#2D4A3E"><strong>Familiares vinculados:</strong> ${u.linked_family.map(f => esc(f.name)).join(', ')}</div>` : ''}
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <button class="btn btn-primary" onclick="saveUser(${u.id})">Salvar Alterações</button>
         <button class="btn" style="background:var(--warning);color:#fff" onclick="toggleResetPassword(${u.id})">Redefinir Senha</button>

@@ -17,6 +17,7 @@ import { COLORS, FONTS, SPACING, SHADOWS, SCREEN, RADIUS } from "../constants/th
 import { useApp } from "../store/AppContext";
 import { notificationService } from "../services/NotificationService";
 import { locationService } from "../services/LocationService";
+import { postFallDetected, postFallCancelled } from "../services/ApiService";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 const HOLD_DURATION = 3000; // 3 seconds to activate SOS
@@ -65,6 +66,13 @@ export function SOSScreen() {
     // Notify all emergency contacts via local notification
     await notificationService.sendSOSNotification(elderName, location);
 
+    // POST to server to trigger escalation pipeline (SMS, WhatsApp, voice calls)
+    postFallDetected(state.currentUser, {
+      user_id: state.currentUser?.id ? Number(state.currentUser.id) : 0,
+      timestamp: new Date().toISOString(),
+      location: undefined,
+    }).catch(() => {});
+
     // Call first emergency contact
     if (state.emergencyContacts.length > 0) {
       const sorted = [...state.emergencyContacts].sort(
@@ -102,12 +110,17 @@ export function SOSScreen() {
       );
     }
 
-    // Reset after 10 seconds
-    setTimeout(() => {
-      setSOSActivated(false);
-      setIsHolding(false);
-      progressAnim.setValue(0);
-    }, 10000);
+  };
+
+  const cancelSOS = () => {
+    setSOSActivated(false);
+    setIsHolding(false);
+    progressAnim.setValue(0);
+    // Notify server to cancel escalation
+    postFallCancelled(state.currentUser, {
+      user_id: state.currentUser?.id ? Number(state.currentUser.id) : 0,
+    }).catch(() => {});
+    Alert.alert("SOS Cancelado", "O alerta de emergencia foi cancelado.");
   };
 
   const progressWidth = progressAnim.interpolate({
@@ -154,6 +167,17 @@ export function SOSScreen() {
                 style={[styles.progressBar, { width: progressWidth }]}
               />
             </View>
+          )}
+
+          {/* Cancel SOS button */}
+          {sosActivated && (
+            <TouchableOpacity
+              onPress={cancelSOS}
+              style={styles.cancelSOSButton}
+            >
+              <Ionicons name="close-circle" size={24} color={COLORS.white} />
+              <Text style={styles.cancelSOSText}>CANCELAR SOS</Text>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -278,4 +302,21 @@ const styles = StyleSheet.create({
   },
   contactName: { ...FONTS.body, fontWeight: "500" },
   contactRel: { ...FONTS.caption },
+  cancelSOSButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.textSecondary,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
+    gap: SPACING.xs,
+  },
+  cancelSOSText: {
+    color: COLORS.white,
+    fontWeight: "600",
+    fontSize: 16,
+    letterSpacing: 1,
+  },
 });

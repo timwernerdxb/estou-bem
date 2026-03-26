@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { useApp } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { HealthEntry, HealthMetricType } from "../types";
-import { postHealth } from "../services/ApiService";
+import { postHealth, fetchHealth } from "../services/ApiService";
 
 const METRIC_CONFIG: Record<
   HealthMetricType,
@@ -39,6 +39,34 @@ export function HealthLogScreen() {
   const [selectedType, setSelectedType] = useState<HealthMetricType>("blood_pressure_systolic");
   const [value, setValue] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Fetch health entries from server on mount and merge with local state
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await fetchHealth(state.currentUser, 200);
+        if (rows && rows.length > 0) {
+          for (const row of rows) {
+            const exists = state.healthEntries.some((e) => e.id === String(row.id));
+            if (!exists) {
+              const entry: HealthEntry = {
+                id: String(row.id),
+                elderId: String(row.user_id),
+                timestamp: row.created_at || new Date().toISOString(),
+                type: row.type as HealthMetricType,
+                value: row.value,
+                unit: row.unit || "",
+                notes: row.notes || undefined,
+              };
+              dispatch({ type: "ADD_HEALTH_ENTRY", payload: entry });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[HealthLog] Failed to fetch health entries:", e);
+      }
+    })();
+  }, []);
 
   const handleAdd = () => {
     const numValue = parseFloat(value);

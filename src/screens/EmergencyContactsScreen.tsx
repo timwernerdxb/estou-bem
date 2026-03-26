@@ -78,12 +78,18 @@ export function EmergencyContactsScreen() {
 
     dispatch({ type: "ADD_EMERGENCY_CONTACT", payload: contact });
 
-    // Sync to server (fire-and-forget)
+    // Sync to server and update local state with server-returned ID
     postContact(state.currentUser, {
       name: contact.name,
       phone: contact.phone,
       relationship: contact.relationship,
       priority: contact.priority,
+    }).then((serverResult) => {
+      if (serverResult?.id) {
+        // Replace local temp ID with server ID
+        dispatch({ type: "REMOVE_EMERGENCY_CONTACT", payload: contact.id });
+        dispatch({ type: "ADD_EMERGENCY_CONTACT", payload: { ...contact, id: String(serverResult.id) } });
+      }
     }).catch(() => {});
 
     setShowAdd(false);

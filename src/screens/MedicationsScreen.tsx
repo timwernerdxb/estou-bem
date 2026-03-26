@@ -105,7 +105,7 @@ export function MedicationsScreen() {
 
     dispatch({ type: "ADD_MEDICATION", payload: medication });
 
-    // Sync to server (fire-and-forget)
+    // Sync to server and update local state with server-returned ID
     postMedication(state.currentUser, {
       name: medication.name,
       dosage: medication.dosage,
@@ -114,6 +114,12 @@ export function MedicationsScreen() {
       stock: medication.stockQuantity,
       unit: medication.stockUnit,
       low_threshold: medication.lowStockThreshold,
+    }).then((serverResult) => {
+      if (serverResult?.id) {
+        // Replace local temp ID with server ID
+        dispatch({ type: "REMOVE_MEDICATION", payload: medication.id });
+        dispatch({ type: "ADD_MEDICATION", payload: { ...medication, id: String(serverResult.id) } });
+      }
     }).catch(() => {});
 
     // Schedule notification for this medication
