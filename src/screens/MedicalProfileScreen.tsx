@@ -295,6 +295,13 @@ export function MedicalProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Perfil Medico</Text>
+        <View style={{ width: 32 }} />
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Perfil Medico</Text>
 
@@ -599,6 +606,15 @@ export function MedicalProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  backBtn: { padding: SPACING.xs },
+  headerTitle: { ...FONTS.subtitle, fontWeight: "600" },
   content: { padding: SPACING.lg },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   title: {

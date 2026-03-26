@@ -205,4 +205,5 @@ export type ConversionEvent =
   | "subscription_started"
   | "subscription_renewed"
   | "subscription_cancelled"
-  | "b2b_lead_generated";
+  | "b2b_lead_generated"
+  | "login";

@@ -121,6 +121,13 @@ export function HealthReportScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Relatorio de Saude</Text>
+        <View style={{ width: 32 }} />
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Relatorio de Saude</Text>
 
@@ -259,6 +266,15 @@ export function HealthReportScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  backBtn: { padding: SPACING.xs },
+  headerTitle: { ...FONTS.subtitle, fontWeight: "600" },
   content: { padding: SPACING.lg },
   loadingContainer: { paddingVertical: SPACING.xxl, alignItems: "center" },
   title: {

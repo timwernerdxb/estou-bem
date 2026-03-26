@@ -255,6 +255,22 @@ export async function fetchElderStatus(
   return res.json();
 }
 
+// ─── LGPD Consent ─────────────────────────────────────────────
+
+export async function postConsent(
+  user: { apiUrl?: string; token?: string } | null,
+  body: { type: string; accepted: boolean }
+): Promise<any | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/consent`, {
+    method: "POST",
+    headers: getHeaders(user.token),
+    body: JSON.stringify(body),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
 // ─── Settings ─────────────────────────────────────────────────
 
 export async function fetchSettings(
@@ -262,6 +278,45 @@ export async function fetchSettings(
 ): Promise<any | null> {
   if (!user?.token) return null;
   const res = await safeFetch(`${getApiUrl(user)}/api/settings`, {
+    method: "GET",
+    headers: getHeaders(user.token),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
+export async function postCheckinReward(
+  user: { apiUrl?: string; token?: string } | null
+): Promise<any | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/gamification/checkin-reward`, {
+    method: "POST",
+    headers: getHeaders(user.token),
+    body: JSON.stringify({}),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
+export async function postActivityUpdate(
+  user: { apiUrl?: string; token?: string } | null,
+  body: { user_id: number; movement_detected?: boolean; heart_rate?: number; spo2?: number; sleep_hours?: number }
+): Promise<any | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/activity-update`, {
+    method: "POST",
+    headers: getHeaders(user.token),
+    body: JSON.stringify(body),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
+export async function fetchNapStatus(
+  user: { apiUrl?: string; token?: string } | null
+): Promise<any | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/nap`, {
     method: "GET",
     headers: getHeaders(user.token),
   });
@@ -277,6 +332,8 @@ export async function putSettings(
     checkin_interval_hours?: number;
     checkin_window_start?: string;
     checkin_window_end?: string;
+    escalation_minutes?: number;
+    samu_auto_call?: boolean;
   }
 ): Promise<boolean> {
   if (!user?.token) return false;

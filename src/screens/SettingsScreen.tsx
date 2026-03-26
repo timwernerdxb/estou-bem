@@ -28,6 +28,7 @@ import { affiliateService } from "../services/AffiliateService";
 import { fallDetectionService } from "../services/FallDetectionService";
 import { notificationService } from "../services/NotificationService";
 import { putSettings, fetchSettings, postFallDetected } from "../services/ApiService";
+import Constants from "expo-constants";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -668,7 +669,7 @@ export function SettingsScreen() {
           style={{ marginTop: SPACING.xl, width: "100%" }}
         />
 
-        <Text style={styles.version}>Estou Bem v1.0.0</Text>
+        <Text style={styles.version}>Estou Bem v{Constants.expoConfig?.version || '1.1.0'} ({Constants.expoConfig?.extra?.buildNumber || Constants.expoConfig?.ios?.buildNumber || Constants.expoConfig?.android?.versionCode || '1'})</Text>
       </ScrollView>
     </SafeAreaView>
   );

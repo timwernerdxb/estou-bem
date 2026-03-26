@@ -16,6 +16,7 @@ const AF_EVENT_MAP: Record<ConversionEvent, string> = {
   subscription_renewed: "af_subscription_renewed",
   subscription_cancelled: "af_subscription_cancelled",
   b2b_lead_generated: "af_b2b_lead",
+  login: "af_login",
 };
 
 interface EventParams {

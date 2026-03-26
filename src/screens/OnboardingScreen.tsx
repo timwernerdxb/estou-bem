@@ -24,6 +24,8 @@ import { UserRole, ElderProfile, FamilyProfile, RootStackParamList } from "../ty
 import { notificationService } from "../services/NotificationService";
 import { checkInService } from "../services/CheckInService";
 import { affiliateService } from "../services/AffiliateService";
+import { fetchSettings, postConsent } from "../services/ApiService";
+import { analyticsService } from "../services/AnalyticsService";
 
 const API_URL = "https://estou-bem-web-production.up.railway.app";
 
@@ -179,12 +181,25 @@ export function OnboardingScreen() {
         dispatch({ type: "ADD_FAMILY_PROFILE", payload: profile });
       }
 
+      // Sync LGPD consent to server
+      const userForApi = { apiUrl: API_URL, token };
+      postConsent(userForApi, { type: "lgpd", accepted: true }).catch(() => {});
+
+      // Track registration
+      analyticsService.trackEvent("registration_complete");
+
       // Initialize notifications
       await notificationService.initialize();
 
-      // Schedule default check-in if elder
+      // Fetch user's saved check-in times, fall back to default
       if (role === "elder") {
-        await checkInService.scheduleCheckinAlarms(["09:00"]);
+        try {
+          const settings = await fetchSettings(userForApi);
+          const times = settings?.checkin_times?.length ? settings.checkin_times : ["09:00"];
+          await checkInService.scheduleCheckinAlarms(times);
+        } catch {
+          await checkInService.scheduleCheckinAlarms(["09:00"]);
+        }
       }
 
       dispatch({ type: "SET_ONBOARDED", payload: true });
@@ -250,9 +265,21 @@ export function OnboardingScreen() {
           dispatch({ type: "ADD_FAMILY_PROFILE", payload: profile });
         }
 
+        // Track login
+        analyticsService.trackEvent("login");
+
         await notificationService.initialize();
+
+        // Fetch user's saved check-in times, fall back to default
         if (userRole === "elder") {
-          await checkInService.scheduleCheckinAlarms(["09:00"]);
+          const userForApi = { apiUrl: API_URL, token };
+          try {
+            const settings = await fetchSettings(userForApi);
+            const times = settings?.checkin_times?.length ? settings.checkin_times : ["09:00"];
+            await checkInService.scheduleCheckinAlarms(times);
+          } catch {
+            await checkInService.scheduleCheckinAlarms(["09:00"]);
+          }
         }
         dispatch({ type: "SET_ONBOARDED", payload: true });
       } else {
