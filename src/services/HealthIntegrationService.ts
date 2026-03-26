@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { HealthEntry, HealthMetricType } from "../types";
+import { postHealth } from "./ApiService";
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
@@ -213,22 +214,49 @@ class HealthIntegrationService {
     }
   }
 
+  // ─── Sync health entries to the server ──────────────────────
+  async syncEntriesToServer(
+    user: { apiUrl?: string; token?: string } | null,
+    entries: HealthEntry[]
+  ): Promise<void> {
+    if (!user?.token || entries.length === 0) return;
+    for (const entry of entries) {
+      const ts = new Date(entry.timestamp);
+      postHealth(user, {
+        type: entry.type,
+        value: entry.value,
+        unit: entry.unit,
+        time: ts.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false }),
+        date: ts.toISOString().slice(0, 10),
+        notes: entry.notes,
+      }).catch(() => {});
+    }
+  }
+
   // ─── Unified read (cross-platform) ──────────────────────────
   async readLatestHealthData(
     elderId: string,
-    hoursBack: number = 24
+    hoursBack: number = 24,
+    user?: { apiUrl?: string; token?: string } | null
   ): Promise<HealthEntry[]> {
     if (!this.initialized) {
       const ok = await this.initialize();
       if (!ok) return [];
     }
 
+    let entries: HealthEntry[] = [];
+
     if (Platform.OS === "android") {
-      return this.readAndroidHealthData(elderId, hoursBack);
+      entries = await this.readAndroidHealthData(elderId, hoursBack);
+    }
+
+    // Sync any new entries to the server (fire-and-forget)
+    if (entries.length > 0 && user) {
+      this.syncEntriesToServer(user, entries).catch(() => {});
     }
 
     // iOS: data comes from watch relay, already in state
-    return [];
+    return entries;
   }
 
   // ─── Check if wearable data indicates movement (for auto check-in) ──

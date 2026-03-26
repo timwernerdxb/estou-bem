@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,11 @@ import { useApp } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { EmergencyContact } from "../types";
+import {
+  fetchContacts,
+  postContact,
+  deleteContact as deleteContactApi,
+} from "../services/ApiService";
 
 export function EmergencyContactsScreen() {
   const navigation = useNavigation();
@@ -28,6 +33,31 @@ export function EmergencyContactsScreen() {
     phone: "",
     relationship: "",
   });
+
+  // Fetch contacts from server on mount and merge with local
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await fetchContacts(state.currentUser);
+        if (rows && rows.length > 0) {
+          const serverContacts: EmergencyContact[] = rows.map((row: any) => ({
+            id: String(row.id),
+            elderId: String(row.user_id),
+            name: row.name,
+            phone: row.phone,
+            relationship: row.relationship || "",
+            priority: row.priority || 1,
+            notifyOnMissedCheckin: true,
+            notifyOnSOS: true,
+          }));
+          // Replace local list with server data if server has data
+          dispatch({ type: "SET_EMERGENCY_CONTACTS", payload: serverContacts });
+        }
+      } catch (e) {
+        console.warn("[Contacts] Failed to fetch from server:", e);
+      }
+    })();
+  }, []);
 
   const handleAdd = () => {
     if (!newContact.name.trim() || !newContact.phone.trim()) {
@@ -47,6 +77,15 @@ export function EmergencyContactsScreen() {
     };
 
     dispatch({ type: "ADD_EMERGENCY_CONTACT", payload: contact });
+
+    // Sync to server (fire-and-forget)
+    postContact(state.currentUser, {
+      name: contact.name,
+      phone: contact.phone,
+      relationship: contact.relationship,
+      priority: contact.priority,
+    }).catch(() => {});
+
     setShowAdd(false);
     setNewContact({ name: "", phone: "", relationship: "" });
   };
@@ -57,8 +96,10 @@ export function EmergencyContactsScreen() {
       {
         text: "Remover",
         style: "destructive",
-        onPress: () =>
-          dispatch({ type: "REMOVE_EMERGENCY_CONTACT", payload: contact.id }),
+        onPress: () => {
+          dispatch({ type: "REMOVE_EMERGENCY_CONTACT", payload: contact.id });
+          deleteContactApi(state.currentUser, contact.id).catch(() => {});
+        },
       },
     ]);
   };

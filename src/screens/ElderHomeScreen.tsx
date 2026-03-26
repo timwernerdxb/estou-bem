@@ -15,9 +15,12 @@ import { COLORS, FONTS, SPACING, SHADOWS, RADIUS, SCREEN } from "../constants/th
 import { useApp, useSubscription } from "../store/AppContext";
 import { checkInService } from "../services/CheckInService";
 import { fallDetectionService } from "../services/FallDetectionService";
+import { postCheckin, fetchCheckins } from "../services/ApiService";
+import { autoCheckinService } from "../services/AutoCheckinService";
+import { notificationService } from "../services/NotificationService";
 import { StatusBadge } from "../components/StatusBadge";
 import { Card } from "../components/Card";
-import { CheckIn } from "../types";
+import { CheckIn, SensorSnapshot } from "../types";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -124,6 +127,38 @@ export function ElderHomeScreen() {
     }
   }, [pendingCheckin, todayCheckins]);
 
+  // Fetch check-in history from server on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const rows = await fetchCheckins(state.currentUser, { date: today, limit: 20 });
+        if (rows && rows.length > 0) {
+          for (const row of rows) {
+            const mapped: CheckIn = {
+              id: String(row.id),
+              elderId: String(row.user_id),
+              scheduledAt: row.created_at || new Date().toISOString(),
+              respondedAt: row.confirmed_at || undefined,
+              status: row.status === "confirmed" || row.status === "auto_confirmed"
+                ? row.status
+                : row.status === "missed"
+                ? "missed"
+                : "pending",
+            };
+            // Only add if not already present locally
+            const exists = state.checkins.some((c) => c.id === mapped.id);
+            if (!exists) {
+              dispatch({ type: "ADD_CHECKIN", payload: mapped });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[ElderHome] Failed to fetch checkins from server:", e);
+      }
+    })();
+  }, []); // run once on mount
+
   // Compute state on mount and every 30 seconds
   useEffect(() => {
     computeDisplayState();
@@ -170,6 +205,14 @@ export function ElderHomeScreen() {
       const confirmed = checkInService.confirmCheckin(pendingCheckin);
       dispatch({ type: "UPDATE_CHECKIN", payload: confirmed });
       setLastCheckin(confirmed);
+      // Sync to server (fire-and-forget)
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+      postCheckin(state.currentUser, {
+        time: timeStr,
+        status: "confirmed",
+        date: now.toISOString().slice(0, 10),
+      }).catch(() => {});
     } else {
       // Create and immediately confirm a new check-in (backwards compat)
       const elderId = state.elderProfile?.id || state.currentUser?.id || "elder";
@@ -177,6 +220,14 @@ export function ElderHomeScreen() {
       const confirmed = checkInService.confirmCheckin(newCheckin);
       dispatch({ type: "ADD_CHECKIN", payload: confirmed });
       setLastCheckin(confirmed);
+      // Sync to server (fire-and-forget)
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+      postCheckin(state.currentUser, {
+        time: timeStr,
+        status: "confirmed",
+        date: now.toISOString().slice(0, 10),
+      }).catch(() => {});
     }
 
     // Recompute state after confirming

@@ -17,6 +17,7 @@ import { useApp } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { HealthEntry, HealthMetricType } from "../types";
+import { postHealth } from "../services/ApiService";
 
 const METRIC_CONFIG: Record<
   HealthMetricType,
@@ -57,6 +58,18 @@ export function HealthLogScreen() {
     };
 
     dispatch({ type: "ADD_HEALTH_ENTRY", payload: entry });
+
+    // Sync to server (fire-and-forget)
+    const ts = new Date(entry.timestamp);
+    postHealth(state.currentUser, {
+      type: entry.type,
+      value: entry.value,
+      unit: entry.unit,
+      time: ts.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false }),
+      date: ts.toISOString().slice(0, 10),
+      notes: entry.notes,
+    }).catch(() => {});
+
     setShowAdd(false);
     setValue("");
     setNotes("");

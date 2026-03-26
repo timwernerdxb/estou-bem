@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,12 @@ import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { Medication, MedicationFrequency } from "../types";
 import { notificationService } from "../services/NotificationService";
+import {
+  fetchMedications,
+  postMedication,
+  putMedication,
+  deleteMedication as deleteMedicationApi,
+} from "../services/ApiService";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -43,6 +49,40 @@ export function MedicationsScreen() {
     stockUnit: "comprimidos",
   });
 
+  // Fetch medications from server on mount and merge with local
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await fetchMedications(state.currentUser);
+        if (rows && rows.length > 0) {
+          for (const row of rows) {
+            const exists = state.medications.some(
+              (m) => m.id === String(row.id) || m.name === row.name
+            );
+            if (!exists) {
+              const med: Medication = {
+                id: String(row.id),
+                elderId: String(row.user_id),
+                name: row.name,
+                dosage: row.dosage || "",
+                frequency: (row.frequency as MedicationFrequency) || "daily",
+                times: row.time ? [row.time] : ["08:00"],
+                stockQuantity: row.stock ?? 30,
+                stockUnit: row.unit || "comprimidos",
+                lowStockThreshold: row.low_threshold ?? 5,
+                autoReorderEnabled: false,
+                createdAt: row.created_at || new Date().toISOString(),
+              };
+              dispatch({ type: "ADD_MEDICATION", payload: med });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[Medications] Failed to fetch from server:", e);
+      }
+    })();
+  }, []);
+
   const handleAddMedication = () => {
     if (!newMed.name.trim()) {
       Alert.alert("Erro", "Digite o nome do medicamento");
@@ -64,6 +104,17 @@ export function MedicationsScreen() {
     };
 
     dispatch({ type: "ADD_MEDICATION", payload: medication });
+
+    // Sync to server (fire-and-forget)
+    postMedication(state.currentUser, {
+      name: medication.name,
+      dosage: medication.dosage,
+      frequency: medication.frequency,
+      time: newMed.time,
+      stock: medication.stockQuantity,
+      unit: medication.stockUnit,
+      low_threshold: medication.lowStockThreshold,
+    }).catch(() => {});
 
     // Schedule notification for this medication
     notificationService.scheduleMedicationReminder(
@@ -94,6 +145,11 @@ export function MedicationsScreen() {
       stockQuantity: med.stockQuantity - 1,
     };
     dispatch({ type: "UPDATE_MEDICATION", payload: updatedMed });
+
+    // Sync stock update to server (fire-and-forget)
+    putMedication(state.currentUser, med.id, {
+      stock: updatedMed.stockQuantity,
+    }).catch(() => {});
 
     // Log the medication
     dispatch({
@@ -132,7 +188,10 @@ export function MedicationsScreen() {
         {
           text: "Remover",
           style: "destructive",
-          onPress: () => dispatch({ type: "REMOVE_MEDICATION", payload: med.id }),
+          onPress: () => {
+            dispatch({ type: "REMOVE_MEDICATION", payload: med.id });
+            deleteMedicationApi(state.currentUser, med.id).catch(() => {});
+          },
         },
       ]
     );

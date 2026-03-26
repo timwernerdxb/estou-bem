@@ -25,6 +25,7 @@ import { autoCheckinService, CheckinMode } from "../services/AutoCheckinService"
 import { healthIntegrationService } from "../services/HealthIntegrationService";
 import { RootStackParamList } from "../types";
 import { affiliateService } from "../services/AffiliateService";
+import { putSettings, fetchSettings } from "../services/ApiService";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -44,10 +45,37 @@ export function SettingsScreen() {
   const [myReferralCode, setMyReferralCode] = useState("");
   const [linkCode, setLinkCode] = useState("");
   const [linkLoading, setLinkLoading] = useState(false);
+  const [escalationMinutes, setEscalationMinutes] = useState("30");
+  const [samuAutoCall, setSamuAutoCall] = useState(true);
+
+  const trialStart = (state.currentUser as any)?.trial_start as string | undefined;
+  const trialDaysLeft = (() => {
+    if (!trialStart) return null;
+    const start = new Date(trialStart);
+    const now = new Date();
+    const elapsed = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(0, 7 - elapsed);
+  })();
 
   React.useEffect(() => {
     setAutoCheckinMode(autoCheckinService.getMode());
     setHealthConnected(healthIntegrationService.isInitialized());
+
+    // Fetch settings from server and merge with local
+    (async () => {
+      try {
+        const serverSettings = await fetchSettings(state.currentUser);
+        if (serverSettings?.checkin_times && Array.isArray(serverSettings.checkin_times)) {
+          const serverTimes = serverSettings.checkin_times as string[];
+          if (serverTimes.length > 0) {
+            setCheckinTimes(serverTimes);
+            dispatch({ type: "SET_CHECKIN_TIMES", payload: serverTimes });
+          }
+        }
+      } catch (e) {
+        console.warn("[Settings] Failed to fetch settings from server:", e);
+      }
+    })();
   }, []);
 
   React.useEffect(() => {
@@ -67,6 +95,8 @@ export function SettingsScreen() {
     }
     await autoCheckinService.setMode(mode);
     setAutoCheckinMode(mode);
+    // Sync mode to server (fire-and-forget)
+    putSettings(state.currentUser, { checkin_mode: mode }).catch(() => {});
   };
 
   const handleConnectHealth = async () => {
@@ -102,6 +132,8 @@ export function SettingsScreen() {
     setCheckinTimes(updated);
     dispatch({ type: "SET_CHECKIN_TIMES", payload: updated });
     await checkInService.scheduleCheckinAlarms(updated);
+    // Sync to server (fire-and-forget)
+    putSettings(state.currentUser, { checkin_times: updated }).catch(() => {});
     setNewTime("");
   };
 
@@ -110,6 +142,8 @@ export function SettingsScreen() {
     setCheckinTimes(updated);
     dispatch({ type: "SET_CHECKIN_TIMES", payload: updated });
     await checkInService.scheduleCheckinAlarms(updated);
+    // Sync to server (fire-and-forget)
+    putSettings(state.currentUser, { checkin_times: updated }).catch(() => {});
   };
 
   const handleLinkElder = async () => {
@@ -191,6 +225,39 @@ export function SettingsScreen() {
             </View>
           </View>
         </Card>
+
+        {/* Trial Period Banner */}
+        {trialDaysLeft !== null && !isPro && (
+          <Card style={[styles.section, trialDaysLeft <= 2 ? styles.trialUrgent : styles.trialBanner]}>
+            <View style={styles.trialRow}>
+              <Ionicons
+                name={trialDaysLeft === 0 ? "alert-circle" : "time"}
+                size={24}
+                color={trialDaysLeft <= 2 ? COLORS.danger : COLORS.accent}
+              />
+              <View style={{ flex: 1, marginLeft: SPACING.sm }}>
+                <Text style={styles.trialTitle}>
+                  {trialDaysLeft === 0
+                    ? "Periodo de teste encerrado"
+                    : `${trialDaysLeft} dia${trialDaysLeft !== 1 ? "s" : ""} restante${trialDaysLeft !== 1 ? "s" : ""} de teste`}
+                </Text>
+                <Text style={styles.trialSubtitle}>
+                  {trialDaysLeft === 0
+                    ? "Faca upgrade para continuar usando todos os recursos."
+                    : "Aproveite todos os recursos Pro durante o teste."}
+                </Text>
+              </View>
+            </View>
+            {trialDaysLeft <= 2 && (
+              <TouchableOpacity
+                style={styles.trialUpgradeBtn}
+                onPress={() => navigation.navigate("Paywall")}
+              >
+                <Text style={styles.trialUpgradeBtnText}>FAZER UPGRADE</Text>
+              </TouchableOpacity>
+            )}
+          </Card>
+        )}
 
         {/* Language Selector */}
         <Card style={styles.section}>
@@ -451,7 +518,87 @@ export function SettingsScreen() {
             <Text style={styles.menuText}>{t("health_data_title")}</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => navigation.navigate("Gamification" as any)}
+          >
+            <Ionicons name="trophy" size={22} color={COLORS.accent} />
+            <Text style={styles.menuText}>Conquistas</Text>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => navigation.navigate("HealthReport" as any)}
+          >
+            <Ionicons name="document-text" size={22} color={COLORS.primary} />
+            <Text style={styles.menuText}>Relatorio de Saude</Text>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => navigation.navigate("MedicalProfile" as any)}
+          >
+            <Ionicons name="person-circle" size={22} color={COLORS.primary} />
+            <Text style={styles.menuText}>Perfil Medico</Text>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+          </TouchableOpacity>
         </Card>
+
+        {/* Escalation Config (Elder only) */}
+        {isElder && (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>Configurar Alertas</Text>
+            <Text style={styles.sectionSubtitle}>
+              Configure quem e notificado e como funciona a escalacao de alertas
+            </Text>
+
+            <View style={styles.escalationRow}>
+              <Ionicons name="time" size={22} color={COLORS.primary} />
+              <View style={{ flex: 1, marginLeft: SPACING.sm }}>
+                <Text style={styles.modeTitle}>Tempo para escalar (minutos)</Text>
+                <Text style={styles.modeDesc}>
+                  Tempo sem resposta antes de notificar familiares
+                </Text>
+              </View>
+              <TextInput
+                style={styles.escalationInput}
+                value={escalationMinutes}
+                onChangeText={setEscalationMinutes}
+                keyboardType="numeric"
+                maxLength={3}
+                placeholderTextColor={COLORS.textLight}
+              />
+            </View>
+
+            <View style={styles.escalationRow}>
+              <Ionicons name="call" size={22} color={COLORS.danger} />
+              <View style={{ flex: 1, marginLeft: SPACING.sm }}>
+                <Text style={styles.modeTitle}>Ligar SAMU automaticamente</Text>
+                <Text style={styles.modeDesc}>
+                  Liga 192 se ninguem responder apos a escalacao completa
+                </Text>
+              </View>
+              <Switch
+                value={samuAutoCall}
+                onValueChange={setSamuAutoCall}
+                trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
+                thumbColor={samuAutoCall ? COLORS.primary : COLORS.disabled}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.menuRow}
+              onPress={() => navigation.navigate("EmergencyContacts")}
+            >
+              <Ionicons name="people" size={22} color={COLORS.primary} />
+              <Text style={styles.menuText}>Gerenciar contatos de emergencia</Text>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+            </TouchableOpacity>
+          </Card>
+        )}
 
         {/* Danger Zone */}
         <Button
@@ -626,5 +773,58 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: SPACING.lg,
     marginBottom: SPACING.xxl,
+  },
+  trialBanner: {
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    backgroundColor: COLORS.warningLight,
+  },
+  trialUrgent: {
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+    backgroundColor: COLORS.dangerLight,
+  },
+  trialRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  trialTitle: {
+    ...FONTS.subtitle,
+    fontWeight: "500",
+  },
+  trialSubtitle: {
+    ...FONTS.caption,
+    marginTop: 2,
+  },
+  trialUpgradeBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    marginTop: SPACING.md,
+  },
+  trialUpgradeBtnText: {
+    color: COLORS.white,
+    fontWeight: "600",
+    fontSize: 13,
+    letterSpacing: 1,
+  },
+  escalationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  escalationInput: {
+    width: 60,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm,
+    fontSize: 16,
+    textAlign: "center",
+    backgroundColor: COLORS.white,
+    color: COLORS.textPrimary,
   },
 });
