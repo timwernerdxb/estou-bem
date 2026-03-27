@@ -320,16 +320,16 @@ class HealthIntegrationService {
    * Returns a HealthSummary with the latest values.
    */
   async readAppleHealthSummary(hoursBack: number = 24): Promise<HealthSummary> {
-    if (Platform.OS !== "ios" || !this.healthKitAvailable) {
+    if (Platform.OS !== "ios") {
       return {};
     }
 
     const summary: HealthSummary = {};
 
     try {
-      // Heart rate — latest from last 24h
+      // Heart rate — latest from last 24h (requires HealthKit module)
       try {
-        const hr = await ExpoHealthkit.getHeartRate();
+        const hr = ExpoHealthkit ? await ExpoHealthkit.getHeartRate() : null;
         if (hr != null) {
           summary.heartRate = Math.round(hr);
           summary.heartRateTime = new Date().toLocaleTimeString("pt-BR", {
@@ -341,41 +341,42 @@ class HealthIntegrationService {
         console.warn("[AppleHealth] Heart rate read error:", e);
       }
 
-      // Step count — today's cumulative
+      // Step count — today's cumulative (pedometer first, then HealthKit)
       try {
-        const steps = await ExpoHealthkit.getStepCount();
-        if (steps > 0) {
-          summary.steps = steps;
-        }
-      } catch {
-        // Fallback: try pedometer
-        try {
-          const available = await Pedometer.isAvailableAsync();
-          if (available) {
-            const startDate = new Date(Date.now() - hoursBack * 3600000);
-            const endDate = new Date();
-            const result = await Pedometer.getStepCountAsync(startDate, endDate);
-            if (result?.steps) {
-              summary.steps = result.steps;
-            }
+        const available = await Pedometer.isAvailableAsync();
+        if (available) {
+          const startDate = new Date(Date.now() - hoursBack * 3600000);
+          const endDate = new Date();
+          const result = await Pedometer.getStepCountAsync(startDate, endDate);
+          if (result?.steps) {
+            summary.steps = result.steps;
           }
+        }
+      } catch {}
+      // Try HealthKit as supplement if pedometer didn't return steps
+      if (!summary.steps && ExpoHealthkit) {
+        try {
+          const steps = await ExpoHealthkit.getStepCount();
+          if (steps > 0) summary.steps = steps;
         } catch {}
       }
 
-      // Blood pressure — latest from last 24h
-      try {
-        const bp = await ExpoHealthkit.getBloodPressure();
-        if (bp) {
-          summary.bloodPressureSystolic = bp.systolic;
-          summary.bloodPressureDiastolic = bp.diastolic;
+      // Blood pressure — latest from last 24h (HealthKit only)
+      if (ExpoHealthkit) {
+        try {
+          const bp = await ExpoHealthkit.getBloodPressure();
+          if (bp) {
+            summary.bloodPressureSystolic = bp.systolic;
+            summary.bloodPressureDiastolic = bp.diastolic;
+          }
+        } catch (e) {
+          console.warn("[AppleHealth] BP read error:", e);
         }
-      } catch (e) {
-        console.warn("[AppleHealth] BP read error:", e);
       }
 
-      // Oxygen saturation (SpO2) — latest from last 24h
+      // Oxygen saturation (SpO2) — latest from last 24h (HealthKit only)
       try {
-        const spo2 = await ExpoHealthkit.getBloodOxygen();
+        const spo2 = ExpoHealthkit ? await ExpoHealthkit.getBloodOxygen() : null;
         if (spo2 != null) {
           summary.spo2 = Math.round(spo2);
         }
@@ -383,14 +384,16 @@ class HealthIntegrationService {
         console.warn("[AppleHealth] SpO2 read error:", e);
       }
 
-      // Sleep hours — last night
-      try {
-        const sleep = await ExpoHealthkit.getSleepHours();
-        if (sleep != null) {
-          summary.sleepHours = sleep;
+      // Sleep hours — last night (HealthKit only)
+      if (ExpoHealthkit) {
+        try {
+          const sleep = await ExpoHealthkit.getSleepHours();
+          if (sleep != null) {
+            summary.sleepHours = sleep;
+          }
+        } catch (e) {
+          console.warn("[AppleHealth] Sleep read error:", e);
         }
-      } catch (e) {
-        console.warn("[AppleHealth] Sleep read error:", e);
       }
 
       summary.lastUpdated = new Date().toISOString();
@@ -563,13 +566,16 @@ class HealthIntegrationService {
 
     const doSync = async () => {
       try {
-        if (Platform.OS === "ios" && this.healthKitAvailable) {
+        if (Platform.OS === "ios") {
+          // Always try to read health data — HealthKit module or pedometer fallback
           const summary = await this.readAppleHealthSummary(24);
-          // Sync summary to activity-update endpoint
-          this.syncHealthSummaryToServer(user, summary).catch(() => {});
-          // Also sync individual entries to health endpoint
-          const entries = await this.readAppleHealthEntries(elderId, 1); // last hour only for periodic
-          this.syncEntriesToServer(user, entries).catch(() => {});
+          if (summary.steps || summary.heartRate || summary.spo2 || summary.sleepHours) {
+            this.syncHealthSummaryToServer(user, summary).catch(() => {});
+          }
+          const entries = await this.readAppleHealthEntries(elderId, 1);
+          if (entries.length > 0) {
+            this.syncEntriesToServer(user, entries).catch(() => {});
+          }
         }
       } catch {}
     };
