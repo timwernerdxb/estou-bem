@@ -76,8 +76,7 @@ export default ({ config }) => ({
     ],
     ["expo-background-fetch"],
     ["expo-task-manager"],
-    // Custom HealthKit module (pure Swift, no C++ interop — works with Xcode 26/Swift 6.2)
-    "./modules/expo-healthkit",
+    // Custom HealthKit module autolinked via expo-module.config.json (not a plugin)
     ["@bacons/apple-targets"],
     ["./plugins/withAsyncStorageRepo"],
     // ["./plugins/withWearOS"], // Wear OS built separately via GitHub Actions

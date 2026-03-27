@@ -2,11 +2,12 @@ import SwiftUI
 
 // MARK: - Color Theme (bright, readable on watchOS)
 extension Color {
-    static let brightGreen = Color(red: 76/255, green: 175/255, blue: 80/255)     // #4CAF50
-    static let lighterGreen = Color(red: 102/255, green: 187/255, blue: 106/255)  // #66BB6A
-    static let houseGold  = Color(red: 201/255, green: 169/255, blue: 110/255)    // #C9A96E
-    static let cardBg     = Color(red: 28/255, green: 28/255, blue: 30/255)       // #1C1C1E (watchOS standard)
-    static let houseDanger = Color(red: 139/255, green: 58/255, blue: 58/255)     // #8B3A3A
+    static let brightGreen = Color(red: 45/255, green: 74/255, blue: 62/255)      // #2D4A3E Soho House green
+    static let lighterGreen = Color(red: 60/255, green: 100/255, blue: 82/255)   // #3C6452
+    static let houseGold  = Color(red: 201/255, green: 169/255, blue: 110/255)   // #C9A96E
+    static let houseCream = Color(red: 245/255, green: 240/255, blue: 235/255)   // #F5F0EB
+    static let cardBg     = Color(red: 28/255, green: 28/255, blue: 30/255)      // #1C1C1E
+    static let houseDanger = Color(red: 139/255, green: 58/255, blue: 58/255)    // #8B3A3A
 }
 
 // MARK: - Check-in Cooldown Manager
@@ -254,9 +255,11 @@ struct MainCheckinPage: View {
                                 .animation(.easeOut(duration: 0.8), value: showingPulse)
                         }
 
-                        // Main button background
+                        // Main button background with gold border
                         RoundedRectangle(cornerRadius: 20)
                             .fill(buttonColor)
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.houseGold.opacity(0.6), lineWidth: 1.5)
 
                         // Button content
                         VStack(spacing: 6) {
@@ -281,10 +284,11 @@ struct MainCheckinPage: View {
                                     .foregroundColor(.white.opacity(0.6))
                             } else {
                                 Text("ESTOU\nBEM")
-                                    .font(.system(size: 28, weight: .bold))
-                                    .foregroundColor(.white)
+                                    .font(.system(size: 28, weight: .bold, design: .serif))
+                                    .foregroundColor(.houseCream)
                                     .multilineTextAlignment(.center)
-                                    .lineSpacing(2)
+                                    .tracking(2)
+                                    .lineSpacing(4)
                             }
                         }
                     }
