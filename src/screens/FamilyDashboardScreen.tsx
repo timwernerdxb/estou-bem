@@ -71,12 +71,16 @@ export function FamilyDashboardScreen() {
   // Read MY health data from this device's HealthKit (for debugging)
   React.useEffect(() => {
     if (Platform.OS !== "ios") return;
+    // Load cached data immediately so the card shows right away
+    healthIntegrationService.getCachedHealthSummary().then((cached) => {
+      if (cached && Object.keys(cached).length > 0) setMyHealth(cached);
+    });
     (async () => {
       try {
         await healthIntegrationService.initialize();
         await healthIntegrationService.requestAppleHealthPermissions();
         const summary = await healthIntegrationService.readAppleHealthSummary(24);
-        if (summary.lastUpdated) setMyHealth(summary);
+        setMyHealth(summary); // always update, even if all values are null
       } catch {}
     })();
   }, []);
@@ -530,8 +534,7 @@ export function FamilyDashboardScreen() {
         </Card>
 
         {/* My Health — debug card reading THIS device's HealthKit */}
-        {(myHealth.heartRate != null || myHealth.steps != null || myHealth.spo2 != null || myHealth.sleepHours != null || myHealth.activeCalories != null) && (
-          <Card style={styles.healthCard}>
+        <Card style={styles.healthCard}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Minha Saúde (este dispositivo)</Text>
             </View>
@@ -585,7 +588,6 @@ export function FamilyDashboardScreen() {
               </Text>
             )}
           </Card>
-        )}
 
         {/* Recent Check-ins */}
         <Card style={styles.sectionCard}>

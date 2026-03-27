@@ -17,7 +17,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { checkInService } from "../services/CheckInService";
 import { fallDetectionService } from "../services/FallDetectionService";
-import { postCheckin, fetchCheckins, postFallDetected, postCheckinReward, fetchNapStatus, postActivityUpdate, fetchGamification } from "../services/ApiService";
+import { postCheckin, putCheckin, fetchCheckins, postFallDetected, postCheckinReward, fetchNapStatus, postActivityUpdate, fetchGamification } from "../services/ApiService";
 import { autoCheckinService } from "../services/AutoCheckinService";
 import { notificationService } from "../services/NotificationService";
 import { healthIntegrationService, HealthSummary } from "../services/HealthIntegrationService";
@@ -429,22 +429,26 @@ export function ElderHomeScreen() {
       const confirmed = checkInService.confirmCheckin(pendingCheckin);
       dispatch({ type: "UPDATE_CHECKIN", payload: confirmed });
       setLastCheckin(confirmed);
-      // Sync to server (fire-and-forget)
       const now = new Date();
       const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-      postCheckin(state.currentUser, {
-        time: timeStr,
-        status: "confirmed",
-        date: now.toISOString().slice(0, 10),
-      }).catch(() => {});
+      // If the pending check-in came from the server (numeric ID), update it via PUT
+      const serverId = Number(pendingCheckin.id);
+      if (!isNaN(serverId)) {
+        putCheckin(state.currentUser, serverId, { status: "confirmed", time: timeStr }).catch(() => {});
+      } else {
+        postCheckin(state.currentUser, {
+          time: timeStr,
+          status: "confirmed",
+          date: now.toISOString().slice(0, 10),
+        }).catch(() => {});
+      }
     } else {
-      // Create and immediately confirm a new check-in (backwards compat)
+      // Create and immediately confirm a new check-in (no scheduled pending exists)
       const elderId = state.elderProfile?.id || state.currentUser?.id || "elder";
       const newCheckin = checkInService.createCheckin(elderId, new Date().toISOString());
       const confirmed = checkInService.confirmCheckin(newCheckin);
       dispatch({ type: "ADD_CHECKIN", payload: confirmed });
       setLastCheckin(confirmed);
-      // Sync to server (fire-and-forget)
       const now = new Date();
       const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
       postCheckin(state.currentUser, {
@@ -819,14 +823,16 @@ const styles = StyleSheet.create({
   checkinButtonInner: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
+    paddingVertical: 12,
+    width: BUTTON_SIZE * 0.62, // constrain to inscribed circle area
   },
   checkinButtonTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: "700",
     color: COLORS.white,
-    letterSpacing: 3,
+    letterSpacing: 2,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    textAlign: "center",
   },
   checkinDivider: {
     width: 40,
