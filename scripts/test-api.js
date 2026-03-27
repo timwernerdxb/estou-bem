@@ -61,6 +61,8 @@ async function run() {
       email: TEST_EMAIL,
       password: TEST_PASSWORD,
       name: TEST_NAME,
+      phone: '+5511999990000',
+      role: 'elder',
     });
     if (res.status === 200 || res.status === 201 || res.status === 409) {
       pass(`POST /api/register → ${res.status}`);
