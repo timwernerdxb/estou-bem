@@ -326,6 +326,10 @@ struct MainCheckinPage: View {
                 lastCheckinTimeString = fmt.string(from: last)
                 checkinConfirmed = true
             }
+            // Fetch schedule from server if not available from phone
+            if connectivity.scheduledCheckinTimes.isEmpty {
+                fetchScheduleFromServer()
+            }
         }
     }
 
@@ -337,6 +341,24 @@ struct MainCheckinPage: View {
         } else {
             return .brightGreen
         }
+    }
+
+    private func fetchScheduleFromServer() {
+        let linkCode = UserDefaults.standard.string(forKey: "elderLinkCode") ?? ""
+        guard !linkCode.isEmpty else { return }
+
+        let urlStr = "https://estou-bem-web-production.up.railway.app/api/watch/schedule?link_code=\(linkCode)"
+        guard let url = URL(string: urlStr) else { return }
+
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let times = json["checkin_times"] as? [String] else { return }
+            DispatchQueue.main.async {
+                self.connectivity.scheduledCheckinTimes = times
+                UserDefaults.standard.set(times, forKey: "scheduledCheckinTimes")
+            }
+        }.resume()
     }
 
     private func performCheckin() {

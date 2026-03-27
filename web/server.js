@@ -2395,6 +2395,19 @@ app.delete('/api/medications/:id', authMiddleware, asyncHandler(async (req, res)
   res.json({ ok: true });
 }));
 
+// Watch schedule endpoint - returns check-in times for a user by link_code
+app.get('/api/watch/schedule', asyncHandler(async (req, res) => {
+  const { link_code } = req.query;
+  if (!link_code) return res.status(400).json({ error: 'link_code required' });
+
+  const user = await pool.query('SELECT id FROM users WHERE link_code = $1', [link_code]);
+  if (user.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+  const settings = await pool.query('SELECT checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end FROM settings WHERE user_id = $1', [user.rows[0].id]);
+  const s = settings.rows[0] || { checkin_times: ['09:00'], checkin_mode: 'scheduled' };
+  res.json(s);
+}));
+
 // ── Health Entries Routes ─────────────────────────────────
 app.get('/api/health', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(
