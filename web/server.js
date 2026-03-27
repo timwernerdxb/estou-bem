@@ -1976,10 +1976,16 @@ app.get('/api/family/elder-status', authMiddleware, asyncHandler(async (req, res
     ).catch(e => { console.warn('[elder-status] medications query failed:', e.message); return { rows: [] }; });
 
     // Recent health entries (last 30)
-    const health = await pool.query(
-      `SELECT id, type, value, unit, time, date, notes, created_at FROM health_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 30`,
+    // Merge health data from both tables: health_entries (manual) + health_readings (HealthKit/watch)
+    const healthEntries = await pool.query(
+      `SELECT id, type, value, unit, time, date, notes, created_at FROM health_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
       [elderId]
-    ).catch(e => { console.warn('[elder-status] health query failed:', e.message); return { rows: [] }; });
+    ).catch(() => ({ rows: [] }));
+    const healthReadings = await pool.query(
+      `SELECT id, reading_type as type, value, 'auto' as unit, created_at::time::text as time, created_at::date::text as date, 'healthkit' as notes, created_at FROM health_readings WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
+      [elderId]
+    ).catch(() => ({ rows: [] }));
+    const health = { rows: [...healthEntries.rows, ...healthReadings.rows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 30) };
 
     // Contacts
     const contacts = await pool.query(
@@ -5081,6 +5087,19 @@ async function doReset(){
 </script></body></html>`);
 });
 
+// Debug: check all health readings and checkins for a user
+app.get('/api/debug/user/:id', adminAuth, asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  const health = await pool.query('SELECT * FROM health_readings WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10', [userId]).catch(() => ({ rows: [] }));
+  const checkins = await pool.query('SELECT * FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10', [userId]).catch(() => ({ rows: [] }));
+  const activity = await pool.query('SELECT * FROM activity_logs WHERE user_id = $1 LIMIT 1', [userId]).catch(() => ({ rows: [] }));
+  res.json({
+    health_readings: health.rows,
+    checkins: checkins.rows,
+    activity_log: activity.rows[0] || null,
+  });
+}));
+
 // SPA fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -5903,3 +5922,4 @@ start().catch(err => {
   // Start without DB if connection fails
   server.listen(PORT, () => console.log(`Estou Bem server running on port ${PORT} (no DB)`));
 });
+
