@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
   },
   elderProfileName: {
-    fontSize: 18, fontWeight: "600", color: COLORS.text,
+    fontSize: 18, fontWeight: "600", color: COLORS.textPrimary,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
   },
   elderProfileRole: { fontSize: 13, color: COLORS.textLight, marginTop: 2 },

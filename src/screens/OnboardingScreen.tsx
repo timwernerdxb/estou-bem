@@ -320,7 +320,7 @@ export function OnboardingScreen() {
 
         fetchContacts(userForApi).then((contacts) => {
           if (contacts && contacts.length > 0) {
-            dispatch({ type: "SET_EMERGENCY_CONTACTS", payload: contacts.map((c: any) => ({ id: String(c.id), name: c.name, phone: c.phone, relationship: c.relationship || "", isPrimary: c.is_primary || false })) });
+            dispatch({ type: "SET_EMERGENCY_CONTACTS", payload: contacts.map((c: any) => ({ id: String(c.id), name: c.name, phone: c.phone, relationship: c.relationship || "", isPrimary: c.is_primary || false, elderId: String(c.elder_id || c.user_id || ""), priority: c.priority || 1, notifyOnMissedCheckin: c.notify_on_missed_checkin ?? true, notifyOnSOS: c.notify_on_sos ?? true })) });
           }
         }).catch(() => {});
 
