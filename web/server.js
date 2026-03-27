@@ -5354,17 +5354,16 @@ async function checkMissedCheckins() {
             }
           }
           if (targetLevel >= 3) {
-            // Level 3 EMERGENCY: Call SAMU 192 + conference ALL contacts — NO MORE WAITING
+            // Level 3 EMERGENCY: DISABLED FOR TESTING — would call SAMU 192
+            console.log(`[SAMU] ⚠️ Level 3 DISABLED — would call SAMU for ${elder.name}. Enable in production.`);
             const allPhones = [
               ...family.rows.filter(f => f.phone).map(f => f.phone),
               ...contacts.rows.filter(c => c.phone).map(c => c.phone),
             ];
-            const medEmergSMS = await getMedicalInfoForSMS(elder.id);
             for (const phone of allPhones) {
-              await sendAlert(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medEmergSMS}`);
+              await sendAlert(phone, `⚠️ ALERTA MAXIMO: ${elder.name} nao responde ha 30 minutos. Verifique imediatamente. (SAMU desativado em modo teste)`);
             }
-            await callSAMUWithConference(elder, allPhones);
-            console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);
+            // await callSAMUWithConference(elder, allPhones); // DISABLED FOR TESTING
           }
 
           // Send reminder to the elder themselves
