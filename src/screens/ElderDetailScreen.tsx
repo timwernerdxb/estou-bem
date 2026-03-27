@@ -114,11 +114,54 @@ export function ElderDetailScreen() {
     return `Ha ${diffDays} dia${diffDays > 1 ? "s" : ""}`;
   }, [elderData?.lastActivity]);
 
-  // Health data
+  // Health data — group by type and take the most recent reading
   const healthEntries = elderData?.health || [];
-  const latestHeartRate = healthEntries.find((h) => h.type === "heart_rate");
-  const latestSteps = healthEntries.find((h) => h.type === "steps");
-  const latestSpO2 = healthEntries.find((h) => h.type === "oxygen_saturation");
+  const latestByType = React.useMemo(() => {
+    const map: Record<string, { type: string; value: number; unit: string; created_at?: string; date?: string; time?: string; notes?: string }> = {};
+    healthEntries.forEach((h) => {
+      const key = h.type;
+      if (!map[key] || new Date(h.created_at || h.date || 0) > new Date(map[key].created_at || map[key].date || 0)) {
+        map[key] = h;
+      }
+    });
+    return map;
+  }, [healthEntries]);
+
+  const latestHeartRate = latestByType["heart_rate"] || null;
+  const latestSteps = latestByType["steps"] || null;
+  const latestSpO2 = latestByType["oxygen_saturation"] || null;
+  const latestSleep = latestByType["sleep"] || null;
+  const latestBpSystolic = latestByType["blood_pressure_systolic"] || null;
+  const latestBpDiastolic = latestByType["blood_pressure_diastolic"] || null;
+
+  // Relative time formatter for health readings
+  const formatRelativeTime = (entry: { created_at?: string; date?: string; time?: string } | null): string => {
+    if (!entry) return "";
+    const recordedStr = entry.created_at || (entry.date ? `${entry.date}T${entry.time || "00:00"}` : null);
+    if (!recordedStr) return "";
+    const recorded = new Date(recordedStr);
+    if (isNaN(recorded.getTime())) return "";
+    const now = new Date();
+    const diffMs = now.getTime() - recorded.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return "agora";
+    if (diffMin < 60) return `h\u00E1 ${diffMin} min`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `h\u00E1 ${diffHours}h`;
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (recorded.toDateString() === yesterday.toDateString()) return "ontem";
+    return recorded.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  };
+
+  const isOlderThanOneHour = (entry: { created_at?: string; date?: string; time?: string } | null): boolean => {
+    if (!entry) return false;
+    const recordedStr = entry.created_at || (entry.date ? `${entry.date}T${entry.time || "00:00"}` : null);
+    if (!recordedStr) return false;
+    const recorded = new Date(recordedStr);
+    if (isNaN(recorded.getTime())) return false;
+    return (Date.now() - recorded.getTime()) > 60 * 60 * 1000;
+  };
 
   // Today's check-ins
   const today = new Date().toISOString().slice(0, 10);
@@ -170,45 +213,110 @@ export function ElderDetailScreen() {
           )}
         </View>
 
-        {/* Saude Section */}
+        {/* Saude Section — always show all metrics with timestamps */}
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <Ionicons name="heart" size={20} color={COLORS.danger} />
-            <Text style={styles.sectionTitle}>Saude</Text>
+            <Text style={styles.sectionTitle}>Sa\u00FAde</Text>
           </View>
-          {latestHeartRate || latestSteps || latestSpO2 ? (
-            <View style={styles.healthGrid}>
-              {latestHeartRate && (
-                <View style={styles.healthItem}>
-                  <Ionicons name="heart" size={20} color={COLORS.danger} />
-                  <Text style={styles.healthValue}>
-                    {Math.round(latestHeartRate.value)}
-                  </Text>
-                  <Text style={styles.healthUnit}>bpm</Text>
-                </View>
-              )}
-              {latestSteps && (
-                <View style={styles.healthItem}>
-                  <Ionicons name="footsteps" size={20} color={COLORS.primary} />
-                  <Text style={styles.healthValue}>
-                    {Math.round(latestSteps.value).toLocaleString()}
-                  </Text>
-                  <Text style={styles.healthUnit}>passos</Text>
-                </View>
-              )}
-              {latestSpO2 && (
-                <View style={styles.healthItem}>
-                  <Ionicons name="water" size={20} color={COLORS.accent} />
-                  <Text style={styles.healthValue}>
-                    {Math.round(latestSpO2.value)}%
-                  </Text>
-                  <Text style={styles.healthUnit}>SpO2</Text>
-                </View>
-              )}
+          <View style={styles.healthGridWrap}>
+            {/* Row 1: Heart rate | SpO2 */}
+            <View style={styles.healthGridRow}>
+              <View style={styles.healthGridCell}>
+                <Ionicons name="heart" size={20} color={COLORS.danger} />
+                {latestHeartRate ? (
+                  <>
+                    <Text style={styles.healthValue}>{Math.round(latestHeartRate.value)}</Text>
+                    <Text style={styles.healthUnit}>bpm</Text>
+                    <Text style={styles.healthTimestamp}>{formatRelativeTime(latestHeartRate)}</Text>
+                    {isOlderThanOneHour(latestHeartRate) && (
+                      <Text style={styles.healthStaleLabel}>(\u00FAltimo registro)</Text>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
+                    <Text style={styles.healthUnit}>bpm</Text>
+                  </>
+                )}
+              </View>
+              <View style={styles.healthGridCell}>
+                <Ionicons name="water" size={20} color="#3498DB" />
+                {latestSpO2 ? (
+                  <>
+                    <Text style={styles.healthValue}>{Math.round(latestSpO2.value)}%</Text>
+                    <Text style={styles.healthUnit}>SpO2</Text>
+                    <Text style={styles.healthTimestamp}>{formatRelativeTime(latestSpO2)}</Text>
+                    {isOlderThanOneHour(latestSpO2) && (
+                      <Text style={styles.healthStaleLabel}>(\u00FAltimo registro)</Text>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
+                    <Text style={styles.healthUnit}>SpO2</Text>
+                  </>
+                )}
+              </View>
             </View>
-          ) : (
-            <Text style={styles.emptyText}>Aguardando dados de saude</Text>
-          )}
+            {/* Row 2: Steps | Sleep */}
+            <View style={styles.healthGridRow}>
+              <View style={styles.healthGridCell}>
+                <Ionicons name="footsteps" size={20} color={COLORS.primary} />
+                {latestSteps ? (
+                  <>
+                    <Text style={styles.healthValue}>{Math.round(latestSteps.value).toLocaleString()}</Text>
+                    <Text style={styles.healthUnit}>passos</Text>
+                    <Text style={styles.healthTimestamp}>{formatRelativeTime(latestSteps)}</Text>
+                    {isOlderThanOneHour(latestSteps) && (
+                      <Text style={styles.healthStaleLabel}>(\u00FAltimo registro)</Text>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
+                    <Text style={styles.healthUnit}>passos</Text>
+                  </>
+                )}
+              </View>
+              <View style={styles.healthGridCell}>
+                <Ionicons name="moon" size={20} color="#8E44AD" />
+                {latestSleep ? (
+                  <>
+                    <Text style={styles.healthValue}>{Number(latestSleep.value).toFixed(1)}h</Text>
+                    <Text style={styles.healthUnit}>sono</Text>
+                    <Text style={styles.healthTimestamp}>{formatRelativeTime(latestSleep)}</Text>
+                    {isOlderThanOneHour(latestSleep) && (
+                      <Text style={styles.healthStaleLabel}>(\u00FAltimo registro)</Text>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
+                    <Text style={styles.healthUnit}>sono</Text>
+                  </>
+                )}
+              </View>
+            </View>
+            {/* Row 3: Blood pressure (only if available) */}
+            {(latestBpSystolic || latestBpDiastolic) && (
+              <View style={styles.healthGridRow}>
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="pulse" size={20} color={COLORS.accent} />
+                  <Text style={styles.healthValue}>
+                    {latestBpSystolic ? Math.round(latestBpSystolic.value) : "\u2014"}
+                    {latestBpDiastolic ? `/${Math.round(latestBpDiastolic.value)}` : ""}
+                  </Text>
+                  <Text style={styles.healthUnit}>mmHg</Text>
+                  <Text style={styles.healthTimestamp}>{formatRelativeTime(latestBpSystolic || latestBpDiastolic)}</Text>
+                  {isOlderThanOneHour(latestBpSystolic || latestBpDiastolic) && (
+                    <Text style={styles.healthStaleLabel}>(\u00FAltimo registro)</Text>
+                  )}
+                </View>
+                <View style={styles.healthGridCell} />
+              </View>
+            )}
+          </View>
         </Card>
 
         {/* Check-ins hoje */}
@@ -362,19 +470,41 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: SPACING.md,
   },
-  healthGrid: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+  healthGridWrap: {
     paddingTop: SPACING.sm,
   },
-  healthItem: { alignItems: "center", gap: 4 },
+  healthGridRow: {
+    flexDirection: "row",
+    marginBottom: SPACING.md,
+  },
+  healthGridCell: {
+    flex: 1,
+    alignItems: "center",
+    gap: 3,
+  },
   healthValue: {
     fontSize: 22,
     fontWeight: "300",
     fontFamily: serifFont,
     color: COLORS.textPrimary,
   },
+  healthValueEmpty: {
+    fontSize: 22,
+    fontWeight: "300",
+    fontFamily: serifFont,
+    color: COLORS.textLight,
+  },
   healthUnit: { ...FONTS.small, color: COLORS.textLight },
+  healthTimestamp: {
+    fontSize: 11,
+    color: COLORS.textLight,
+    marginTop: 1,
+  },
+  healthStaleLabel: {
+    fontSize: 10,
+    color: COLORS.textLight,
+    fontStyle: "italic",
+  },
   checkinRow: {
     flexDirection: "row",
     justifyContent: "space-between",

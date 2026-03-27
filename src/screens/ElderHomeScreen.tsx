@@ -56,6 +56,9 @@ export function ElderHomeScreen() {
   // Read check-in times directly from state (set by SettingsScreen dispatch)
   const scheduleTimes = state.checkinTimes && state.checkinTimes.length > 0 ? state.checkinTimes : ["09:00"];
 
+  // Track server-confirmed check-in times for today (e.g. ["09:00", "14:00"])
+  const [serverConfirmedTimes, setServerConfirmedTimes] = useState<string[]>([]);
+
   const todayCheckins = state.checkins.filter((c) => {
     const today = new Date().toDateString();
     return new Date(c.scheduledAt).toDateString() === today;
@@ -66,62 +69,106 @@ export function ElderHomeScreen() {
     (c) => c.status === "confirmed" || c.status === "auto_confirmed"
   ).length;
 
-  // Determine check-in display state from local data
+  // Fetch today's confirmed check-ins from server to know which scheduled times are confirmed
+  const fetchServerConfirmedCheckins = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = await fetchCheckins(state.currentUser, { date: today, limit: 50 });
+      if (rows && rows.length > 0) {
+        const confirmedTimes = rows
+          .filter((r: any) => r.status === "confirmed" || r.status === "auto_confirmed")
+          .map((r: any) => r.time)
+          .filter(Boolean);
+        setServerConfirmedTimes(confirmedTimes);
+      } else {
+        setServerConfirmedTimes([]);
+      }
+    } catch (e) {
+      console.warn("[ElderHome] Failed to fetch server confirmed checkins:", e);
+    }
+  }, [state.currentUser]);
+
+  // Helper: check if a scheduled time is within the check-in window (+-15 min of current time)
+  const isWithinCheckinWindow = useCallback((scheduleTime: string, nowMins: number): boolean => {
+    const [h, m] = scheduleTime.split(":").map(Number);
+    const scheduleMins = h * 60 + m;
+    return Math.abs(nowMins - scheduleMins) <= 15;
+  }, []);
+
+  // Helper: check if a scheduled time is confirmed on server
+  const isTimeConfirmedOnServer = useCallback((scheduleTime: string): boolean => {
+    return serverConfirmedTimes.includes(scheduleTime);
+  }, [serverConfirmedTimes]);
+
+  // Determine check-in display state using server-confirmed data
   const computeDisplayState = useCallback(() => {
     const now = new Date();
     const nowMins = now.getHours() * 60 + now.getMinutes();
 
-    // scheduleTimes comes from state (loaded from AsyncStorage)
-
-    if (pendingCheckin) {
-      setCheckinDisplayState("pending");
-      // Find next scheduled time after now
-      const nextTime = scheduleTimes.find((t) => {
-        const [h, m] = t.split(":").map(Number);
-        return h * 60 + m > nowMins;
-      });
-      setNextCheckinTime(nextTime || null);
-      return;
-    }
-
-    // Check if we have confirmed checkins today
-    const confirmedCheckins = todayCheckins.filter(
-      (c) => c.status === "confirmed" || c.status === "auto_confirmed"
-    );
-
-    // Check if any scheduled time has passed
-    const pastTimes = scheduleTimes.filter((t) => {
-      const [h, m] = t.split(":").map(Number);
-      return h * 60 + m <= nowMins;
-    });
-
-    if (pastTimes.length > 0 && confirmedCheckins.length > 0) {
-      setCheckinDisplayState("completed");
-      const lastConfirmed = confirmedCheckins[confirmedCheckins.length - 1];
-      const respondedAt = lastConfirmed.respondedAt
-        ? new Date(lastConfirmed.respondedAt)
-        : new Date();
-      setConfirmedTime(
-        respondedAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-      );
-      const nextTime = scheduleTimes.find((t) => {
-        const [h, m] = t.split(":").map(Number);
-        return h * 60 + m > nowMins;
-      });
-      setNextCheckinTime(nextTime || null);
-      return;
-    }
-
-    // No schedule set at all — backwards compatible, show as pending
+    // No schedule set at all -- backwards compatible, show as pending
     if (!scheduleTimes || scheduleTimes.length === 0) {
       setCheckinDisplayState("pending");
       setNextCheckinTime(null);
       return;
     }
 
-    // Check if a scheduled time has passed but not yet confirmed — show as pending
-    if (pastTimes.length > 0 && confirmedCheckins.length < pastTimes.length) {
+    // Find scheduled times that have passed (within their window)
+    const pastTimes = scheduleTimes.filter((t) => {
+      const [h, m] = t.split(":").map(Number);
+      return h * 60 + m <= nowMins + 15; // include times within current window
+    });
+
+    // Find scheduled times where we are currently in the check-in window
+    const currentWindowTimes = scheduleTimes.filter((t) => isWithinCheckinWindow(t, nowMins));
+
+    // Check if any current-window time is NOT confirmed on the server
+    const unconfirmedCurrentWindow = currentWindowTimes.filter((t) => !isTimeConfirmedOnServer(t));
+
+    if (unconfirmedCurrentWindow.length > 0) {
+      // There is a check-in window active right now that hasn't been confirmed - show as pending
       setCheckinDisplayState("pending");
+      const nextTime = scheduleTimes.find((t) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m > nowMins;
+      });
+      setNextCheckinTime(nextTime || null);
+      return;
+    }
+
+    // Check past times that are NOT confirmed (outside current window)
+    const pastNotInWindow = pastTimes.filter((t) => !isWithinCheckinWindow(t, nowMins));
+    const unconfirmedPast = pastNotInWindow.filter((t) => !isTimeConfirmedOnServer(t));
+
+    // Also check local pending checkins for backwards compatibility
+    if (pendingCheckin || unconfirmedPast.length > 0) {
+      // Past check-in time that was missed / not confirmed - show as pending
+      setCheckinDisplayState("pending");
+      const nextTime = scheduleTimes.find((t) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m > nowMins;
+      });
+      setNextCheckinTime(nextTime || null);
+      return;
+    }
+
+    // All past times are confirmed
+    const confirmedCheckins = todayCheckins.filter(
+      (c) => c.status === "confirmed" || c.status === "auto_confirmed"
+    );
+
+    if (pastTimes.length > 0 && (confirmedCheckins.length > 0 || serverConfirmedTimes.length > 0)) {
+      setCheckinDisplayState("completed");
+      const lastConfirmed = confirmedCheckins[confirmedCheckins.length - 1];
+      if (lastConfirmed?.respondedAt) {
+        const respondedAt = new Date(lastConfirmed.respondedAt);
+        setConfirmedTime(
+          respondedAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+        );
+      } else {
+        // Use the latest server confirmed time
+        const latestServerTime = serverConfirmedTimes[serverConfirmedTimes.length - 1];
+        setConfirmedTime(latestServerTime || null);
+      }
       const nextTime = scheduleTimes.find((t) => {
         const [h, m] = t.split(":").map(Number);
         return h * 60 + m > nowMins;
@@ -144,9 +191,9 @@ export function ElderHomeScreen() {
       setCheckinDisplayState("waiting");
       setNextCheckinTime(scheduleTimes[0] || "09:00");
     }
-  }, [pendingCheckin, todayCheckins]);
+  }, [pendingCheckin, todayCheckins, scheduleTimes, serverConfirmedTimes, isWithinCheckinWindow, isTimeConfirmedOnServer]);
 
-  // Fetch check-in history from server on mount
+  // Fetch check-in history from server on mount and refresh confirmed times
   useEffect(() => {
     (async () => {
       try {
@@ -172,11 +219,22 @@ export function ElderHomeScreen() {
             }
           }
         }
+        // Also fetch confirmed times from server
+        await fetchServerConfirmedCheckins();
       } catch (e) {
         console.warn("[ElderHome] Failed to fetch checkins from server:", e);
       }
     })();
   }, []); // run once on mount
+
+  // Re-fetch server confirmed checkins when a notification arrives (app becomes active)
+  // and periodically to catch new check-in windows
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      fetchServerConfirmedCheckins();
+    }, 60000); // every 60 seconds
+    return () => clearInterval(refreshInterval);
+  }, [fetchServerConfirmedCheckins]);
 
   // Check nap status from server on mount
   useEffect(() => {
@@ -397,9 +455,10 @@ export function ElderHomeScreen() {
     // Award gamification points for check-in (fire-and-forget)
     postCheckinReward(state.currentUser).catch(() => {});
 
-    // Recompute state after confirming
-    setTimeout(() => {
+    // Recompute state after confirming — also refresh server confirmed times
+    setTimeout(async () => {
       setIsConfirming(false);
+      await fetchServerConfirmedCheckins();
       computeDisplayState();
     }, 2000);
   }, [checkinDisplayState, pendingCheckin, isConfirming, state.elderProfile, state.currentUser, computeDisplayState]);

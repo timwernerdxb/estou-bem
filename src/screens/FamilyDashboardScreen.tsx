@@ -203,22 +203,56 @@ export function FamilyDashboardScreen() {
     (m) => m.stock <= m.low_threshold
   );
 
-  // Health data from server
+  // Health data from server — group by type and take the most recent reading
   const healthEntries = elderData?.health || [];
-  const latestHeartRate = healthEntries.find((h) => h.type === "heart_rate");
-  const latestSteps = healthEntries.find(
-    (h) => h.type === "steps" || (h.notes === "steps" && h.type === "blood_glucose")
-  );
-  const latestBpSystolic = healthEntries.find(
-    (h) => h.type === "blood_pressure_systolic"
-  );
-  const latestBpDiastolic = healthEntries.find(
-    (h) => h.type === "blood_pressure_diastolic"
-  );
-  const latestSpo2 = healthEntries.find((h) => h.type === "oxygen_saturation");
-  const latestSleep = healthEntries.find((h) => h.type === "sleep" || h.notes === "sleep");
-  const hasHealthData =
-    !!latestHeartRate || !!latestSteps || !!latestBpSystolic || !!latestSpo2;
+  const latestByType = React.useMemo(() => {
+    const map: Record<string, { type: string; value: number; unit: string; created_at?: string; date?: string; time?: string; notes?: string }> = {};
+    healthEntries.forEach((h) => {
+      const key = h.type;
+      if (!map[key] || new Date(h.created_at || h.date || 0) > new Date(map[key].created_at || map[key].date || 0)) {
+        map[key] = h;
+      }
+    });
+    return map;
+  }, [healthEntries]);
+
+  const latestHeartRate = latestByType["heart_rate"] || null;
+  const latestSteps = latestByType["steps"] || null;
+  const latestBpSystolic = latestByType["blood_pressure_systolic"] || null;
+  const latestBpDiastolic = latestByType["blood_pressure_diastolic"] || null;
+  const latestSpo2 = latestByType["oxygen_saturation"] || null;
+  const latestSleep = latestByType["sleep"] || null;
+
+  // Relative time formatter for health readings
+  const formatRelativeTime = (entry: { created_at?: string; date?: string; time?: string } | null): string => {
+    if (!entry) return "";
+    const recordedStr = entry.created_at || (entry.date ? `${entry.date}T${entry.time || "00:00"}` : null);
+    if (!recordedStr) return "";
+    const recorded = new Date(recordedStr);
+    if (isNaN(recorded.getTime())) return "";
+    const now = new Date();
+    const diffMs = now.getTime() - recorded.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return "agora";
+    if (diffMin < 60) return `h\u00E1 ${diffMin} min`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `h\u00E1 ${diffHours}h`;
+    // Check if yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (recorded.toDateString() === yesterday.toDateString()) return "ontem";
+    // Older: show date
+    return recorded.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  };
+
+  const isOlderThanOneHour = (entry: { created_at?: string; date?: string; time?: string } | null): boolean => {
+    if (!entry) return false;
+    const recordedStr = entry.created_at || (entry.date ? `${entry.date}T${entry.time || "00:00"}` : null);
+    if (!recordedStr) return false;
+    const recorded = new Date(recordedStr);
+    if (isNaN(recorded.getTime())) return false;
+    return (Date.now() - recorded.getTime()) > 60 * 60 * 1000;
+  };
 
   // Last activity
   const lastActivityText = React.useMemo(() => {
@@ -374,61 +408,109 @@ export function FamilyDashboardScreen() {
           </Card>
         </View>
 
-        {/* Health Card - always visible */}
+        {/* Health Card - always visible, shows ALL metrics with timestamps */}
         <Card style={styles.healthCard}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Saúde</Text>
+            <Text style={styles.sectionTitle}>Sa\u00FAde</Text>
           </View>
-          {hasHealthData ? (
-            <View style={styles.healthGrid}>
-              {latestHeartRate && (
-                <View style={styles.healthItem}>
-                  <Ionicons name="heart" size={20} color={COLORS.danger} />
-                  <Text style={styles.healthValue}>
-                    {Math.round(latestHeartRate.value)}
-                  </Text>
-                  <Text style={styles.healthUnit}>bpm</Text>
-                </View>
-              )}
-              {latestSteps && (
-                <View style={styles.healthItem}>
-                  <Ionicons name="footsteps" size={20} color={COLORS.primary} />
-                  <Text style={styles.healthValue}>
-                    {Math.round(latestSteps.value).toLocaleString()}
-                  </Text>
-                  <Text style={styles.healthUnit}>passos</Text>
-                </View>
-              )}
-              {latestBpSystolic && (
-                <View style={styles.healthItem}>
+          <View style={styles.healthGridWrap}>
+            {/* Row 1: Heart rate | SpO2 */}
+            <View style={styles.healthGridRow}>
+              <View style={styles.healthGridCell}>
+                <Ionicons name="heart" size={20} color={COLORS.danger} />
+                {latestHeartRate ? (
+                  <>
+                    <Text style={styles.healthValue}>{Math.round(latestHeartRate.value)}</Text>
+                    <Text style={styles.healthUnit}>bpm</Text>
+                    <Text style={styles.healthTimestamp}>{formatRelativeTime(latestHeartRate)}</Text>
+                    {isOlderThanOneHour(latestHeartRate) && (
+                      <Text style={styles.healthStaleLabel}>(último registro)</Text>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
+                    <Text style={styles.healthUnit}>bpm</Text>
+                  </>
+                )}
+              </View>
+              <View style={styles.healthGridCell}>
+                <Ionicons name="water" size={20} color="#3498DB" />
+                {latestSpo2 ? (
+                  <>
+                    <Text style={styles.healthValue}>{Math.round(latestSpo2.value)}%</Text>
+                    <Text style={styles.healthUnit}>SpO2</Text>
+                    <Text style={styles.healthTimestamp}>{formatRelativeTime(latestSpo2)}</Text>
+                    {isOlderThanOneHour(latestSpo2) && (
+                      <Text style={styles.healthStaleLabel}>(último registro)</Text>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
+                    <Text style={styles.healthUnit}>SpO2</Text>
+                  </>
+                )}
+              </View>
+            </View>
+            {/* Row 2: Steps | Sleep */}
+            <View style={styles.healthGridRow}>
+              <View style={styles.healthGridCell}>
+                <Ionicons name="footsteps" size={20} color={COLORS.primary} />
+                {latestSteps ? (
+                  <>
+                    <Text style={styles.healthValue}>{Math.round(latestSteps.value).toLocaleString()}</Text>
+                    <Text style={styles.healthUnit}>passos</Text>
+                    <Text style={styles.healthTimestamp}>{formatRelativeTime(latestSteps)}</Text>
+                    {isOlderThanOneHour(latestSteps) && (
+                      <Text style={styles.healthStaleLabel}>(último registro)</Text>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
+                    <Text style={styles.healthUnit}>passos</Text>
+                  </>
+                )}
+              </View>
+              <View style={styles.healthGridCell}>
+                <Ionicons name="moon" size={20} color="#8E44AD" />
+                {latestSleep ? (
+                  <>
+                    <Text style={styles.healthValue}>{Number(latestSleep.value).toFixed(1)}h</Text>
+                    <Text style={styles.healthUnit}>sono</Text>
+                    <Text style={styles.healthTimestamp}>{formatRelativeTime(latestSleep)}</Text>
+                    {isOlderThanOneHour(latestSleep) && (
+                      <Text style={styles.healthStaleLabel}>(último registro)</Text>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
+                    <Text style={styles.healthUnit}>sono</Text>
+                  </>
+                )}
+              </View>
+            </View>
+            {/* Row 3: Blood pressure (only if available) */}
+            {(latestBpSystolic || latestBpDiastolic) && (
+              <View style={styles.healthGridRow}>
+                <View style={styles.healthGridCell}>
                   <Ionicons name="pulse" size={20} color={COLORS.accent} />
                   <Text style={styles.healthValue}>
-                    {Math.round(latestBpSystolic.value)}
-                    {latestBpDiastolic
-                      ? `/${Math.round(latestBpDiastolic.value)}`
-                      : ""}
+                    {latestBpSystolic ? Math.round(latestBpSystolic.value) : "\u2014"}
+                    {latestBpDiastolic ? `/${Math.round(latestBpDiastolic.value)}` : ""}
                   </Text>
                   <Text style={styles.healthUnit}>mmHg</Text>
+                  <Text style={styles.healthTimestamp}>{formatRelativeTime(latestBpSystolic || latestBpDiastolic)}</Text>
+                  {isOlderThanOneHour(latestBpSystolic || latestBpDiastolic) && (
+                    <Text style={styles.healthStaleLabel}>(último registro)</Text>
+                  )}
                 </View>
-              )}
-              {latestSpo2 && (
-                <View style={styles.healthItem}>
-                  <Ionicons name="water" size={20} color="#3498DB" />
-                  <Text style={styles.healthValue}>
-                    {Math.round(latestSpo2.value)}%
-                  </Text>
-                  <Text style={styles.healthUnit}>SpO2</Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={{ alignItems: "center", paddingVertical: SPACING.lg }}>
-              <Ionicons name="heart-outline" size={32} color={COLORS.textLight} />
-              <Text style={{ ...FONTS.caption, color: COLORS.textLight, marginTop: SPACING.sm, textAlign: "center" }}>
-                Aguardando dados de saúde do Apple Health
-              </Text>
-            </View>
-          )}
+                <View style={styles.healthGridCell} />
+              </View>
+            )}
+          </View>
         </Card>
 
         {/* Recent Check-ins */}
@@ -607,19 +689,41 @@ const styles = StyleSheet.create({
   },
   statLabel: { ...FONTS.caption, marginTop: SPACING.xs, textAlign: "center" },
   healthCard: { marginBottom: SPACING.md },
-  healthGrid: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+  healthGridWrap: {
     paddingTop: SPACING.sm,
   },
-  healthItem: { alignItems: "center", gap: 4 },
+  healthGridRow: {
+    flexDirection: "row",
+    marginBottom: SPACING.md,
+  },
+  healthGridCell: {
+    flex: 1,
+    alignItems: "center",
+    gap: 3,
+  },
   healthValue: {
     fontSize: 22,
     fontWeight: "300",
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     color: COLORS.textPrimary,
   },
+  healthValueEmpty: {
+    fontSize: 22,
+    fontWeight: "300",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    color: COLORS.textLight,
+  },
   healthUnit: { ...FONTS.small, color: COLORS.textLight },
+  healthTimestamp: {
+    fontSize: 11,
+    color: COLORS.textLight,
+    marginTop: 1,
+  },
+  healthStaleLabel: {
+    fontSize: 10,
+    color: COLORS.textLight,
+    fontStyle: "italic",
+  },
   sectionCard: { marginBottom: SPACING.md },
   sectionHeader: {
     flexDirection: "row",
