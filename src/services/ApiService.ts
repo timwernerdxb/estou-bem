@@ -341,6 +341,19 @@ export async function postActivityUpdate(
   return res.json();
 }
 
+export async function testPushNotification(
+  user: { apiUrl?: string; token?: string } | null
+): Promise<{ ok: boolean; tokenCount?: number; tokens?: string[]; error?: string } | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/push-test`, {
+    method: "POST",
+    headers: getHeaders(user.token),
+    body: JSON.stringify({}),
+  });
+  if (!res) return { ok: false, error: "No response from server" };
+  return res.json();
+}
+
 export async function fetchNapStatus(
   user: { apiUrl?: string; token?: string } | null
 ): Promise<any | null> {

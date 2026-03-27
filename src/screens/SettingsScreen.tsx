@@ -27,7 +27,7 @@ import { RootStackParamList, SensorSnapshot } from "../types";
 import { affiliateService } from "../services/AffiliateService";
 import { fallDetectionService } from "../services/FallDetectionService";
 import { notificationService } from "../services/NotificationService";
-import { putSettings, fetchSettings, postFallDetected, fetchProfile } from "../services/ApiService";
+import { putSettings, fetchSettings, postFallDetected, fetchProfile, testPushNotification } from "../services/ApiService";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Constants from "expo-constants";
 
@@ -1001,13 +1001,29 @@ export function SettingsScreen() {
           </Card>
         )}
 
+        {/* Push notification test */}
+        <Button
+          title="Testar Push Notification"
+          onPress={async () => {
+            const res = await testPushNotification(state.currentUser);
+            if (res?.ok) {
+              Alert.alert("Push enviado!", `Token(s): ${res.tokenCount ?? 0}. Você deve receber uma notificação agora.`);
+            } else {
+              Alert.alert("Erro", res?.error || "Nenhum token registrado. Reinicie o app e tente novamente.");
+            }
+          }}
+          variant="secondary"
+          size="large"
+          style={{ marginTop: SPACING.lg, width: "100%" }}
+        />
+
         {/* Danger Zone */}
         <Button
           title={t("settings_logout")}
           onPress={handleLogout}
           variant="danger"
           size="large"
-          style={{ marginTop: SPACING.xl, width: "100%" }}
+          style={{ marginTop: SPACING.lg, width: "100%" }}
         />
 
         <Text style={styles.version}>Estou Bem v{Constants.expoConfig?.version || '1.1.0'} ({Constants.expoConfig?.extra?.buildNumber || Constants.expoConfig?.ios?.buildNumber || Constants.expoConfig?.android?.versionCode || '1'})</Text>
