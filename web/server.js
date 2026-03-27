@@ -2561,7 +2561,7 @@ app.post('/api/health', authMiddleware, asyncHandler(async (req, res) => {
 
 // POST /api/activity-update — receives movement + health data from Apple Watch
 app.post('/api/activity-update', authMiddleware, asyncHandler(async (req, res) => {
-  const { user_id, movement_detected, heart_rate, spo2, sleep_hours } = req.body;
+  const { user_id, movement_detected, heart_rate, steps, spo2, sleep_hours } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
   try {
@@ -2591,6 +2591,12 @@ app.post('/api/activity-update', authMiddleware, asyncHandler(async (req, res) =
       await pool.query(
         `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'heart_rate', $2)`,
         [user_id, heart_rate]
+      );
+    }
+    if (steps && steps > 0) {
+      await pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'steps', $2)`,
+        [user_id, steps]
       );
     }
     if (spo2) {

@@ -329,7 +329,7 @@ export async function postCheckinReward(
 
 export async function postActivityUpdate(
   user: { apiUrl?: string; token?: string } | null,
-  body: { user_id: number; movement_detected?: boolean; heart_rate?: number; spo2?: number; sleep_hours?: number }
+  body: { user_id: number; movement_detected?: boolean; heart_rate?: number; steps?: number; spo2?: number; sleep_hours?: number }
 ): Promise<any | null> {
   if (!user?.token) return null;
   const res = await safeFetch(`${getApiUrl(user)}/api/activity-update`, {

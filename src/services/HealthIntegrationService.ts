@@ -548,6 +548,7 @@ class HealthIntegrationService {
         user_id: user.id ? Number(user.id) : 0,
         movement_detected: (summary.steps || 0) > 10,
         heart_rate: summary.heartRate,
+        steps: summary.steps,
         spo2: summary.spo2,
         sleep_hours: summary.sleepHours,
       }).catch(() => {});

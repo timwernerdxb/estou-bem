@@ -21,6 +21,8 @@ class HealthManager: NSObject, ObservableObject {
     private var stepsQuery: HKStatisticsCollectionQuery?
     private var spo2Query: HKAnchoredObjectQuery?
     private var hasRequestedAuth = false
+    private var serverSyncTimer: Timer?
+    private static let serverURL = "https://estou-bem-web-production.up.railway.app/api/watch/health"
 
     // MARK: - Health data types (lazy to avoid crash if HealthKit unavailable)
     private lazy var heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)
@@ -64,6 +66,7 @@ class HealthManager: NSObject, ObservableObject {
                     self?.fetchTodaySteps()
                     self?.startSpO2Observer()
                     self?.fetchTodaySleep()
+                    self?.startServerSync()
                 }
             }
             if let error = error {
@@ -248,6 +251,83 @@ class HealthManager: NSObject, ObservableObject {
         healthStore.execute(query)
     }
 
+    // MARK: - Server Sync (Option C: watch posts directly to server)
+
+    /// Start posting health data to the server every 5 minutes.
+    /// Called after HealthKit authorization succeeds.
+    func startServerSync() {
+        guard serverSyncTimer == nil else { return }
+        print("[Health] Starting server sync (every 5 minutes)")
+
+        // Initial sync after a short delay to let first readings come in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+            self?.postHealthToServer()
+        }
+
+        // Repeat every 5 minutes
+        serverSyncTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            self?.postHealthToServer()
+        }
+    }
+
+    func stopServerSync() {
+        serverSyncTimer?.invalidate()
+        serverSyncTimer = nil
+    }
+
+    /// POST current health data snapshot to server using link_code auth (no token needed).
+    private func postHealthToServer() {
+        let linkCode = UserDefaults.standard.string(forKey: "elderLinkCode") ?? ""
+        guard !linkCode.isEmpty else {
+            print("[Health] No link code stored, cannot post to server")
+            return
+        }
+
+        guard let url = URL(string: HealthManager.serverURL) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 15
+
+        var body: [String: Any] = [
+            "link_code": linkCode,
+            "timestamp": ISO8601DateFormatter().string(from: Date())
+        ]
+
+        // Only include readings that have meaningful values
+        if latestHeartRate > 0 {
+            body["heart_rate"] = latestHeartRate
+        }
+        if todaySteps > 0 {
+            body["steps"] = todaySteps
+        }
+        if bloodOxygen > 0 {
+            body["spo2"] = bloodOxygen
+        }
+        if sleepHours > 0 {
+            body["sleep_hours"] = sleepHours
+        }
+
+        // Don't POST if we have no health data at all
+        if latestHeartRate <= 0 && todaySteps <= 0 && bloodOxygen <= 0 && sleepHours <= 0 {
+            print("[Health] No health data to send, skipping server sync")
+            return
+        }
+
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("[Health] Server sync failed: \(error.localizedDescription)")
+                return
+            }
+            if let httpResponse = response as? HTTPURLResponse {
+                print("[Health] Server sync response: \(httpResponse.statusCode)")
+            }
+        }.resume()
+    }
+
     // MARK: - Cleanup
     func stopObserving() {
         if let query = heartRateQuery {
@@ -256,6 +336,7 @@ class HealthManager: NSObject, ObservableObject {
         if let query = spo2Query {
             healthStore?.stop(query)
         }
+        stopServerSync()
     }
 
     deinit {
