@@ -19,6 +19,7 @@ import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { Medication, MedicationFrequency } from "../types";
 import { notificationService } from "../services/NotificationService";
+import { useI18n } from "../i18n";
 import {
   fetchMedications,
   postMedication,
@@ -29,17 +30,18 @@ import {
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
-const FREQUENCY_LABELS: Record<MedicationFrequency, string> = {
-  daily: "1x ao dia",
-  twice_daily: "2x ao dia",
-  three_times_daily: "3x ao dia",
-  weekly: "Semanal",
-  as_needed: "Quando necessario",
-};
-
 export function MedicationsScreen() {
   const { state, dispatch } = useApp();
   const { isFamilia } = useSubscription();
+  const { t } = useI18n();
+
+  const FREQUENCY_LABELS: Record<MedicationFrequency, string> = {
+    daily: t("meds_freq_1x"),
+    twice_daily: t("meds_freq_2x"),
+    three_times_daily: t("meds_freq_3x"),
+    weekly: t("meds_freq_weekly"),
+    as_needed: t("meds_freq_asneeded"),
+  };
   const isFamily = state.currentUser?.role === "family" || state.currentUser?.role === "caregiver";
   const [showAddModal, setShowAddModal] = useState(false);
   const [elderMedications, setElderMedications] = useState<Medication[]>([]);
@@ -204,7 +206,7 @@ export function MedicationsScreen() {
         updatedMed.stockQuantity
       );
       Alert.alert(
-        "Estoque baixo",
+        t("meds_stock_low"),
         `${med.name}: restam ${updatedMed.stockQuantity} ${med.stockUnit}`
       );
     }
@@ -233,17 +235,17 @@ export function MedicationsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Medicamentos</Text>
+        <Text style={styles.title}>{t("meds_title")}</Text>
 
         {displayMedications.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Ionicons name="medical-outline" size={48} color={COLORS.textLight} />
             <Text style={styles.emptyText}>
-              Nenhum medicamento cadastrado
+              {t("meds_empty")}
             </Text>
             {!isFamily && (
               <Text style={styles.emptySubtext}>
-                Adicione seus medicamentos para receber lembretes
+                {t("meds_empty_desc")}
               </Text>
             )}
           </Card>
@@ -285,8 +287,8 @@ export function MedicationsScreen() {
                     },
                   ]}
                 >
-                  Estoque: {med.stockQuantity} {med.stockUnit}
-                  {med.stockQuantity <= med.lowStockThreshold && " - Baixo"}
+                  {t("meds_stock")}: {med.stockQuantity} {med.stockUnit}
+                  {med.stockQuantity <= med.lowStockThreshold && ` - ${t("meds_stock_low")}`}
                 </Text>
               </View>
 
@@ -296,7 +298,7 @@ export function MedicationsScreen() {
                   onPress={() => handleTakeMedication(med)}
                 >
                   <Ionicons name="checkmark-circle" size={24} color={COLORS.white} />
-                  <Text style={styles.takeButtonText}>TOMEI</Text>
+                  <Text style={styles.takeButtonText}>{t("meds_took")}</Text>
                 </TouchableOpacity>
               )}
             </Card>
@@ -305,7 +307,7 @@ export function MedicationsScreen() {
 
         {!isFamily && (
           <Button
-            title="Adicionar Medicamento"
+            title={t("meds_add")}
             onPress={() => setShowAddModal(true)}
             size="large"
             style={{ marginTop: SPACING.md, width: "100%" }}
@@ -317,32 +319,32 @@ export function MedicationsScreen() {
       <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Novo Medicamento</Text>
+            <Text style={styles.modalTitle}>{t("meds_new")}</Text>
             <TouchableOpacity onPress={() => setShowAddModal(false)}>
               <Ionicons name="close" size={28} color={COLORS.textPrimary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={styles.modalContent}>
-            <Text style={styles.inputLabel}>Nome do medicamento *</Text>
+            <Text style={styles.inputLabel}>{t("meds_name")} *</Text>
             <TextInput
               style={styles.input}
               placeholder="Ex: Losartana"
               value={newMed.name}
-              onChangeText={(t) => setNewMed({ ...newMed, name: t })}
+              onChangeText={(v) => setNewMed({ ...newMed, name: v })}
               placeholderTextColor={COLORS.textLight}
             />
 
-            <Text style={styles.inputLabel}>Dosagem</Text>
+            <Text style={styles.inputLabel}>{t("meds_dosage")}</Text>
             <TextInput
               style={styles.input}
               placeholder="Ex: 50mg"
               value={newMed.dosage}
-              onChangeText={(t) => setNewMed({ ...newMed, dosage: t })}
+              onChangeText={(v) => setNewMed({ ...newMed, dosage: v })}
               placeholderTextColor={COLORS.textLight}
             />
 
-            <Text style={styles.inputLabel}>Frequencia</Text>
+            <Text style={styles.inputLabel}>{t("meds_frequency")}</Text>
             <View style={styles.freqRow}>
               {(Object.keys(FREQUENCY_LABELS) as MedicationFrequency[]).map(
                 (freq) => (
@@ -367,23 +369,23 @@ export function MedicationsScreen() {
               )}
             </View>
 
-            <Text style={styles.inputLabel}>Horario</Text>
+            <Text style={styles.inputLabel}>{t("meds_time")}</Text>
             <TextInput
               style={styles.input}
               placeholder="08:00"
               value={newMed.time}
-              onChangeText={(t) => setNewMed({ ...newMed, time: t })}
+              onChangeText={(v) => setNewMed({ ...newMed, time: v })}
               placeholderTextColor={COLORS.textLight}
               keyboardType="numbers-and-punctuation"
             />
 
-            <Text style={styles.inputLabel}>Quantidade em estoque</Text>
+            <Text style={styles.inputLabel}>{t("meds_stock")}</Text>
             <View style={styles.stockInputRow}>
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 placeholder="30"
                 value={newMed.stockQuantity}
-                onChangeText={(t) => setNewMed({ ...newMed, stockQuantity: t })}
+                onChangeText={(v) => setNewMed({ ...newMed, stockQuantity: v })}
                 placeholderTextColor={COLORS.textLight}
                 keyboardType="numeric"
               />
@@ -391,13 +393,13 @@ export function MedicationsScreen() {
                 style={[styles.input, { flex: 1, marginLeft: SPACING.sm }]}
                 placeholder="comprimidos"
                 value={newMed.stockUnit}
-                onChangeText={(t) => setNewMed({ ...newMed, stockUnit: t })}
+                onChangeText={(v) => setNewMed({ ...newMed, stockUnit: v })}
                 placeholderTextColor={COLORS.textLight}
               />
             </View>
 
             <Button
-              title="Salvar Medicamento"
+              title={t("meds_save")}
               onPress={handleAddMedication}
               size="large"
               style={{ marginTop: SPACING.lg, width: "100%" }}

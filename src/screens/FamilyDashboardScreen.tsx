@@ -18,6 +18,7 @@ import { Card } from "../components/Card";
 import { StatusBadge } from "../components/StatusBadge";
 import { CheckIn } from "../types";
 import { fetchElderStatus, fetchProfile } from "../services/ApiService";
+import { useI18n } from "../i18n";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -60,6 +61,7 @@ export function FamilyDashboardScreen() {
   const { state, dispatch } = useApp();
   const { isFamilia, isCentral, tier } = useSubscription();
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
   const [refreshing, setRefreshing] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [elderData, setElderData] = React.useState<ElderStatusData | null>(null);
@@ -277,7 +279,7 @@ export function FamilyDashboardScreen() {
   };
 
   const getStatusText = () => {
-    if (missed.length > 0) return `${missed.length} check-in(s) perdido(s)`;
+    if (missed.length > 0) return t("dashboard_missed_checkins", { count: missed.length });
     if (pending.length > 0) return `${pending.length} check-in(s) pendente(s)`;
     if (confirmed.length > 0) return "Todos os check-ins confirmados";
     return "Nenhum check-in hoje ainda";
@@ -323,7 +325,7 @@ export function FamilyDashboardScreen() {
         }
       >
         {/* Header */}
-        <Text style={styles.title}>Painel Familiar</Text>
+        <Text style={styles.title}>{t("dashboard_title")}</Text>
 
         {/* Elder Profile Card - tappable */}
         <TouchableOpacity
@@ -374,8 +376,7 @@ export function FamilyDashboardScreen() {
             <View style={styles.statusInfo}>
               <Text style={styles.statusText}>{getStatusText()}</Text>
               <Text style={styles.statusSubtext}>
-                {confirmed.length}/{todayCheckins.length} check-ins confirmados
-                hoje
+                {t("dashboard_confirmed_today", { confirmed: confirmed.length, total: todayCheckins.length })}
               </Text>
             </View>
           </View>
@@ -385,15 +386,15 @@ export function FamilyDashboardScreen() {
         <View style={styles.statsGrid}>
           <Card style={styles.statCard}>
             <Text style={styles.statValue}>{adherenceRate}%</Text>
-            <Text style={styles.statLabel}>Aderência (7 dias)</Text>
+            <Text style={styles.statLabel}>{t("dashboard_adherence")}</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text style={styles.statValue}>{medications.length}</Text>
-            <Text style={styles.statLabel}>Medicamentos</Text>
+            <Text style={styles.statLabel}>{t("dashboard_medications")}</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text style={styles.statValue}>{checkins.length}</Text>
-            <Text style={styles.statLabel}>Check-ins total</Text>
+            <Text style={styles.statLabel}>{t("dashboard_total_checkins")}</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text
@@ -404,14 +405,14 @@ export function FamilyDashboardScreen() {
             >
               {lowStockMeds.length}
             </Text>
-            <Text style={styles.statLabel}>Estoque baixo</Text>
+            <Text style={styles.statLabel}>{t("dashboard_low_stock")}</Text>
           </Card>
         </View>
 
         {/* Health Card - always visible, shows ALL metrics with timestamps */}
         <Card style={styles.healthCard}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Saúde</Text>
+            <Text style={styles.sectionTitle}>{t("health_title")}</Text>
           </View>
           <View style={styles.healthGridWrap}>
             {/* Row 1: Heart rate | SpO2 */}
@@ -516,7 +517,7 @@ export function FamilyDashboardScreen() {
         {/* Recent Check-ins */}
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Check-ins Recentes</Text>
+            <Text style={styles.sectionTitle}>{t("checkin_recent")}</Text>
             <TouchableOpacity
               onPress={() => navigation.navigate("CheckInHistory")}
             >
@@ -546,7 +547,7 @@ export function FamilyDashboardScreen() {
         {medications.length > 0 && (
           <Card style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Medicamentos</Text>
+              <Text style={styles.sectionTitle}>{t("dashboard_medications")}</Text>
             </View>
             {medications.map((m) => (
               <View key={m.id} style={styles.medRow}>

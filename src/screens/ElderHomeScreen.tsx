@@ -21,6 +21,7 @@ import { postCheckin, fetchCheckins, postFallDetected, postCheckinReward, fetchN
 import { autoCheckinService } from "../services/AutoCheckinService";
 import { notificationService } from "../services/NotificationService";
 import { healthIntegrationService, HealthSummary } from "../services/HealthIntegrationService";
+import { useI18n } from "../i18n";
 import { StatusBadge } from "../components/StatusBadge";
 import { Card } from "../components/Card";
 import { CheckIn, SensorSnapshot } from "../types";
@@ -39,6 +40,7 @@ type CheckinDisplayState = "pending" | "completed" | "waiting";
 export function ElderHomeScreen() {
   const { state, dispatch } = useApp();
   const { isFamilia } = useSubscription();
+  const { t } = useI18n();
   const [pulseAnim] = useState(new Animated.Value(1));
   const [lastCheckin, setLastCheckin] = useState<CheckIn | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -465,9 +467,9 @@ export function ElderHomeScreen() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Bom dia";
-    if (hour < 18) return "Boa tarde";
-    return "Boa noite";
+    if (hour < 12) return t("greeting_morning");
+    if (hour < 18) return t("greeting_afternoon");
+    return t("greeting_evening");
   };
 
   const streak = streakDays;
@@ -523,7 +525,7 @@ export function ElderHomeScreen() {
             ]}
           >
             <Ionicons name="checkmark-circle" size={80} color={COLORS.white} />
-            <Text style={styles.checkinButtonText}>Confirmado</Text>
+            <Text style={styles.checkinButtonText}>{t("checkin_confirmed")}</Text>
           </View>
         </Animated.View>
       );
@@ -542,7 +544,7 @@ export function ElderHomeScreen() {
               ]}
             >
               <View style={styles.checkinButtonInner}>
-                <Text style={styles.checkinButtonTitle}>ESTOU BEM</Text>
+                <Text style={styles.checkinButtonTitle}>{t("checkin_done")}</Text>
                 <View style={styles.checkinDivider} />
                 <Ionicons name="finger-print" size={48} color={COLORS.white} />
                 <Text style={styles.checkinButtonSub}>Toque para confirmar</Text>
@@ -588,7 +590,7 @@ export function ElderHomeScreen() {
           ]}
         >
           <View style={styles.checkinButtonInner}>
-            <Text style={[styles.checkinButtonTitle, { opacity: 0.6 }]}>ESTOU BEM</Text>
+            <Text style={[styles.checkinButtonTitle, { opacity: 0.6 }]}>{t("checkin_done")}</Text>
             <View style={[styles.checkinDivider, { opacity: 0.3 }]} />
             <Ionicons name="finger-print" size={48} color={COLORS.white} style={{ opacity: 0.5 }} />
             <Text style={[styles.checkinButtonSub, { opacity: 0.6 }]}>
@@ -658,7 +660,7 @@ export function ElderHomeScreen() {
           <Card style={styles.healthSummaryCard}>
             <View style={styles.healthSummaryHeader}>
               <Ionicons name="heart-circle" size={22} color={SH_GREEN} />
-              <Text style={styles.healthSummaryTitle}>Saúde</Text>
+              <Text style={styles.healthSummaryTitle}>{t("health_title")}</Text>
               {healthSummary.lastUpdated && (
                 <Text style={styles.healthSummaryTimestamp}>
                   {(() => {
@@ -710,7 +712,7 @@ export function ElderHomeScreen() {
         <Card style={styles.statusCard}>
           <View style={styles.statusRow}>
             <Ionicons name="today" size={24} color={COLORS.primary} />
-            <Text style={styles.statusLabel}>Check-ins hoje</Text>
+            <Text style={styles.statusLabel}>{t("checkin_today")}</Text>
             <Text style={styles.statusValue}>{confirmedToday}</Text>
           </View>
 
@@ -736,7 +738,7 @@ export function ElderHomeScreen() {
           <Card style={styles.infoCard}>
             <Ionicons name="medical" size={28} color={COLORS.primary} />
             <Text style={styles.infoValue}>{state.medications.length}</Text>
-            <Text style={styles.infoLabel}>Medicamentos</Text>
+            <Text style={styles.infoLabel}>{t("meds_title")}</Text>
           </Card>
 
           <Card style={styles.infoCard}>
