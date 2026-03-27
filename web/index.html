@@ -3636,7 +3636,7 @@ const WS = {
           if (authToken) syncFromAPI().then(() => render());
         }
         if (msg.type === 'notification') {
-          toast(msg.message || 'Nova notificacao');
+          toast(msg.message || 'Nova notificação');
         }
         // Handle real-time alerts
         if (msg.type === 'escalation' || msg.type === 'fall_detected' || msg.type === 'fall_samu_escalation' ||
