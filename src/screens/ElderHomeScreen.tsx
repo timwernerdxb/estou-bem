@@ -653,45 +653,55 @@ export function ElderHomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Health Summary Card — only for elders with data */}
-        {state.currentUser?.role === "elder" &&
-          (healthSummary.heartRate || healthSummary.steps || healthSummary.sleepHours || healthSummary.spo2) && (
+        {/* Health Summary Card — always show for elders */}
+        {state.currentUser?.role === "elder" && (
           <Card style={styles.healthSummaryCard}>
             <View style={styles.healthSummaryHeader}>
               <Ionicons name="heart-circle" size={22} color={SH_GREEN} />
               <Text style={styles.healthSummaryTitle}>Saúde</Text>
+              {healthSummary.lastUpdated && (
+                <Text style={styles.healthSummaryTimestamp}>
+                  {(() => {
+                    const d = new Date(healthSummary.lastUpdated!);
+                    const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
+                    if (diffMin < 1) return "agora";
+                    if (diffMin < 60) return `há ${diffMin} min`;
+                    const diffH = Math.floor(diffMin / 60);
+                    if (diffH < 24) return `há ${diffH}h`;
+                    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+                  })()}
+                </Text>
+              )}
             </View>
             <View style={styles.healthSummaryGrid}>
-              {healthSummary.heartRate != null && (
-                <View style={styles.healthSummaryItem}>
-                  <Ionicons name="heart" size={18} color="#E74C3C" />
-                  <Text style={styles.healthSummaryValue}>{healthSummary.heartRate}</Text>
-                  <Text style={styles.healthSummaryUnit}>bpm</Text>
-                </View>
-              )}
-              {healthSummary.steps != null && (
-                <View style={styles.healthSummaryItem}>
-                  <Ionicons name="footsteps" size={18} color={SH_GREEN} />
-                  <Text style={styles.healthSummaryValue}>
-                    {healthSummary.steps.toLocaleString()}
-                  </Text>
-                  <Text style={styles.healthSummaryUnit}>passos</Text>
-                </View>
-              )}
-              {healthSummary.sleepHours != null && (
-                <View style={styles.healthSummaryItem}>
-                  <Ionicons name="moon" size={18} color="#8E44AD" />
-                  <Text style={styles.healthSummaryValue}>{healthSummary.sleepHours}h</Text>
-                  <Text style={styles.healthSummaryUnit}>sono</Text>
-                </View>
-              )}
-              {healthSummary.spo2 != null && (
-                <View style={styles.healthSummaryItem}>
-                  <Ionicons name="water" size={18} color="#3498DB" />
-                  <Text style={styles.healthSummaryValue}>{healthSummary.spo2}%</Text>
-                  <Text style={styles.healthSummaryUnit}>SpO2</Text>
-                </View>
-              )}
+              <View style={styles.healthSummaryItem}>
+                <Ionicons name="heart" size={18} color="#E74C3C" />
+                <Text style={healthSummary.heartRate != null ? styles.healthSummaryValue : styles.healthSummaryValueEmpty}>
+                  {healthSummary.heartRate != null ? healthSummary.heartRate : "\u2014"}
+                </Text>
+                <Text style={styles.healthSummaryUnit}>bpm</Text>
+              </View>
+              <View style={styles.healthSummaryItem}>
+                <Ionicons name="footsteps" size={18} color={SH_GREEN} />
+                <Text style={healthSummary.steps != null ? styles.healthSummaryValue : styles.healthSummaryValueEmpty}>
+                  {healthSummary.steps != null ? healthSummary.steps.toLocaleString() : "\u2014"}
+                </Text>
+                <Text style={styles.healthSummaryUnit}>passos</Text>
+              </View>
+              <View style={styles.healthSummaryItem}>
+                <Ionicons name="moon" size={18} color="#8E44AD" />
+                <Text style={healthSummary.sleepHours != null ? styles.healthSummaryValue : styles.healthSummaryValueEmpty}>
+                  {healthSummary.sleepHours != null ? `${healthSummary.sleepHours}h` : "\u2014"}
+                </Text>
+                <Text style={styles.healthSummaryUnit}>sono</Text>
+              </View>
+              <View style={styles.healthSummaryItem}>
+                <Ionicons name="water" size={18} color="#3498DB" />
+                <Text style={healthSummary.spo2 != null ? styles.healthSummaryValue : styles.healthSummaryValueEmpty}>
+                  {healthSummary.spo2 != null ? `${healthSummary.spo2}%` : "\u2014"}
+                </Text>
+                <Text style={styles.healthSummaryUnit}>SpO2</Text>
+              </View>
             </View>
           </Card>
         )}
@@ -954,6 +964,19 @@ const styles = StyleSheet.create({
   healthSummaryTitle: {
     ...FONTS.subtitle,
     fontWeight: "500",
+    flex: 1,
+  },
+  healthSummaryTimestamp: {
+    ...FONTS.small,
+    color: COLORS.textLight,
+    fontStyle: "italic",
+  },
+  healthSummaryValueEmpty: {
+    fontSize: 20,
+    fontWeight: "300",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    color: COLORS.textLight,
+    marginTop: 4,
   },
   healthSummaryGrid: {
     flexDirection: "row",
