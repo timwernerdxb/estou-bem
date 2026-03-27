@@ -19,6 +19,12 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        // Do NOT activate WCSession here — defer to activateSession()
+    }
+
+    /// Call from onAppear to safely activate WatchConnectivity after UI is ready
+    func activateSession() {
+        guard session == nil else { return }
         guard WCSession.isSupported() else {
             print("[Watch] WCSession is not supported on this device")
             return

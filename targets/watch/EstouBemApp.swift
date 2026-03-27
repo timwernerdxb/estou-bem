@@ -19,6 +19,8 @@ struct EstouBemWatchApp: App {
                 .environmentObject(healthManager)
                 .environmentObject(fallDetectionManager)
                 .onAppear {
+                    // Activate WatchConnectivity after UI is ready
+                    connectivity.activateSession()
                     // Request HealthKit authorization after the app UI is ready
                     healthManager.requestAuthorization()
                     // Start motion & fall detection after UI is ready
