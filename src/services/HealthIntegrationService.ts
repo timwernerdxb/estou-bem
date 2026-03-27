@@ -1,6 +1,8 @@
 import { Platform } from "react-native";
 import { HealthEntry, HealthMetricType } from "../types";
 import { postHealth } from "./ApiService";
+// expo-sensors Pedometer for iOS step count fallback
+import { Pedometer } from "expo-sensors";
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
@@ -199,19 +201,54 @@ class HealthIntegrationService {
   }
 
   // ─── iOS: Apple HealthKit (via react-native-health or expo plugin) ──
+  // TODO: Install react-native-health or expo-health-connect for full HealthKit
+  // access (heart rate, SpO2, etc.) directly on iPhone without Watch.
+  // For now, we read step count via expo-sensors Pedometer as a fallback.
   private async initAppleHealth(): Promise<boolean> {
     try {
-      // Apple HealthKit is accessed via the Watch companion app (HealthManager.swift)
-      // and relayed via WatchConnectivity. On the phone side, we receive data
-      // from the watch and also read directly if available.
-      // For now, mark as initialized — actual HealthKit reads happen via watch relay
+      // Check if Pedometer is available for step counting
+      const available = await Pedometer.isAvailableAsync();
+      if (available) {
+        console.log("[AppleHealth] Pedometer available — will read step count from iPhone");
+      } else {
+        console.log("[AppleHealth] Pedometer not available on this device");
+      }
       this.initialized = true;
-      console.log("[AppleHealth] Ready (watch relay mode)");
+      console.log("[AppleHealth] Ready (pedometer + watch relay mode)");
       return true;
     } catch (err) {
       console.warn("[AppleHealth] Init error:", err);
-      return false;
+      this.initialized = true;
+      return true;
     }
+  }
+
+  // Read step count from iPhone Pedometer (iOS fallback without Watch)
+  async readIOSPedometerData(elderId: string, hoursBack: number = 24): Promise<HealthEntry[]> {
+    if (Platform.OS !== "ios") return [];
+    const entries: HealthEntry[] = [];
+    try {
+      const available = await Pedometer.isAvailableAsync();
+      if (!available) return [];
+
+      const end = new Date();
+      const start = new Date(end.getTime() - hoursBack * 3600000);
+      const result = await Pedometer.getStepCountAsync(start, end);
+      if (result && result.steps > 0) {
+        entries.push({
+          id: generateId(),
+          elderId,
+          timestamp: end.toISOString(),
+          type: "blood_glucose" as HealthMetricType, // reuse as steps
+          value: result.steps,
+          unit: "passos",
+          notes: "steps",
+        });
+      }
+    } catch (err) {
+      console.warn("[AppleHealth] Pedometer read error:", err);
+    }
+    return entries;
   }
 
   // ─── Sync health entries to the server ──────────────────────
@@ -248,6 +285,10 @@ class HealthIntegrationService {
 
     if (Platform.OS === "android") {
       entries = await this.readAndroidHealthData(elderId, hoursBack);
+    } else if (Platform.OS === "ios") {
+      // Read step count from iPhone Pedometer (direct, no Watch needed)
+      const pedometerEntries = await this.readIOSPedometerData(elderId, hoursBack);
+      entries = [...entries, ...pedometerEntries];
     }
 
     // Sync any new entries to the server (fire-and-forget)
@@ -255,7 +296,6 @@ class HealthIntegrationService {
       this.syncEntriesToServer(user, entries).catch(() => {});
     }
 
-    // iOS: data comes from watch relay, already in state
     return entries;
   }
 
@@ -276,6 +316,20 @@ class HealthIntegrationService {
           0
         );
         return totalSteps > 10; // any meaningful movement
+      } catch {
+        return false;
+      }
+    }
+
+    // iOS: check pedometer for recent movement
+    if (Platform.OS === "ios") {
+      try {
+        const available = await Pedometer.isAvailableAsync();
+        if (!available) return false;
+        const end = new Date();
+        const start = new Date(end.getTime() - hoursBack * 3600000);
+        const result = await Pedometer.getStepCountAsync(start, end);
+        return (result?.steps || 0) > 10;
       } catch {
         return false;
       }

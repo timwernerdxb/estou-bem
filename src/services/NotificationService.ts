@@ -5,7 +5,9 @@ import { Platform } from "react-native";
 class NotificationService {
   private isInitialized = false;
 
-  async initialize(): Promise<string | null> {
+  async initialize(
+    user?: { id?: string | number; token?: string; apiUrl?: string } | null
+  ): Promise<string | null> {
     if (this.isInitialized) return null;
 
     // Set notification handler for foreground
@@ -95,10 +97,12 @@ class NotificationService {
     }
 
     this.isInitialized = true;
-    return this.registerForPushNotifications();
+    return this.registerForPushNotifications(user);
   }
 
-  async registerForPushNotifications(): Promise<string | null> {
+  async registerForPushNotifications(
+    user?: { id?: string | number; token?: string; apiUrl?: string } | null
+  ): Promise<string | null> {
     if (!Device.isDevice) {
       console.warn("[Notifications] Push notifications require a physical device");
       return null;
@@ -122,28 +126,37 @@ class NotificationService {
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId: "2c5b816f-19cf-46ec-bc64-33fc65b47033",
       });
-      const token = tokenData.data;
+      const pushToken = tokenData.data;
 
       // Register token with the server
-      this.registerTokenWithServer(token);
+      this.registerTokenWithServer(pushToken, user);
 
-      return token;
+      return pushToken;
     } catch (err) {
       console.warn("[Notifications] Failed to get push token:", err);
       return null;
     }
   }
 
-  private async registerTokenWithServer(token: string): Promise<void> {
+  private async registerTokenWithServer(
+    pushToken: string,
+    user?: { id?: string | number; token?: string; apiUrl?: string } | null
+  ): Promise<void> {
     try {
+      const baseUrl = user?.apiUrl || "https://estou-bem-web-production.up.railway.app";
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user?.token) {
+        headers["Authorization"] = `Bearer ${user.token}`;
+      }
       await fetch(
-        "https://estou-bem-web-production.up.railway.app/api/push-token",
+        `${baseUrl}/api/push-token`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({
-            token,
+            token: pushToken,
             platform: Platform.OS,
+            user_id: user?.id || undefined,
           }),
         }
       );

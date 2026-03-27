@@ -299,6 +299,18 @@ export async function fetchSettings(
   return res.json();
 }
 
+export async function fetchGamification(
+  user: { apiUrl?: string; token?: string } | null
+): Promise<any | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/gamification`, {
+    method: "GET",
+    headers: getHeaders(user.token),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
 export async function postCheckinReward(
   user: { apiUrl?: string; token?: string } | null
 ): Promise<any | null> {
@@ -348,6 +360,7 @@ export async function putSettings(
     checkin_window_end?: string;
     escalation_minutes?: number;
     samu_auto_call?: boolean;
+    language?: string;
   }
 ): Promise<boolean> {
   if (!user?.token) return false;

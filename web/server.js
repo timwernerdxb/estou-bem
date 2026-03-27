@@ -396,7 +396,8 @@ async function initDB() {
         checkin_mode TEXT DEFAULT 'scheduled',
         checkin_interval_hours INTEGER DEFAULT 2,
         checkin_window_start TEXT DEFAULT '07:00',
-        checkin_window_end TEXT DEFAULT '22:00'
+        checkin_window_end TEXT DEFAULT '22:00',
+        language TEXT DEFAULT 'pt-BR'
       );
 
       -- Conversion tracking
@@ -787,6 +788,10 @@ async function initDB() {
       CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(token);
     `);
     console.log('Database initialized');
+
+    // Migrations: add columns if missing
+    await client.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'pt-BR'`).catch(() => {});
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS nap_until TIMESTAMPTZ`).catch(() => {});
 
     // Backfill: create contacts for all existing family→elder links
     const linked = await client.query(`
@@ -1850,7 +1855,17 @@ app.get('/api/profile', authMiddleware, async (req, res) => {
       if (elder.rows.length > 0) linked_elder_name = elder.rows[0].name;
     }
 
-    res.json({ ...user, linked_elder_name });
+    // If elder, fetch linked family members (users who linked to this elder)
+    let linked_family = [];
+    if (user.role === 'elder') {
+      const family = await pool.query(
+        `SELECT id, name, phone FROM users WHERE linked_elder_id = $1`,
+        [user.id]
+      );
+      linked_family = family.rows;
+    }
+
+    res.json({ ...user, linked_elder_name, linked_family });
   } catch (err) {
     console.error('[profile] Error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -1953,14 +1968,14 @@ app.get('/api/family/elder-status', authMiddleware, async (req, res) => {
 // ── Settings Routes ───────────────────────────────────────
 app.get('/api/settings', authMiddleware, async (req, res) => {
   const result = await pool.query(`SELECT * FROM settings WHERE user_id = $1`, [req.userId]);
-  res.json(result.rows[0] || { checkin_times: ['09:00'], checkin_mode: 'scheduled', checkin_interval_hours: 2, checkin_window_start: '07:00', checkin_window_end: '22:00' });
+  res.json(result.rows[0] || { checkin_times: ['09:00'], checkin_mode: 'scheduled', checkin_interval_hours: 2, checkin_window_start: '07:00', checkin_window_end: '22:00', language: 'pt-BR' });
 });
 
 app.put('/api/settings', authMiddleware, async (req, res) => {
-  const { checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes, samu_auto_call } = req.body;
+  const { checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes, samu_auto_call, language } = req.body;
   await pool.query(
-    `INSERT INTO settings (user_id, checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes, samu_auto_call)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO settings (user_id, checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes, samu_auto_call, language)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (user_id) DO UPDATE SET
        checkin_times = COALESCE($2, settings.checkin_times),
        checkin_mode = COALESCE($3, settings.checkin_mode),
@@ -1968,8 +1983,9 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
        checkin_window_start = COALESCE($5, settings.checkin_window_start),
        checkin_window_end = COALESCE($6, settings.checkin_window_end),
        escalation_minutes = COALESCE($7, settings.escalation_minutes),
-       samu_auto_call = COALESCE($8, settings.samu_auto_call)`,
-    [req.userId, checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes ?? null, samu_auto_call ?? null]
+       samu_auto_call = COALESCE($8, settings.samu_auto_call),
+       language = COALESCE($9, settings.language)`,
+    [req.userId, checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes ?? null, samu_auto_call ?? null, language ?? null]
   );
   res.json({ ok: true });
 });
@@ -2180,29 +2196,29 @@ app.get('/api/checkin-status/:userId', async (req, res) => {
   }
 });
 
-// ── Nap mode — pause escalations for up to 1 hour ──
-const napUsers = new Map(); // userId -> { until: Date }
+// ── Nap mode — pause escalations for up to 1 hour (DB-persisted) ──
 
 app.post('/api/nap', authMiddleware, async (req, res) => {
   const minutes = Math.min(parseInt(req.body.minutes) || 60, 60); // max 1 hour
   const until = new Date(Date.now() + minutes * 60 * 1000);
-  napUsers.set(req.userId, { until });
+  await pool.query(`UPDATE users SET nap_until = $1 WHERE id = $2`, [until, req.userId]);
   console.log(`[Nap] User ${req.userId} napping until ${until.toISOString()} (${minutes} min)`);
   res.json({ success: true, nap_until: until.toISOString(), minutes });
 });
 
 app.delete('/api/nap', authMiddleware, async (req, res) => {
-  napUsers.delete(req.userId);
+  await pool.query(`UPDATE users SET nap_until = NULL WHERE id = $1`, [req.userId]);
   console.log(`[Nap] User ${req.userId} woke up (nap cancelled)`);
   res.json({ success: true });
 });
 
 app.get('/api/nap', authMiddleware, async (req, res) => {
-  const nap = napUsers.get(req.userId);
-  if (nap && nap.until > new Date()) {
-    res.json({ napping: true, nap_until: nap.until.toISOString() });
+  const result = await pool.query(`SELECT nap_until FROM users WHERE id = $1`, [req.userId]);
+  const napUntil = result.rows[0]?.nap_until;
+  if (napUntil && new Date(napUntil) > new Date()) {
+    res.json({ napping: true, nap_until: new Date(napUntil).toISOString() });
   } else {
-    napUsers.delete(req.userId);
+    if (napUntil) await pool.query(`UPDATE users SET nap_until = NULL WHERE id = $1`, [req.userId]);
     res.json({ napping: false });
   }
 });
@@ -5170,7 +5186,7 @@ async function checkMissedCheckins() {
 
     // Get all elder users with their settings
     const elders = await pool.query(`
-      SELECT u.id, u.name, u.phone,
+      SELECT u.id, u.name, u.phone, u.nap_until,
              s.checkin_mode, s.checkin_times, s.checkin_interval_hours,
              s.checkin_window_start, s.checkin_window_end
       FROM users u
@@ -5179,12 +5195,12 @@ async function checkMissedCheckins() {
     `);
 
     for (const elder of elders.rows) {
-      // Skip if user is napping
-      const nap = napUsers.get(elder.id);
-      if (nap && nap.until > now) {
+      // Skip if user is napping (DB-persisted)
+      if (elder.nap_until && new Date(elder.nap_until) > now) {
         continue;
-      } else if (nap) {
-        napUsers.delete(elder.id); // expired
+      } else if (elder.nap_until) {
+        // Expired nap — clear it
+        pool.query(`UPDATE users SET nap_until = NULL WHERE id = $1`, [elder.id]).catch(() => {});
       }
 
       const mode = elder.checkin_mode || 'scheduled';

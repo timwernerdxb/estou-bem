@@ -84,6 +84,10 @@ export function SettingsScreen() {
         if (serverSettings?.samu_auto_call != null) {
           setSamuAutoCall(serverSettings.samu_auto_call);
         }
+        // Apply server language preference
+        if (serverSettings?.language) {
+          setLang(serverSettings.language as any);
+        }
       } catch (e) {
         console.warn("[Settings] Failed to fetch settings from server:", e);
       }
@@ -272,7 +276,23 @@ export function SettingsScreen() {
       {
         text: t("confirm_logout"),
         style: "destructive",
-        onPress: () => dispatch({ type: "LOGOUT" }),
+        onPress: async () => {
+          // Invalidate server session (fire-and-forget)
+          try {
+            const apiUrl = state.currentUser?.apiUrl || "https://estou-bem-web-production.up.railway.app";
+            const token = state.currentUser?.token;
+            if (token) {
+              fetch(`${apiUrl}/api/logout`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              }).catch(() => {});
+            }
+          } catch {}
+          dispatch({ type: "LOGOUT" });
+        },
       },
     ]);
   };
@@ -347,7 +367,11 @@ export function SettingsScreen() {
                 styles.langOption,
                 lang === l.code && styles.langOptionActive,
               ]}
-              onPress={() => setLang(l.code)}
+              onPress={() => {
+                setLang(l.code);
+                // Sync language preference to server
+                putSettings(state.currentUser, { language: l.code } as any).catch(() => {});
+              }}
             >
               <Text
                 style={[

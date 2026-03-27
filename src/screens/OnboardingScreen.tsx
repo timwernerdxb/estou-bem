@@ -24,7 +24,7 @@ import { UserRole, ElderProfile, FamilyProfile, RootStackParamList } from "../ty
 import { notificationService } from "../services/NotificationService";
 import { checkInService } from "../services/CheckInService";
 import { affiliateService } from "../services/AffiliateService";
-import { fetchSettings, postConsent } from "../services/ApiService";
+import { fetchSettings, postConsent, fetchMedications, fetchContacts, fetchHealth } from "../services/ApiService";
 import { analyticsService } from "../services/AnalyticsService";
 
 const API_URL = "https://estou-bem-web-production.up.railway.app";
@@ -198,8 +198,9 @@ export function OnboardingScreen() {
       // Track registration
       analyticsService.trackEvent("registration_complete");
 
-      // Initialize notifications
-      await notificationService.initialize();
+      // Initialize notifications (pass user for push token auth)
+      const userForNotif = { id: String(user.id), token, apiUrl: API_URL };
+      await notificationService.initialize(userForNotif);
 
       // Fetch user's saved check-in times, fall back to default
       if (role === "elder") {
@@ -291,19 +292,46 @@ export function OnboardingScreen() {
         // Track login
         analyticsService.trackEvent("login");
 
-        await notificationService.initialize();
+        const userForNotif = { id: String(user.id), token, apiUrl: API_URL };
+        await notificationService.initialize(userForNotif);
 
         // Fetch user's saved check-in times, fall back to default
+        const userForApi = { apiUrl: API_URL, token };
         if (userRole === "elder") {
-          const userForApi = { apiUrl: API_URL, token };
           try {
             const settings = await fetchSettings(userForApi);
             const times = settings?.checkin_times?.length ? settings.checkin_times : ["09:00"];
             await checkInService.scheduleCheckinAlarms(times);
+
+            // Language preference from server will be applied on SettingsScreen mount
           } catch {
             await checkInService.scheduleCheckinAlarms(["09:00"]);
           }
         }
+
+        // Pre-fetch medications, contacts, and health data (fire-and-forget)
+        fetchMedications(userForApi).then((meds) => {
+          if (meds && meds.length > 0) {
+            for (const med of meds) {
+              dispatch({ type: "ADD_MEDICATION", payload: { id: String(med.id), name: med.name, dosage: med.dosage || "", frequency: med.frequency || "daily", times: med.times || [], stock: med.stock, elderId: String(med.user_id || ""), notes: med.notes } as any });
+            }
+          }
+        }).catch(() => {});
+
+        fetchContacts(userForApi).then((contacts) => {
+          if (contacts && contacts.length > 0) {
+            dispatch({ type: "SET_EMERGENCY_CONTACTS", payload: contacts.map((c: any) => ({ id: String(c.id), name: c.name, phone: c.phone, relationship: c.relationship || "", isPrimary: c.is_primary || false })) });
+          }
+        }).catch(() => {});
+
+        fetchHealth(userForApi, 50).then((entries) => {
+          if (entries && entries.length > 0) {
+            for (const entry of entries) {
+              dispatch({ type: "ADD_HEALTH_ENTRY", payload: { id: String(entry.id), elderId: String(entry.user_id || ""), timestamp: entry.date || entry.created_at || new Date().toISOString(), type: entry.type || entry.reading_type, value: entry.value, unit: entry.unit || "" } as any });
+            }
+          }
+        }).catch(() => {});
+
         dispatch({ type: "SET_ONBOARDED", payload: true });
       } else {
         Alert.alert("Erro", data.error || "E-mail ou senha incorretos");

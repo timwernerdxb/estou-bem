@@ -17,7 +17,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { checkInService } from "../services/CheckInService";
 import { fallDetectionService } from "../services/FallDetectionService";
-import { postCheckin, fetchCheckins, postFallDetected, postCheckinReward, fetchNapStatus, postActivityUpdate } from "../services/ApiService";
+import { postCheckin, fetchCheckins, postFallDetected, postCheckinReward, fetchNapStatus, postActivityUpdate, fetchGamification } from "../services/ApiService";
 import { autoCheckinService } from "../services/AutoCheckinService";
 import { notificationService } from "../services/NotificationService";
 import { StatusBadge } from "../components/StatusBadge";
@@ -48,6 +48,7 @@ export function ElderHomeScreen() {
   const [napUntil, setNapUntil] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [streakDays, setStreakDays] = useState(0);
   const elderName = state.elderProfile?.name || state.currentUser?.name || "Voce";
 
   // Read check-in times directly from state (set by SettingsScreen dispatch)
@@ -187,6 +188,18 @@ export function ElderHomeScreen() {
           if (remaining > 0) {
             setTimeout(() => { setIsNapping(false); setNapUntil(null); }, remaining);
           }
+        }
+      } catch {}
+    })();
+  }, []);
+
+  // Fetch gamification data (streak) from server on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await fetchGamification(state.currentUser);
+        if (data && data.streak_days != null) {
+          setStreakDays(data.streak_days);
         }
       } catch {}
     })();
@@ -338,7 +351,7 @@ export function ElderHomeScreen() {
     return "Boa noite";
   };
 
-  const streak = (state as any).gamification?.streak || 0;
+  const streak = streakDays;
 
   const handleNap = async (minutes: number) => {
     try {
