@@ -53,6 +53,12 @@ export function SettingsScreen() {
   const [samuAutoCall, setSamuAutoCall] = useState(true);
   const [fallDetectionEnabled, setFallDetectionEnabled] = useState(fallDetectionService.isActive());
 
+  // Interval check-in mode state
+  const [scheduleMode, setScheduleMode] = useState<"scheduled" | "interval">("scheduled");
+  const [intervalHours, setIntervalHours] = useState(2);
+  const [windowStart, setWindowStart] = useState("07:00");
+  const [windowEnd, setWindowEnd] = useState("22:00");
+
   const trialStart = (state.currentUser as any)?.trial_start as string | undefined;
   const trialDaysLeft = (() => {
     if (!trialStart) return null;
@@ -71,11 +77,35 @@ export function SettingsScreen() {
       try {
         const serverSettings = await fetchSettings(state.currentUser);
         if (serverSettings?.checkin_times && Array.isArray(serverSettings.checkin_times)) {
-          const serverTimes = serverSettings.checkin_times as string[];
+          const serverTimes = (serverSettings.checkin_times as string[]).map((t: string) => {
+            // Normalize times to HH:MM format (fix timezone-shifted values like "00:40")
+            if (t && t.match(/^\d{2}:\d{2}$/)) return t;
+            // If it's a full ISO string, extract local HH:MM
+            try {
+              const d = new Date(t);
+              if (!isNaN(d.getTime())) {
+                return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+              }
+            } catch {}
+            return t;
+          });
           if (serverTimes.length > 0) {
             setCheckinTimes(serverTimes);
             dispatch({ type: "SET_CHECKIN_TIMES", payload: serverTimes });
           }
+        }
+        // Load interval mode settings from server
+        if (serverSettings?.checkin_mode === "interval") {
+          setScheduleMode("interval");
+        }
+        if (serverSettings?.checkin_interval_hours) {
+          setIntervalHours(Number(serverSettings.checkin_interval_hours));
+        }
+        if (serverSettings?.checkin_window_start) {
+          setWindowStart(String(serverSettings.checkin_window_start));
+        }
+        if (serverSettings?.checkin_window_end) {
+          setWindowEnd(String(serverSettings.checkin_window_end));
         }
         // Load escalation settings from server
         if (serverSettings?.escalation_minutes != null) {
@@ -106,7 +136,8 @@ export function SettingsScreen() {
           payload: {
             tier: serverSub !== "free" ? "pro" : "free",
             isActive: true,
-          },
+            serverTier: serverSub, // "free" | "familia" | "central"
+          } as any,
         });
 
         // Update linked elder info
@@ -162,11 +193,62 @@ export function SettingsScreen() {
     }
   };
 
-  const maxCheckins = CHECKIN_CONFIG.maxCheckinsPerDay[tier];
+  // Max check-ins based on subscription: free=1, familia/pro=5, central=10
+  const serverSubscription = (state.subscription as any)?.serverTier || (tier === "pro" ? "familia" : "free");
+  const maxCheckins = serverSubscription === "central" ? 10 : tier === "pro" ? 5 : 1;
+
+  // Compute times from interval settings
+  const computeIntervalTimes = (hours: number, start: string, end: string): string[] => {
+    const [startH, startM] = start.split(":").map(Number);
+    const [endH, endM] = end.split(":").map(Number);
+    const startMinutes = startH * 60 + (startM || 0);
+    const endMinutes = endH * 60 + (endM || 0);
+    const times: string[] = [];
+    for (let m = startMinutes; m <= endMinutes; m += hours * 60) {
+      const h = Math.floor(m / 60);
+      const min = m % 60;
+      times.push(`${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`);
+    }
+    return times;
+  };
+
+  const intervalPreviewTimes = computeIntervalTimes(intervalHours, windowStart, windowEnd);
+
+  const handleSaveInterval = async () => {
+    const times = computeIntervalTimes(intervalHours, windowStart, windowEnd);
+    setCheckinTimes(times);
+    dispatch({ type: "SET_CHECKIN_TIMES", payload: times });
+    await checkInService.scheduleCheckinAlarms(times);
+    putSettings(state.currentUser, {
+      checkin_times: times,
+      checkin_mode: "interval",
+      checkin_interval_hours: intervalHours,
+      checkin_window_start: windowStart,
+      checkin_window_end: windowEnd,
+    } as any).catch(() => {});
+  };
+
+  // Format HH:MM input, fixing timezone / default issues (ensure pure HH:MM string)
+  const formatTimeInput = (raw: string): string => {
+    const clean = raw.replace(/[^0-9:]/g, "");
+    if (clean.match(/^\d{2}:\d{2}$/)) {
+      const [h, m] = clean.split(":").map(Number);
+      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      }
+    }
+    return clean;
+  };
 
   const handleAddTime = async () => {
-    if (!newTime.match(/^\d{2}:\d{2}$/)) {
+    const cleanTime = formatTimeInput(newTime);
+    if (!cleanTime.match(/^\d{2}:\d{2}$/)) {
       Alert.alert("Formato invalido", "Use o formato HH:MM (ex: 14:30)");
+      return;
+    }
+    const [h, m] = cleanTime.split(":").map(Number);
+    if (h < 0 || h > 23 || m < 0 || m > 59) {
+      Alert.alert("Hora invalida", "Use horas entre 00:00 e 23:59");
       return;
     }
     if (checkinTimes.length >= maxCheckins) {
@@ -181,12 +263,12 @@ export function SettingsScreen() {
       return;
     }
 
-    const updated = [...checkinTimes, newTime].sort();
+    const updated = [...checkinTimes, cleanTime].sort();
     setCheckinTimes(updated);
     dispatch({ type: "SET_CHECKIN_TIMES", payload: updated });
     await checkInService.scheduleCheckinAlarms(updated);
     // Sync to server (fire-and-forget)
-    putSettings(state.currentUser, { checkin_times: updated }).catch(() => {});
+    putSettings(state.currentUser, { checkin_times: updated, checkin_mode: "scheduled" } as any).catch(() => {});
     setNewTime("");
   };
 
@@ -396,34 +478,141 @@ export function SettingsScreen() {
               Seu plano permite ate {maxCheckins} check-in(s)/dia
             </Text>
 
-            {checkinTimes.map((time) => (
-              <View key={time} style={styles.timeRow}>
-                <Ionicons name="alarm" size={22} color={COLORS.primary} />
-                <Text style={styles.timeText}>{time}</Text>
-                <TouchableOpacity onPress={() => handleRemoveTime(time)}>
-                  <Ionicons name="close-circle" size={22} color={COLORS.danger} />
-                </TouchableOpacity>
-              </View>
-            ))}
-
-            {checkinTimes.length < maxCheckins && (
-              <View style={styles.addTimeRow}>
-                <TextInput
-                  style={styles.timeInput}
-                  placeholder="HH:MM"
-                  value={newTime}
-                  onChangeText={setNewTime}
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={5}
-                  placeholderTextColor={COLORS.textLight}
+            {/* Schedule mode toggle */}
+            <View style={styles.segmentRow}>
+              <TouchableOpacity
+                style={[
+                  styles.segmentBtn,
+                  scheduleMode === "scheduled" && styles.segmentBtnActive,
+                ]}
+                onPress={() => setScheduleMode("scheduled")}
+              >
+                <Ionicons
+                  name="time"
+                  size={18}
+                  color={scheduleMode === "scheduled" ? COLORS.white : COLORS.textSecondary}
                 />
-                <TouchableOpacity
-                  style={styles.addTimeBtn}
-                  onPress={handleAddTime}
+                <Text
+                  style={[
+                    styles.segmentText,
+                    scheduleMode === "scheduled" && styles.segmentTextActive,
+                  ]}
                 >
-                  <Ionicons name="add-circle" size={32} color={COLORS.primary} />
+                  Horarios fixos
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.segmentBtn,
+                  scheduleMode === "interval" && styles.segmentBtnActive,
+                ]}
+                onPress={() => setScheduleMode("interval")}
+              >
+                <Ionicons
+                  name="repeat"
+                  size={18}
+                  color={scheduleMode === "interval" ? COLORS.white : COLORS.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.segmentText,
+                    scheduleMode === "interval" && styles.segmentTextActive,
+                  ]}
+                >
+                  A cada X horas
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {scheduleMode === "scheduled" ? (
+              <>
+                {checkinTimes.map((time) => (
+                  <View key={time} style={styles.timeRow}>
+                    <Ionicons name="alarm" size={22} color={COLORS.primary} />
+                    <Text style={styles.timeText}>{time}</Text>
+                    <TouchableOpacity onPress={() => handleRemoveTime(time)}>
+                      <Ionicons name="close-circle" size={22} color={COLORS.danger} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                {checkinTimes.length < maxCheckins && (
+                  <View style={styles.addTimeRow}>
+                    <TextInput
+                      style={styles.timeInput}
+                      placeholder="HH:MM"
+                      value={newTime}
+                      onChangeText={(text) => setNewTime(formatTimeInput(text))}
+                      keyboardType="numbers-and-punctuation"
+                      maxLength={5}
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                    <TouchableOpacity
+                      style={styles.addTimeBtn}
+                      onPress={handleAddTime}
+                    >
+                      <Ionicons name="add-circle" size={32} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Interval hours stepper */}
+                <View style={styles.intervalRow}>
+                  <Text style={styles.intervalLabel}>A cada</Text>
+                  <View style={styles.stepperRow}>
+                    <TouchableOpacity
+                      style={styles.stepperBtn}
+                      onPress={() => setIntervalHours(Math.max(1, intervalHours - 1))}
+                    >
+                      <Ionicons name="remove" size={20} color={COLORS.white} />
+                    </TouchableOpacity>
+                    <Text style={styles.stepperValue}>{intervalHours}h</Text>
+                    <TouchableOpacity
+                      style={styles.stepperBtn}
+                      onPress={() => setIntervalHours(Math.min(6, intervalHours + 1))}
+                    >
+                      <Ionicons name="add" size={20} color={COLORS.white} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Window start/end */}
+                <View style={styles.intervalRow}>
+                  <Text style={styles.intervalLabel}>Das</Text>
+                  <TextInput
+                    style={styles.intervalTimeInput}
+                    value={windowStart}
+                    onChangeText={(text) => setWindowStart(formatTimeInput(text))}
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                    placeholderTextColor={COLORS.textLight}
+                  />
+                  <Text style={styles.intervalLabel}>as</Text>
+                  <TextInput
+                    style={styles.intervalTimeInput}
+                    value={windowEnd}
+                    onChangeText={(text) => setWindowEnd(formatTimeInput(text))}
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                    placeholderTextColor={COLORS.textLight}
+                  />
+                </View>
+
+                {/* Preview */}
+                <Text style={styles.intervalPreview}>
+                  Check-ins as {intervalPreviewTimes.join(", ")}
+                </Text>
+
+                {/* Save button */}
+                <TouchableOpacity
+                  style={styles.intervalSaveBtn}
+                  onPress={handleSaveInterval}
+                >
+                  <Text style={styles.intervalSaveBtnText}>SALVAR HORARIOS</Text>
                 </TouchableOpacity>
-              </View>
+              </>
             )}
           </Card>
         )}
@@ -974,5 +1163,94 @@ const styles = StyleSheet.create({
     textAlign: "center",
     backgroundColor: COLORS.white,
     color: COLORS.textPrimary,
+  },
+  // Interval check-in mode styles
+  segmentRow: {
+    flexDirection: "row",
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.md,
+    padding: 3,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  segmentBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: SPACING.sm + 2,
+    borderRadius: RADIUS.md,
+  },
+  segmentBtnActive: {
+    backgroundColor: COLORS.primary,
+  },
+  segmentText: {
+    ...FONTS.caption,
+    fontWeight: "500",
+    color: COLORS.textSecondary,
+  },
+  segmentTextActive: {
+    color: COLORS.white,
+  },
+  intervalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  intervalLabel: {
+    ...FONTS.body,
+    color: COLORS.textSecondary,
+  },
+  stepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  stepperBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  stepperValue: {
+    ...FONTS.subtitle,
+    fontWeight: "600",
+    color: COLORS.primary,
+    minWidth: 40,
+    textAlign: "center",
+  },
+  intervalTimeInput: {
+    width: 70,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm,
+    fontSize: 18,
+    textAlign: "center",
+    backgroundColor: COLORS.white,
+    color: COLORS.textPrimary,
+  },
+  intervalPreview: {
+    ...FONTS.caption,
+    color: COLORS.textSecondary,
+    fontStyle: "italic",
+    marginBottom: SPACING.md,
+  },
+  intervalSaveBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+  },
+  intervalSaveBtnText: {
+    color: COLORS.white,
+    fontWeight: "600",
+    fontSize: 14,
+    letterSpacing: 1,
   },
 });

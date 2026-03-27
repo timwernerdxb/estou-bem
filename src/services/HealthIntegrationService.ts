@@ -4,6 +4,8 @@ import { HealthEntry, HealthMetricType } from "../types";
 import { postHealth, postActivityUpdate } from "./ApiService";
 // expo-sensors Pedometer for iOS step count fallback
 import { Pedometer } from "expo-sensors";
+// Custom Expo module for HealthKit (Swift, no C++ interop issues)
+import * as ExpoHealthkit from "../../modules/expo-healthkit/src";
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
@@ -220,30 +222,19 @@ class HealthIntegrationService {
     return entries;
   }
 
-  // ─── iOS: Apple HealthKit (via @kingstinct/react-native-healthkit) ──
+  // ─── iOS: Apple HealthKit (via custom expo-healthkit module) ──────
   private async initAppleHealth(): Promise<boolean> {
     try {
-      let HK: any;
-      try {
-        HK = require("@kingstinct/react-native-healthkit");
-      } catch {
-        console.log("[AppleHealth] @kingstinct/react-native-healthkit not installed, falling back to pedometer");
-        this.initialized = true;
-        return true;
-      }
-
-      // Check if HealthKit is available on this device
-      const available = HK.isHealthDataAvailable();
+      const available = await ExpoHealthkit.isAvailable();
       if (!available) {
         console.log("[AppleHealth] HealthKit not available on this device");
         this.initialized = true;
         return true;
       }
 
-      this.healthKit = HK;
       this.healthKitAvailable = true;
       this.initialized = true;
-      console.log("[AppleHealth] HealthKit available, ready to request authorization");
+      console.log("[AppleHealth] HealthKit available (custom expo-healthkit module)");
       return true;
     } catch (err) {
       console.warn("[AppleHealth] Init error:", err);
@@ -258,7 +249,7 @@ class HealthIntegrationService {
    * for elder users only. Checks AsyncStorage so we don't prompt repeatedly.
    */
   async requestAppleHealthPermissions(): Promise<boolean> {
-    if (Platform.OS !== "ios" || !this.healthKit) return false;
+    if (Platform.OS !== "ios" || !this.healthKitAvailable) return false;
 
     try {
       // Check if we already asked
@@ -268,18 +259,7 @@ class HealthIntegrationService {
         return true;
       }
 
-      const HK = this.healthKit;
-
-      const granted = await HK.requestAuthorization({
-        toRead: [
-          "HKQuantityTypeIdentifierHeartRate",
-          "HKQuantityTypeIdentifierStepCount",
-          "HKQuantityTypeIdentifierBloodPressureSystolic",
-          "HKQuantityTypeIdentifierBloodPressureDiastolic",
-          "HKQuantityTypeIdentifierOxygenSaturation",
-          "HKCategoryTypeIdentifierSleepAnalysis",
-        ],
-      });
+      const granted = await ExpoHealthkit.requestAuthorization();
 
       // Mark that we've asked (even if user denied, we don't ask again)
       await AsyncStorage.setItem(HEALTHKIT_AUTHORIZED_KEY, "true");
@@ -297,57 +277,40 @@ class HealthIntegrationService {
    * Returns a HealthSummary with the latest values.
    */
   async readAppleHealthSummary(hoursBack: number = 24): Promise<HealthSummary> {
-    if (Platform.OS !== "ios" || !this.healthKit || !this.healthKitAvailable) {
+    if (Platform.OS !== "ios" || !this.healthKitAvailable) {
       return {};
     }
 
-    const HK = this.healthKit;
     const summary: HealthSummary = {};
-    const startDate = new Date(Date.now() - hoursBack * 3600000);
-    const endDate = new Date();
 
     try {
-      // Heart rate — get most recent sample
+      // Heart rate — latest from last 24h
       try {
-        const hrSamples = await HK.queryQuantitySamples(
-          "HKQuantityTypeIdentifierHeartRate",
-          {
-            limit: 1,
-            ascending: false,
-            unit: "count/min",
-            filter: { date: { startDate, endDate } },
-          }
-        );
-        if (hrSamples && hrSamples.length > 0) {
-          summary.heartRate = Math.round(hrSamples[0].quantity);
-          summary.heartRateTime = new Date(hrSamples[0].startDate).toLocaleTimeString(
-            "pt-BR",
-            { hour: "2-digit", minute: "2-digit" }
-          );
+        const hr = await ExpoHealthkit.getHeartRate();
+        if (hr != null) {
+          summary.heartRate = Math.round(hr);
+          summary.heartRateTime = new Date().toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
         }
       } catch (e) {
         console.warn("[AppleHealth] Heart rate read error:", e);
       }
 
-      // Step count — get cumulative sum for the day
+      // Step count — today's cumulative
       try {
-        const stepSamples = await HK.queryStatisticsForQuantity(
-          "HKQuantityTypeIdentifierStepCount",
-          ["cumulativeSum"],
-          {
-            from: startDate,
-            to: endDate,
-            unit: "count",
-          }
-        );
-        if (stepSamples && stepSamples.sumQuantity != null) {
-          summary.steps = Math.round(stepSamples.sumQuantity);
+        const steps = await ExpoHealthkit.getStepCount();
+        if (steps > 0) {
+          summary.steps = steps;
         }
       } catch {
         // Fallback: try pedometer
         try {
           const available = await Pedometer.isAvailableAsync();
           if (available) {
+            const startDate = new Date(Date.now() - hoursBack * 3600000);
+            const endDate = new Date();
             const result = await Pedometer.getStepCountAsync(startDate, endDate);
             if (result?.steps) {
               summary.steps = result.steps;
@@ -356,89 +319,32 @@ class HealthIntegrationService {
         } catch {}
       }
 
-      // Blood pressure systolic — most recent
+      // Blood pressure — latest from last 24h
       try {
-        const bpSys = await HK.queryQuantitySamples(
-          "HKQuantityTypeIdentifierBloodPressureSystolic",
-          {
-            limit: 1,
-            ascending: false,
-            unit: "mmHg",
-            filter: { date: { startDate, endDate } },
-          }
-        );
-        if (bpSys && bpSys.length > 0) {
-          summary.bloodPressureSystolic = Math.round(bpSys[0].quantity);
+        const bp = await ExpoHealthkit.getBloodPressure();
+        if (bp) {
+          summary.bloodPressureSystolic = bp.systolic;
+          summary.bloodPressureDiastolic = bp.diastolic;
         }
       } catch (e) {
-        console.warn("[AppleHealth] BP systolic read error:", e);
+        console.warn("[AppleHealth] BP read error:", e);
       }
 
-      // Blood pressure diastolic — most recent
+      // Oxygen saturation (SpO2) — latest from last 24h
       try {
-        const bpDia = await HK.queryQuantitySamples(
-          "HKQuantityTypeIdentifierBloodPressureDiastolic",
-          {
-            limit: 1,
-            ascending: false,
-            unit: "mmHg",
-            filter: { date: { startDate, endDate } },
-          }
-        );
-        if (bpDia && bpDia.length > 0) {
-          summary.bloodPressureDiastolic = Math.round(bpDia[0].quantity);
-        }
-      } catch (e) {
-        console.warn("[AppleHealth] BP diastolic read error:", e);
-      }
-
-      // Oxygen saturation (SpO2) — most recent
-      try {
-        const spo2Samples = await HK.queryQuantitySamples(
-          "HKQuantityTypeIdentifierOxygenSaturation",
-          {
-            limit: 1,
-            ascending: false,
-            unit: "%",
-            filter: { date: { startDate, endDate } },
-          }
-        );
-        if (spo2Samples && spo2Samples.length > 0) {
-          // HealthKit stores SpO2 as a fraction (0.0–1.0), multiply by 100
-          const raw = spo2Samples[0].quantity;
-          summary.spo2 = Math.round(raw <= 1 ? raw * 100 : raw);
+        const spo2 = await ExpoHealthkit.getBloodOxygen();
+        if (spo2 != null) {
+          summary.spo2 = Math.round(spo2);
         }
       } catch (e) {
         console.warn("[AppleHealth] SpO2 read error:", e);
       }
 
-      // Sleep analysis — sum of asleep time from last night
+      // Sleep hours — last night
       try {
-        // Look back further for sleep (last 24h should capture last night)
-        const sleepSamples = await HK.queryCategorySamples(
-          "HKCategoryTypeIdentifierSleepAnalysis",
-          {
-            limit: 0, // all samples
-            ascending: false,
-            filter: { date: { startDate, endDate } },
-          }
-        );
-        if (sleepSamples && sleepSamples.length > 0) {
-          // Sum up asleep durations (value > 0 means some form of sleep; 1=InBed, 2+=asleep variants)
-          let totalSleepMs = 0;
-          for (const sample of sleepSamples) {
-            // value: 0 = InBed, 1 = AsleepUnspecified, 2 = Awake, 3 = AsleepCore, 4 = AsleepDeep, 5 = AsleepREM
-            // Count asleep states (1, 3, 4, 5) — not InBed(0) or Awake(2)
-            const val = sample.value;
-            if (val === 1 || val === 3 || val === 4 || val === 5) {
-              const start = new Date(sample.startDate).getTime();
-              const end = new Date(sample.endDate).getTime();
-              totalSleepMs += end - start;
-            }
-          }
-          if (totalSleepMs > 0) {
-            summary.sleepHours = Math.round((totalSleepMs / 3600000) * 10) / 10;
-          }
+        const sleep = await ExpoHealthkit.getSleepHours();
+        if (sleep != null) {
+          summary.sleepHours = sleep;
         }
       } catch (e) {
         console.warn("[AppleHealth] Sleep read error:", e);
@@ -450,7 +356,6 @@ class HealthIntegrationService {
       try {
         await AsyncStorage.setItem(HEALTH_SUMMARY_KEY, JSON.stringify(summary));
       } catch {}
-
     } catch (err) {
       console.warn("[AppleHealth] Read summary error:", err);
     }

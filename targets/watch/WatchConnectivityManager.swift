@@ -73,6 +73,42 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 
         // Haptic feedback
         WKInterfaceDevice.current().play(.success)
+
+        // Also POST directly to server as backup
+        postCheckinToServer()
+    }
+
+    private func postCheckinToServer() {
+        let linkCode = UserDefaults.standard.string(forKey: "elderLinkCode") ?? ""
+        guard !linkCode.isEmpty else {
+            print("[Watch] No link code stored, cannot post to server")
+            return
+        }
+
+        let serverURL = "https://estou-bem-web-production.up.railway.app/api/watch/checkin"
+        guard let url = URL(string: serverURL) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 10
+
+        let body: [String: Any] = [
+            "link_code": linkCode,
+            "timestamp": ISO8601DateFormatter().string(from: Date())
+        ]
+
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("[Watch] Server checkin failed: \(error.localizedDescription)")
+                return
+            }
+            if let httpResponse = response as? HTTPURLResponse {
+                print("[Watch] Server checkin response: \(httpResponse.statusCode)")
+            }
+        }.resume()
     }
 
     // MARK: - Send SOS to iPhone
@@ -232,6 +268,9 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             scheduledCheckinTimes = times
             // Persist so we have them after relaunch
             UserDefaults.standard.set(times, forKey: "scheduledCheckinTimes")
+        }
+        if let linkCode = data["linkCode"] as? String {
+            UserDefaults.standard.set(linkCode, forKey: "elderLinkCode")
         }
         lastSyncTime = Date()
     }

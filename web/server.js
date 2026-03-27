@@ -2280,6 +2280,33 @@ app.post('/api/checkins', authMiddleware, asyncHandler(async (req, res) => {
   res.json(result.rows[0]);
 }));
 
+// Watch check-in - uses link_code instead of auth token
+app.post('/api/watch/checkin', asyncHandler(async (req, res) => {
+  const { link_code, timestamp } = req.body;
+  if (!link_code) return res.status(400).json({ error: 'link_code required' });
+
+  const user = await pool.query('SELECT id, name FROM users WHERE link_code = $1', [link_code]);
+  if (user.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+  const userId = user.rows[0].id;
+  const now = new Date(timestamp || Date.now());
+  const time = now.toTimeString().slice(0, 5);
+  const date = now.toISOString().slice(0, 10);
+
+  const result = await pool.query(
+    'INSERT INTO checkins (user_id, time, status, date, confirmed_at) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+    [userId, time, 'confirmed', date, now.toISOString()]
+  );
+
+  // Also award gamification points
+  const streak = await pool.query('SELECT streak_days, total_points FROM users WHERE id = $1', [userId]);
+  const s = streak.rows[0];
+  const newStreak = (s?.streak_days || 0) + 1;
+  await pool.query('UPDATE users SET streak_days = $1, total_points = total_points + 10 WHERE id = $2', [newStreak, userId]);
+
+  res.json({ ok: true, checkin: result.rows[0], streak: newStreak });
+}));
+
 app.put('/api/checkins/:id', authMiddleware, asyncHandler(async (req, res) => {
   const { status, time } = req.body;
   const confirmedAt = (status === 'confirmed' || status === 'auto_confirmed') ? new Date().toISOString() : null;
