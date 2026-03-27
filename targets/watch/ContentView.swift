@@ -102,377 +102,42 @@ struct CheckinCooldown {
     }
 }
 
-// MARK: - Main Content View
+// MARK: - Main Content View (Paged: Main + Secondary)
 struct ContentView: View {
     @EnvironmentObject var connectivity: WatchConnectivityManager
     @EnvironmentObject var motionManager: MotionDetectionManager
     @EnvironmentObject var healthManager: HealthManager
     @EnvironmentObject var fallDetection: FallDetectionManager
 
-    @State private var checkinConfirmed = false
-    @State private var showingPulse = false
-    @State private var showStatusDetail = false
-    @State private var lastCheckinTimeString: String? = nil
-
-    /// Whether the button is disabled due to cooldown or schedule
-    private var checkinDisabled: Bool {
-        if checkinConfirmed { return true }
-        if CheckinCooldown.isInCooldown() { return true }
-        if !CheckinCooldown.isWithinScheduledWindow(scheduledTimes: connectivity.scheduledCheckinTimes) {
-            return true
-        }
-        return false
-    }
+    @State private var selectedPage = 0
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 16) {
-                    headerSection
-                    checkinButton
-                    statusRow
+        TabView(selection: $selectedPage) {
+            MainCheckinPage()
+                .environmentObject(connectivity)
+                .environmentObject(fallDetection)
+                .tag(0)
 
-                    if healthManager.latestHeartRate > 0 || healthManager.bloodOxygen > 0 {
-                        healthCard
-                    }
-
-                    if healthManager.sleepHours > 0 {
-                        sleepCard
-                    }
-
-                    movementCard
-                    fallDetectionStatusCard
-                }
-                .padding(.horizontal, 8)
-                .padding(.bottom, 16)
-            }
-            .background(Color.black) // System default watchOS dark background
-            .navigationTitle("")
-            .navigationBarHidden(true)
-            .overlay(
-                Group {
-                    if fallDetection.fallDetected {
-                        fallAlertOverlay
-                    }
-                }
-            )
+            SecondaryPage()
+                .environmentObject(connectivity)
+                .environmentObject(healthManager)
+                .tag(1)
         }
-        .onAppear {
-            // Restore last check-in display if in cooldown
-            if let last = CheckinCooldown.lastCheckinDate, CheckinCooldown.isInCooldown() {
-                let fmt = DateFormatter()
-                fmt.dateFormat = "HH:mm"
-                lastCheckinTimeString = fmt.string(from: last)
-                checkinConfirmed = true
+        .tabViewStyle(.page(indexDisplayMode: .automatic))
+        .background(Color.black)
+        .overlay(
+            Group {
+                if fallDetection.fallDetected {
+                    fallAlertOverlay
+                }
             }
+        )
+        .onAppear {
             connectivity.loadPersistedSchedule()
         }
     }
 
-    // MARK: - Header
-    private var headerSection: some View {
-        VStack(spacing: 2) {
-            Text(greeting)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.houseGold)
-                .tracking(1.5)
-                .textCase(.uppercase)
-
-            if let name = connectivity.elderName {
-                Text(name)
-                    .font(.system(.title3, design: .serif))
-                    .foregroundColor(.white)
-                    .fontWeight(.regular)
-            }
-        }
-        .padding(.top, 4)
-    }
-
-    // MARK: - Check-in Button
-    private var checkinButton: some View {
-        VStack(spacing: 6) {
-            Button(action: performCheckin) {
-                ZStack {
-                    // Outer pulse ring
-                    if showingPulse {
-                        Circle()
-                            .stroke(Color.brightGreen.opacity(0.4), lineWidth: 2)
-                            .scaleEffect(showingPulse ? 1.3 : 1.0)
-                            .opacity(showingPulse ? 0 : 1)
-                            .animation(.easeOut(duration: 0.8), value: showingPulse)
-                    }
-
-                    // Main circle
-                    Circle()
-                        .fill(buttonColor)
-                        .shadow(color: Color.brightGreen.opacity(0.4), radius: 12, y: 4)
-
-                    // Content
-                    VStack(spacing: 4) {
-                        if checkinConfirmed {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 28, weight: .light))
-                                .foregroundColor(.white)
-                        } else if checkinDisabled {
-                            Image(systemName: "clock.fill")
-                                .font(.system(size: 24, weight: .light))
-                                .foregroundColor(.white.opacity(0.6))
-                        } else {
-                            Image(systemName: "hand.raised.fill")
-                                .font(.system(size: 24, weight: .light))
-                                .foregroundColor(.white)
-                        }
-
-                        Text(buttonLabel)
-                            .font(.system(size: checkinConfirmed ? 9 : 12, weight: .semibold))
-                            .foregroundColor(.white)
-                            .tracking(1.5)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-            .frame(width: 110, height: 110)
-            .disabled(checkinDisabled)
-            .opacity(checkinDisabled && !checkinConfirmed ? 0.5 : 1.0)
-
-            // Status text below button
-            if checkinConfirmed, let ts = lastCheckinTimeString {
-                Text("Check-in confirmado \u{2713}")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.lighterGreen)
-                Text("as \(ts)")
-                    .font(.system(size: 9))
-                    .foregroundColor(Color.gray)
-            } else if !CheckinCooldown.isWithinScheduledWindow(scheduledTimes: connectivity.scheduledCheckinTimes),
-                      let next = CheckinCooldown.nextScheduledTime(scheduledTimes: connectivity.scheduledCheckinTimes) {
-                Text("Proximo check-in as \(next)")
-                    .font(.system(size: 10))
-                    .foregroundColor(Color.gray)
-            } else if CheckinCooldown.isInCooldown(), let nextDate = CheckinCooldown.nextAllowedDate() {
-                let fmt = { () -> String in
-                    let f = DateFormatter(); f.dateFormat = "HH:mm"; return f.string(from: nextDate)
-                }()
-                Text("Proximo check-in as \(fmt)")
-                    .font(.system(size: 10))
-                    .foregroundColor(Color.gray)
-            }
-        }
-    }
-
-    private var buttonColor: Color {
-        if checkinConfirmed {
-            return .brightGreen
-        } else if checkinDisabled {
-            return Color(white: 0.25)
-        } else if connectivity.hasPendingCheckin {
-            return .houseGold
-        } else {
-            return .brightGreen
-        }
-    }
-
-    private var buttonLabel: String {
-        if checkinConfirmed {
-            return "OK"
-        } else if checkinDisabled {
-            return "AGUARDE"
-        } else {
-            return "ESTOU BEM"
-        }
-    }
-
-    // MARK: - Status Row
-    private var statusRow: some View {
-        HStack(spacing: 12) {
-            if let nextTime = connectivity.nextCheckinTime {
-                VStack(spacing: 2) {
-                    Text("PROXIMO")
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundColor(Color.gray)
-                        .tracking(1)
-                    Text(nextTime)
-                        .font(.system(size: 16, design: .serif))
-                        .foregroundColor(.white)
-                }
-            }
-
-            VStack(spacing: 2) {
-                Text("SEQUENCIA")
-                    .font(.system(size: 8, weight: .medium))
-                    .foregroundColor(Color.gray)
-                    .tracking(1)
-                Text("\(connectivity.streak)")
-                    .font(.system(size: 16, design: .serif))
-                    .foregroundColor(.houseGold)
-            }
-        }
-    }
-
-    // MARK: - Health Card
-    private var healthCard: some View {
-        VStack(spacing: 8) {
-            if healthManager.latestHeartRate > 0 {
-                HStack {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.red)
-
-                    Text("\(Int(healthManager.latestHeartRate))")
-                        .font(.system(size: 18, design: .serif))
-                        .foregroundColor(.white)
-
-                    Text("BPM")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(Color.gray)
-                        .tracking(1)
-
-                    Spacer()
-
-                    if healthManager.latestHeartRate > 100 {
-                        Text("ALTO")
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundColor(.houseDanger)
-                            .tracking(1)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.houseDanger.opacity(0.2))
-                            .cornerRadius(2)
-                    }
-                }
-            }
-
-            if healthManager.bloodOxygen > 0 {
-                HStack {
-                    Image(systemName: "lungs.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(spo2Color)
-
-                    Text("\(Int(healthManager.bloodOxygen))")
-                        .font(.system(size: 18, design: .serif))
-                        .foregroundColor(.white)
-
-                    Text("% SpO2")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(Color.gray)
-                        .tracking(1)
-
-                    Spacer()
-
-                    Text(spo2Label)
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundColor(spo2Color)
-                        .tracking(1)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(spo2Color.opacity(0.2))
-                        .cornerRadius(2)
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color.cardBg)
-        .cornerRadius(8)
-    }
-
-    // MARK: - SpO2 Helpers
-    private var spo2Color: Color {
-        if healthManager.bloodOxygen > 95 {
-            return .brighterGreen
-        } else if healthManager.bloodOxygen >= 90 {
-            return .houseGold
-        } else {
-            return .houseDanger
-        }
-    }
-
-    private var spo2Label: String {
-        if healthManager.bloodOxygen > 95 {
-            return "NORMAL"
-        } else if healthManager.bloodOxygen >= 90 {
-            return "BAIXO"
-        } else {
-            return "CRITICO"
-        }
-    }
-
-    // MARK: - Sleep Card
-    private var sleepCard: some View {
-        HStack {
-            Image(systemName: "moon.zzz.fill")
-                .font(.system(size: 12))
-                .foregroundColor(Color(red: 156/255, green: 39/255, blue: 176/255))
-
-            Text(String(format: "%.1f", healthManager.sleepHours))
-                .font(.system(size: 18, design: .serif))
-                .foregroundColor(.white)
-
-            Text("HORAS")
-                .font(.system(size: 9, weight: .medium))
-                .foregroundColor(Color.gray)
-                .tracking(1)
-
-            Spacer()
-
-            Text(healthManager.sleepHours >= 7 ? "BOM" : healthManager.sleepHours >= 5 ? "POUCO" : "ALERTA")
-                .font(.system(size: 8, weight: .medium))
-                .foregroundColor(healthManager.sleepHours >= 7 ? .brighterGreen : healthManager.sleepHours >= 5 ? .houseGold : .houseDanger)
-                .tracking(1)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background((healthManager.sleepHours >= 7 ? Color.brighterGreen : healthManager.sleepHours >= 5 ? Color.houseGold : Color.houseDanger).opacity(0.2))
-                .cornerRadius(2)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.cardBg)
-        .cornerRadius(8)
-    }
-
-    // MARK: - Movement Card
-    private var movementCard: some View {
-        HStack {
-            Circle()
-                .fill(motionManager.isMoving ? Color.brighterGreen : Color.gray.opacity(0.3))
-                .frame(width: 8, height: 8)
-
-            Text(motionManager.isMoving ? "Movimento detectado" : "Em repouso")
-                .font(.system(size: 11))
-                .foregroundColor(Color(white: 0.7))
-
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.cardBg)
-        .cornerRadius(8)
-    }
-
-    // MARK: - Fall Detection Status Card
-    private var fallDetectionStatusCard: some View {
-        HStack {
-            Image(systemName: "figure.fall")
-                .font(.system(size: 12))
-                .foregroundColor(fallDetection.fallDetectionAvailable ? .brighterGreen : Color.gray.opacity(0.3))
-
-            Text(fallDetection.fallDetectionAvailable ? "Deteccao de queda ativa" : "Deteccao indisponivel")
-                .font(.system(size: 11))
-                .foregroundColor(Color(white: 0.7))
-
-            Spacer()
-
-            Circle()
-                .fill(fallDetection.fallDetectionAvailable ? Color.brighterGreen : Color.gray.opacity(0.3))
-                .frame(width: 6, height: 6)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.cardBg)
-        .cornerRadius(8)
-    }
-
-    // MARK: - Fall Alert Overlay
+    // MARK: - Fall Alert Overlay (kept as-is, emergency overlay)
     private var fallAlertOverlay: some View {
         ZStack {
             Color.black.opacity(0.95)
@@ -525,13 +190,149 @@ struct ContentView: View {
             }
         }
     }
+}
 
-    // MARK: - Helpers
-    private var greeting: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        if hour < 12 { return "Bom dia" }
-        if hour < 18 { return "Boa tarde" }
-        return "Boa noite"
+// MARK: - Main Check-in Page (ONE big green button)
+struct MainCheckinPage: View {
+    @EnvironmentObject var connectivity: WatchConnectivityManager
+    @EnvironmentObject var fallDetection: FallDetectionManager
+
+    @State private var checkinConfirmed = false
+    @State private var showingPulse = false
+    @State private var lastCheckinTimeString: String? = nil
+
+    private var checkinDisabled: Bool {
+        if checkinConfirmed { return true }
+        if CheckinCooldown.isInCooldown() { return true }
+        if !CheckinCooldown.isWithinScheduledWindow(scheduledTimes: connectivity.scheduledCheckinTimes) {
+            return true
+        }
+        return false
+    }
+
+    /// Next check-in display string
+    private var nextTimeText: String? {
+        if let next = CheckinCooldown.nextScheduledTime(scheduledTimes: connectivity.scheduledCheckinTimes) {
+            return next
+        }
+        if CheckinCooldown.isInCooldown(), let nextDate = CheckinCooldown.nextAllowedDate() {
+            let f = DateFormatter()
+            f.dateFormat = "HH:mm"
+            return f.string(from: nextDate)
+        }
+        return nil
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                // Gear icon top-right — tapping goes to secondary page (page 1)
+                HStack {
+                    Spacer()
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color.gray.opacity(0.6))
+                        .padding(.trailing, 4)
+                        .padding(.top, 2)
+                        .onTapGesture {
+                            // Swipe hint — the TabView handles actual navigation
+                        }
+                }
+                .frame(height: 16)
+
+                Spacer(minLength: 4)
+
+                // Big check-in button
+                Button(action: performCheckin) {
+                    ZStack {
+                        // Pulse ring on confirmation
+                        if showingPulse {
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.brightGreen.opacity(0.4), lineWidth: 3)
+                                .scaleEffect(showingPulse ? 1.1 : 1.0)
+                                .opacity(showingPulse ? 0 : 1)
+                                .animation(.easeOut(duration: 0.8), value: showingPulse)
+                        }
+
+                        // Main button background
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(buttonColor)
+
+                        // Button content
+                        VStack(spacing: 6) {
+                            if checkinConfirmed {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 36, weight: .bold))
+                                    .foregroundColor(.white)
+                                Text("Confirmado \u{2713}")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                if let ts = lastCheckinTimeString {
+                                    Text(ts)
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            } else if checkinDisabled {
+                                Image(systemName: "clock.fill")
+                                    .font(.system(size: 30, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.6))
+                                Text("AGUARDE")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.6))
+                            } else {
+                                Text("ESTOU\nBEM")
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .multilineTextAlignment(.center)
+                                    .lineSpacing(2)
+                            }
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .frame(
+                    width: geo.size.width - 16,
+                    height: geo.size.height * 0.65
+                )
+                .disabled(checkinDisabled)
+                .opacity(checkinDisabled && !checkinConfirmed ? 0.5 : 1.0)
+
+                Spacer(minLength: 6)
+
+                // Next check-in time below button
+                if let next = nextTimeText {
+                    Text("Proximo: \(next)")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color.gray)
+                } else {
+                    // Keep spacing consistent
+                    Text(" ")
+                        .font(.system(size: 12))
+                }
+
+                Spacer(minLength: 2)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .background(Color.black)
+        .onAppear {
+            if let last = CheckinCooldown.lastCheckinDate, CheckinCooldown.isInCooldown() {
+                let fmt = DateFormatter()
+                fmt.dateFormat = "HH:mm"
+                lastCheckinTimeString = fmt.string(from: last)
+                checkinConfirmed = true
+            }
+        }
+    }
+
+    private var buttonColor: Color {
+        if checkinConfirmed {
+            return .brightGreen
+        } else if checkinDisabled {
+            return Color(white: 0.25)
+        } else {
+            return .brightGreen
+        }
     }
 
     private func performCheckin() {
@@ -540,7 +341,6 @@ struct ContentView: View {
         checkinConfirmed = true
         showingPulse = true
 
-        // Record the check-in time
         CheckinCooldown.recordCheckin()
         let fmt = DateFormatter()
         fmt.dateFormat = "HH:mm"
@@ -552,19 +352,150 @@ struct ContentView: View {
         // Send check-in to iPhone app
         connectivity.sendCheckin()
 
-        // Keep confirmed state (don't auto-reset -- cooldown controls re-enable)
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             showingPulse = false
         }
     }
 }
 
-// Convenience alias so spo2Color references work
-private extension Color {
-    static let brighterGreen = Color.brightGreen
+// MARK: - Secondary Page (Health, SOS, Nap)
+struct SecondaryPage: View {
+    @EnvironmentObject var connectivity: WatchConnectivityManager
+    @EnvironmentObject var healthManager: HealthManager
+
+    @State private var napActive = false
+    @State private var sosActivated = false
+    @State private var holdProgress: CGFloat = 0
+    @State private var holdTimer: Timer?
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                // Heart rate
+                if healthManager.latestHeartRate > 0 {
+                    HStack(spacing: 8) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.red)
+
+                        Text("\(Int(healthManager.latestHeartRate))")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+
+                        Text("BPM")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(Color.gray)
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color.cardBg)
+                    .cornerRadius(12)
+                }
+
+                // Nap button
+                Button(action: toggleNap) {
+                    HStack(spacing: 8) {
+                        Image(systemName: napActive ? "moon.zzz.fill" : "moon.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(napActive ? Color.purple : .white)
+
+                        Text(napActive ? "ACORDEI" : "COCHILO")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+                    .background(napActive ? Color.purple.opacity(0.3) : Color.cardBg)
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
+
+                // SOS button (long press)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(sosActivated ? Color.houseDanger : Color.houseDanger.opacity(0.8))
+
+                    // Progress overlay
+                    GeometryReader { geo in
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.houseDanger)
+                            .frame(width: geo.size.width * holdProgress)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .opacity(holdProgress > 0 && !sosActivated ? 0.6 : 0)
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("SOS")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                            Text(sosActivated ? "Enviado" : "Segure 3s")
+                                .font(.system(size: 10))
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                }
+                .frame(height: 52)
+                .gesture(
+                    LongPressGesture(minimumDuration: 3)
+                        .onChanged { _ in startHold() }
+                        .onEnded { _ in activateSOS() }
+                )
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onEnded { _ in cancelHold() }
+                )
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+        }
+        .background(Color.black)
+    }
+
+    private func toggleNap() {
+        napActive.toggle()
+        WKInterfaceDevice.current().play(.click)
+    }
+
+    private func startHold() {
+        holdTimer?.invalidate()
+        holdProgress = 0
+        holdTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+            DispatchQueue.main.async {
+                holdProgress += 0.05 / 3.0
+                if holdProgress >= 1.0 {
+                    holdTimer?.invalidate()
+                }
+            }
+        }
+    }
+
+    private func cancelHold() {
+        holdTimer?.invalidate()
+        holdProgress = 0
+    }
+
+    private func activateSOS() {
+        sosActivated = true
+        holdTimer?.invalidate()
+        holdProgress = 1.0
+        connectivity.sendSOS()
+        WKInterfaceDevice.current().play(.notification)
+    }
 }
 
-// MARK: - SOS View (accessible from long press or swipe)
+// MARK: - SOS View (kept for backward compatibility if referenced elsewhere)
 struct SOSView: View {
     @EnvironmentObject var connectivity: WatchConnectivityManager
     @State private var sosActivated = false
@@ -645,4 +576,9 @@ struct SOSView: View {
         connectivity.sendSOS()
         WKInterfaceDevice.current().play(.notification)
     }
+}
+
+// Convenience alias so references work
+private extension Color {
+    static let brighterGreen = Color.brightGreen
 }
