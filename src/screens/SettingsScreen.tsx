@@ -181,7 +181,7 @@ export function SettingsScreen() {
     if (mode === "auto_wearable" && !healthConnected) {
       const ok = await healthIntegrationService.initialize();
       if (!ok) {
-        Alert.alert("Nao disponivel", "Nao foi possivel conectar ao servico de saude.");
+        Alert.alert(t("error_not_available"), t("error_health_connect"));
         return;
       }
       setHealthConnected(true);
@@ -196,9 +196,9 @@ export function SettingsScreen() {
     const ok = await healthIntegrationService.initialize();
     if (ok) {
       setHealthConnected(true);
-      Alert.alert("Conectado", `${healthIntegrationService.getPlatformName()} conectado.`);
+      Alert.alert(t("error_connected"), t("settings_health_connect_success").replace("{platform}", healthIntegrationService.getPlatformName()));
     } else {
-      Alert.alert("Erro", "Nao foi possivel conectar. Verifique se o app de saude esta instalado.");
+      Alert.alert(t("error_not_available"), t("error_health_check"));
     }
   };
 
@@ -252,21 +252,21 @@ export function SettingsScreen() {
   const handleAddTime = async () => {
     const cleanTime = formatTimeInput(newTime);
     if (!cleanTime.match(/^\d{2}:\d{2}$/)) {
-      Alert.alert("Formato invalido", "Use o formato HH:MM (ex: 14:30)");
+      Alert.alert(t("error_invalid_format"), t("error_use_format"));
       return;
     }
     const [h, m] = cleanTime.split(":").map(Number);
     if (h < 0 || h > 23 || m < 0 || m > 59) {
-      Alert.alert("Hora invalida", "Use horas entre 00:00 e 23:59");
+      Alert.alert(t("settings_checkin_hour_invalid"), t("settings_checkin_hour_invalid_desc"));
       return;
     }
     if (checkinTimes.length >= maxCheckins) {
       Alert.alert(
-        "Limite atingido",
-        `Seu plano permite ate ${maxCheckins} check-in(s) por dia. Faca upgrade para adicionar mais.`,
+        t("error_limit_reached"),
+        t("error_limit_desc").replace("{max}", String(maxCheckins)),
         [
-          { text: "OK" },
-          { text: "Ver planos", onPress: () => navigation.navigate("Paywall") },
+          { text: t("ok") },
+          { text: t("view_plans"), onPress: () => navigation.navigate("Paywall") },
         ]
       );
       return;
@@ -293,7 +293,7 @@ export function SettingsScreen() {
   const handleLinkElder = async () => {
     const code = linkCode.trim().toUpperCase();
     if (!code) {
-      Alert.alert("Erro", "Digite o codigo de vinculacao do idoso.");
+      Alert.alert(t("error_not_available"), t("settings_link_enter_code"));
       return;
     }
     setLinkLoading(true);
@@ -301,7 +301,7 @@ export function SettingsScreen() {
       const API_URL = state.currentUser?.apiUrl || process.env.EXPO_PUBLIC_API_URL || "";
       const token = state.currentUser?.token;
       if (!API_URL || !token) {
-        Alert.alert("Erro", "Nao foi possivel conectar ao servidor.");
+        Alert.alert(t("error_not_available"), t("settings_link_server_error"));
         setLinkLoading(false);
         return;
       }
@@ -312,7 +312,7 @@ export function SettingsScreen() {
       });
       const data = await res.json();
       if (!res.ok) {
-        Alert.alert("Erro", data.error || "Codigo invalido.");
+        Alert.alert(t("error_not_available"), data.error || t("settings_link_invalid_code"));
       } else {
         // Update local state with linked elder info
         if (data.elderId && state.currentUser) {
@@ -324,11 +324,11 @@ export function SettingsScreen() {
         if (data.elderName) {
           setLinkedElderName(data.elderName);
         }
-        Alert.alert("Vinculado!", `Voce foi vinculado(a) a ${data.elderName}.`);
+        Alert.alert(t("settings_link_success_title"), t("settings_link_success_msg").replace("{name}", data.elderName));
         setLinkCode("");
       }
     } catch {
-      Alert.alert("Erro", "Nao foi possivel conectar ao servidor.");
+      Alert.alert(t("error_not_available"), t("settings_link_server_error"));
     } finally {
       setLinkLoading(false);
     }
@@ -338,14 +338,14 @@ export function SettingsScreen() {
     const code = state.currentUser?.link_code;
     if (!code) return;
     Share.share({
-      message: `Use meu codigo de vinculacao no Estou Bem para acompanhar meu bem-estar: ${code}`,
+      message: t("settings_link_share_msg").replace("{code}", code),
     });
   };
 
   const handleToggleFallDetection = async (enabled: boolean) => {
     if (enabled) {
       const handleFall = async (snapshot: SensorSnapshot) => {
-        const name = state.elderProfile?.name || state.currentUser?.name || "Idoso";
+        const name = state.elderProfile?.name || state.currentUser?.name || t("role_elder");
         await notificationService.sendFallDetectedNotification(name, snapshot.heartRate);
         await postFallDetected(state.currentUser, {
           user_id: state.currentUser?.id ? Number(state.currentUser.id) : 0,
@@ -427,13 +427,13 @@ export function SettingsScreen() {
               <View style={{ flex: 1, marginLeft: SPACING.sm }}>
                 <Text style={styles.trialTitle}>
                   {trialDaysLeft === 0
-                    ? "Periodo de teste encerrado"
-                    : `${trialDaysLeft} dia${trialDaysLeft !== 1 ? "s" : ""} restante${trialDaysLeft !== 1 ? "s" : ""} de teste`}
+                    ? t("settings_trial_ended")
+                    : t("settings_trial_days_remaining").replace("{days}", String(trialDaysLeft))}
                 </Text>
                 <Text style={styles.trialSubtitle}>
                   {trialDaysLeft === 0
-                    ? "Faca upgrade para continuar usando todos os recursos."
-                    : "Aproveite todos os recursos Pro durante o teste."}
+                    ? t("settings_trial_upgrade_prompt")
+                    : t("settings_trial_enjoy")}
                 </Text>
               </View>
             </View>
@@ -442,7 +442,7 @@ export function SettingsScreen() {
                 style={styles.trialUpgradeBtn}
                 onPress={() => navigation.navigate("Paywall")}
               >
-                <Text style={styles.trialUpgradeBtnText}>FAZER UPGRADE</Text>
+                <Text style={styles.trialUpgradeBtnText}>{t("settings_trial_upgrade_btn")}</Text>
               </TouchableOpacity>
             )}
           </Card>
@@ -484,7 +484,7 @@ export function SettingsScreen() {
           <Card style={styles.section}>
             <Text style={styles.sectionTitle}>{t("checkin_schedule")}</Text>
             <Text style={styles.sectionSubtitle}>
-              Seu plano permite ate {maxCheckins} check-in(s)/dia
+              {t("checkin_plan_limit").replace("{max}", String(maxCheckins))}
             </Text>
 
             {/* Schedule mode toggle */}
@@ -507,7 +507,7 @@ export function SettingsScreen() {
                     scheduleMode === "scheduled" && styles.segmentTextActive,
                   ]}
                 >
-                  Horarios fixos
+                  {t("checkin_fixed_times")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -528,7 +528,7 @@ export function SettingsScreen() {
                     scheduleMode === "interval" && styles.segmentTextActive,
                   ]}
                 >
-                  A cada X horas
+                  {t("checkin_interval")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -560,7 +560,7 @@ export function SettingsScreen() {
                       }}
                     >
                       <Text style={{ color: newTime ? COLORS.textPrimary : COLORS.textLight, fontSize: 16 }}>
-                        {newTime || "Toque para escolher"}
+                        {newTime || t("settings_checkin_touch_to_pick")}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -603,7 +603,7 @@ export function SettingsScreen() {
               <>
                 {/* Interval hours stepper */}
                 <View style={styles.intervalRow}>
-                  <Text style={styles.intervalLabel}>A cada</Text>
+                  <Text style={styles.intervalLabel}>{t("settings_checkin_every")}</Text>
                   <View style={styles.stepperRow}>
                     <TouchableOpacity
                       style={styles.stepperBtn}
@@ -623,7 +623,7 @@ export function SettingsScreen() {
 
                 {/* Window start/end */}
                 <View style={styles.intervalRow}>
-                  <Text style={styles.intervalLabel}>Das</Text>
+                  <Text style={styles.intervalLabel}>{t("from")}</Text>
                   <TextInput
                     style={styles.intervalTimeInput}
                     value={windowStart}
@@ -632,7 +632,7 @@ export function SettingsScreen() {
                     maxLength={5}
                     placeholderTextColor={COLORS.textLight}
                   />
-                  <Text style={styles.intervalLabel}>as</Text>
+                  <Text style={styles.intervalLabel}>{t("to")}</Text>
                   <TextInput
                     style={styles.intervalTimeInput}
                     value={windowEnd}
@@ -645,7 +645,7 @@ export function SettingsScreen() {
 
                 {/* Preview */}
                 <Text style={styles.intervalPreview}>
-                  Check-ins as {intervalPreviewTimes.join(", ")}
+                  {t("settings_checkin_preview").replace("{times}", intervalPreviewTimes.join(", "))}
                 </Text>
 
                 {/* Save button */}
@@ -653,7 +653,7 @@ export function SettingsScreen() {
                   style={styles.intervalSaveBtn}
                   onPress={handleSaveInterval}
                 >
-                  <Text style={styles.intervalSaveBtnText}>SALVAR HORARIOS</Text>
+                  <Text style={styles.intervalSaveBtnText}>{t("settings_checkin_save_times")}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -663,16 +663,16 @@ export function SettingsScreen() {
         {/* Auto Check-in Mode */}
         {isElder && (
           <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Modo de Check-in</Text>
+            <Text style={styles.sectionTitle}>{t("checkin_mode")}</Text>
             <Text style={styles.sectionSubtitle}>
-              Escolha como deseja confirmar seus check-ins
+              {t("checkin_mode_desc")}
             </Text>
 
             {(["manual", "auto_movement", "auto_wearable"] as CheckinMode[]).map((mode) => {
               const labels: Record<CheckinMode, { title: string; desc: string; icon: string }> = {
-                manual: { title: "Manual", desc: "Voce toca o botao para confirmar", icon: "hand-left" },
-                auto_movement: { title: "Automatico (movimento)", desc: "Confirmado se o celular detectar movimento", icon: "phone-portrait" },
-                auto_wearable: { title: "Automatico (relogio/pulseira)", desc: "Confirmado se o wearable detectar atividade", icon: "watch" },
+                manual: { title: t("checkin_mode_manual"), desc: t("checkin_mode_manual_desc"), icon: "hand-left" },
+                auto_movement: { title: t("checkin_mode_movement"), desc: t("checkin_mode_movement_desc"), icon: "phone-portrait" },
+                auto_wearable: { title: t("checkin_mode_wearable"), desc: t("checkin_mode_wearable_desc"), icon: "watch" },
               };
               const l = labels[mode];
               return (
@@ -763,7 +763,7 @@ export function SettingsScreen() {
           {isElder ? (
             <>
               <Text style={styles.sectionSubtitle}>
-                Compartilhe este codigo com seus familiares para que eles possam acompanhar seu bem-estar
+                {t("settings_link_family_subtitle")}
               </Text>
               {state.currentUser?.link_code ? (
                 <View style={styles.referralRow}>
@@ -772,16 +772,16 @@ export function SettingsScreen() {
                   </View>
                   <TouchableOpacity style={styles.shareBtn} onPress={handleShareLinkCode}>
                     <Ionicons name="share-social" size={20} color={COLORS.white} />
-                    <Text style={styles.shareBtnText}>ENVIAR</Text>
+                    <Text style={styles.shareBtnText}>{t("settings_link_send")}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
-                <Text style={styles.sectionSubtitle}>Codigo de vinculacao nao disponivel.</Text>
+                <Text style={styles.sectionSubtitle}>{t("settings_link_code_unavailable")}</Text>
               )}
               {linkedFamily.length > 0 && (
                 <View style={{ marginTop: SPACING.md }}>
                   <Text style={{ ...FONTS.caption, color: COLORS.textSecondary, marginBottom: SPACING.xs }}>
-                    Familiares conectados ({linkedFamily.length}):
+                    {t("settings_linked_family_label").replace("{count}", String(linkedFamily.length))}
                   </Text>
                   {linkedFamily.map((f) => (
                     <View key={f.id} style={{ flexDirection: "row", alignItems: "center", paddingVertical: SPACING.xs, gap: SPACING.sm }}>
@@ -793,7 +793,7 @@ export function SettingsScreen() {
                         {f.phone ? <Text style={{ ...FONTS.small, color: COLORS.textLight }}>{f.phone}</Text> : null}
                       </View>
                       <View style={{ backgroundColor: "#E8F5E9", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
-                        <Text style={{ fontSize: 11, color: COLORS.primary, fontWeight: "600" }}>Familiar</Text>
+                        <Text style={{ fontSize: 11, color: COLORS.primary, fontWeight: "600" }}>{t("role_family")}</Text>
                       </View>
                     </View>
                   ))}
@@ -805,17 +805,17 @@ export function SettingsScreen() {
               {(linkedElderName || state.currentUser?.linked_elder_id) && (
                 <View style={{ backgroundColor: COLORS.successLight, padding: SPACING.md, borderRadius: RADIUS.md, marginBottom: SPACING.sm }}>
                   <Text style={{ ...FONTS.body, color: COLORS.primary, fontWeight: "500" }}>
-                    Conectado com: {linkedElderName || "Idoso vinculado"}
+                    {t("settings_connected_with").replace("{name}", linkedElderName || t("role_elder"))}
                   </Text>
                 </View>
               )}
               <Text style={styles.sectionSubtitle}>
-                Digite o codigo de vinculacao do idoso para acompanhar seu bem-estar
+                {t("settings_link_elder_subtitle")}
               </Text>
               <View style={styles.addTimeRow}>
                 <TextInput
                   style={styles.timeInput}
-                  placeholder="Codigo"
+                  placeholder={t("settings_link_code_placeholder")}
                   value={linkCode}
                   onChangeText={setLinkCode}
                   autoCapitalize="characters"
@@ -827,7 +827,7 @@ export function SettingsScreen() {
                   disabled={linkLoading}
                 >
                   <Text style={styles.planBtnText}>
-                    {linkLoading ? "..." : "VINCULAR"}
+                    {linkLoading ? "..." : t("settings_link_btn")}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -845,10 +845,7 @@ export function SettingsScreen() {
               </Text>
               {state.subscription.expiresAt && (
                 <Text style={styles.subExpiry}>
-                  Renova em:{" "}
-                  {new Date(state.subscription.expiresAt).toLocaleDateString(
-                    "pt-BR"
-                  )}
+                  {t("settings_subscription_renews").replace("{date}", new Date(state.subscription.expiresAt).toLocaleDateString())}
                 </Text>
               )}
             </View>
@@ -869,7 +866,7 @@ export function SettingsScreen() {
         <Card style={styles.section}>
           <Text style={styles.sectionTitle}>{t("settings_referral")}</Text>
           <Text style={styles.sectionSubtitle}>
-            Compartilhe seu codigo e ganhe descontos quando seus amigos assinarem
+            {t("settings_referral_desc")}
           </Text>
           <View style={styles.referralRow}>
             <View style={styles.referralCodeBox}>
@@ -879,12 +876,12 @@ export function SettingsScreen() {
               style={styles.shareBtn}
               onPress={() => {
                 Share.share({
-                  message: `Cuide de quem voce ama com o Estou Bem! Use meu codigo ${myReferralCode} e ganhe 7 dias gratis: https://estoubem.com/invite?ref=${myReferralCode}`,
+                  message: t("settings_referral_share_msg").replace(/\{code\}/g, myReferralCode),
                 });
               }}
             >
               <Ionicons name="share-social" size={20} color={COLORS.white} />
-              <Text style={styles.shareBtnText}>COMPARTILHAR</Text>
+              <Text style={styles.shareBtnText}>{t("settings_share")}</Text>
             </TouchableOpacity>
           </View>
         </Card>
@@ -916,7 +913,7 @@ export function SettingsScreen() {
             onPress={() => navigation.navigate("Gamification" as any)}
           >
             <Ionicons name="trophy" size={22} color={COLORS.accent} />
-            <Text style={styles.menuText}>Conquistas</Text>
+            <Text style={styles.menuText}>{t("achievements")}</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
           </TouchableOpacity>
 
@@ -925,7 +922,7 @@ export function SettingsScreen() {
             onPress={() => navigation.navigate("HealthReport" as any)}
           >
             <Ionicons name="document-text" size={22} color={COLORS.primary} />
-            <Text style={styles.menuText}>Relatorio de Saude</Text>
+            <Text style={styles.menuText}>{t("settings_health_report")}</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
           </TouchableOpacity>
 
@@ -934,7 +931,7 @@ export function SettingsScreen() {
             onPress={() => navigation.navigate("MedicalProfile" as any)}
           >
             <Ionicons name="person-circle" size={22} color={COLORS.primary} />
-            <Text style={styles.menuText}>Perfil Medico</Text>
+            <Text style={styles.menuText}>{t("settings_medical_profile")}</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
           </TouchableOpacity>
         </Card>
@@ -942,17 +939,17 @@ export function SettingsScreen() {
         {/* Escalation Config (Elder only) */}
         {isElder && (
           <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Configurar Alertas</Text>
+            <Text style={styles.sectionTitle}>{t("settings_configure_alerts")}</Text>
             <Text style={styles.sectionSubtitle}>
-              Configure quem e notificado e como funciona a escalacao de alertas
+              {t("settings_configure_alerts_desc")}
             </Text>
 
             <View style={styles.escalationRow}>
               <Ionicons name="time" size={22} color={COLORS.primary} />
               <View style={{ flex: 1, marginLeft: SPACING.sm }}>
-                <Text style={styles.modeTitle}>Tempo para escalar (minutos)</Text>
+                <Text style={styles.modeTitle}>{t("settings_escalation_time_label")}</Text>
                 <Text style={styles.modeDesc}>
-                  Tempo sem resposta antes de notificar familiares
+                  {t("settings_escalation_time_desc")}
                 </Text>
               </View>
               <TextInput
@@ -974,9 +971,9 @@ export function SettingsScreen() {
             <View style={styles.escalationRow}>
               <Ionicons name="call" size={22} color={COLORS.danger} />
               <View style={{ flex: 1, marginLeft: SPACING.sm }}>
-                <Text style={styles.modeTitle}>Ligar SAMU automaticamente</Text>
+                <Text style={styles.modeTitle}>{t("settings_samu_auto_call")}</Text>
                 <Text style={styles.modeDesc}>
-                  Liga 192 se ninguem responder apos a escalacao completa
+                  {t("settings_samu_auto_call_desc")}
                 </Text>
               </View>
               <Switch
@@ -995,7 +992,7 @@ export function SettingsScreen() {
               onPress={() => navigation.navigate("EmergencyContacts")}
             >
               <Ionicons name="people" size={22} color={COLORS.primary} />
-              <Text style={styles.menuText}>Gerenciar contatos de emergencia</Text>
+              <Text style={styles.menuText}>{t("settings_manage_emergency_contacts")}</Text>
               <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
             </TouchableOpacity>
           </Card>
@@ -1003,13 +1000,13 @@ export function SettingsScreen() {
 
         {/* Push notification test */}
         <Button
-          title="Testar Push Notification"
+          title={t("settings_test_push")}
           onPress={async () => {
             const res = await testPushNotification(state.currentUser);
             if (res?.ok) {
-              Alert.alert("Push enviado!", `Token(s): ${res.tokenCount ?? 0}. Você deve receber uma notificação agora.`);
+              Alert.alert(t("settings_push_sent_title"), t("settings_push_sent_msg").replace("{count}", String(res.tokenCount ?? 0)));
             } else {
-              Alert.alert("Erro", res?.error || "Nenhum token registrado. Reinicie o app e tente novamente.");
+              Alert.alert(t("error_not_available"), res?.error || t("settings_push_error_msg"));
             }
           }}
           variant="secondary"

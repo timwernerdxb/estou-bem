@@ -18,6 +18,7 @@ import { useApp } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { StatusBadge } from "../components/StatusBadge";
 import { fetchElderStatus, fetchContacts } from "../services/ApiService";
+import { useI18n } from "../i18n";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -66,6 +67,7 @@ interface ElderStatusData {
 export function ElderDetailScreen() {
   const { state } = useApp();
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
   const [refreshing, setRefreshing] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [elderData, setElderData] = React.useState<ElderStatusData | null>(null);
@@ -97,7 +99,7 @@ export function ElderDetailScreen() {
     setRefreshing(false);
   };
 
-  const elderName = elderData?.elderName || state.elderProfile?.name || "Idoso";
+  const elderName = elderData?.elderName || state.elderProfile?.name || t("role_elder");
 
   // Last activity text
   const lastActivityText = React.useMemo(() => {
@@ -106,13 +108,15 @@ export function ElderDetailScreen() {
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
     const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return "Agora mesmo";
-    if (diffMin < 60) return `Ha ${diffMin} min`;
+    if (diffMin < 1) return t("elder_detail_just_now");
+    if (diffMin < 60) return t("elder_detail_time_minutes_ago", { count: diffMin });
     const diffHours = Math.floor(diffMin / 60);
-    if (diffHours < 24) return `Ha ${diffHours}h`;
+    if (diffHours < 24) return t("elder_detail_time_hours_ago", { count: diffHours });
     const diffDays = Math.floor(diffHours / 24);
-    return `Ha ${diffDays} dia${diffDays > 1 ? "s" : ""}`;
-  }, [elderData?.lastActivity]);
+    return diffDays > 1
+      ? t("elder_detail_time_days_ago_plural", { count: diffDays })
+      : t("elder_detail_time_days_ago", { count: diffDays });
+  }, [elderData?.lastActivity, t]);
 
   // Health data — group by type and take the most recent reading
   const healthEntries = elderData?.health || [];
@@ -144,13 +148,13 @@ export function ElderDetailScreen() {
     const now = new Date();
     const diffMs = now.getTime() - recorded.getTime();
     const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return "agora";
-    if (diffMin < 60) return `h\u00E1 ${diffMin} min`;
+    if (diffMin < 1) return t("elder_detail_now");
+    if (diffMin < 60) return t("elder_detail_time_minutes_ago", { count: diffMin });
     const diffHours = Math.floor(diffMin / 60);
-    if (diffHours < 24) return `h\u00E1 ${diffHours}h`;
+    if (diffHours < 24) return t("elder_detail_time_hours_ago", { count: diffHours });
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    if (recorded.toDateString() === yesterday.toDateString()) return "ontem";
+    if (recorded.toDateString() === yesterday.toDateString()) return t("elder_detail_yesterday");
     return recorded.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
   };
 
@@ -175,7 +179,7 @@ export function ElderDetailScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Carregando dados...</Text>
+          <Text style={styles.loadingText}>{t("elder_detail_loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -188,7 +192,7 @@ export function ElderDetailScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Detalhes</Text>
+        <Text style={styles.headerTitle}>{t("elder_detail_title")}</Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -208,7 +212,7 @@ export function ElderDetailScreen() {
           <Text style={styles.elderName}>{elderName}</Text>
           {lastActivityText && (
             <Text style={styles.lastActivity}>
-              Ultima atividade: {lastActivityText}
+              {t("elder_detail_last_activity", { time: lastActivityText })}
             </Text>
           )}
         </View>
@@ -217,7 +221,7 @@ export function ElderDetailScreen() {
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <Ionicons name="heart" size={20} color={COLORS.danger} />
-            <Text style={styles.sectionTitle}>Saúde</Text>
+            <Text style={styles.sectionTitle}>{t("health_title")}</Text>
           </View>
           <View style={styles.healthGridWrap}>
             {/* Row 1: Heart rate | SpO2 */}
@@ -230,7 +234,7 @@ export function ElderDetailScreen() {
                     <Text style={styles.healthUnit}>bpm</Text>
                     <Text style={styles.healthTimestamp}>{formatRelativeTime(latestHeartRate)}</Text>
                     {isOlderThanOneHour(latestHeartRate) && (
-                      <Text style={styles.healthStaleLabel}>(\u00FAltimo registro)</Text>
+                      <Text style={styles.healthStaleLabel}>{t("elder_detail_last_record")}</Text>
                     )}
                   </>
                 ) : (
@@ -248,7 +252,7 @@ export function ElderDetailScreen() {
                     <Text style={styles.healthUnit}>SpO2</Text>
                     <Text style={styles.healthTimestamp}>{formatRelativeTime(latestSpO2)}</Text>
                     {isOlderThanOneHour(latestSpO2) && (
-                      <Text style={styles.healthStaleLabel}>(\u00FAltimo registro)</Text>
+                      <Text style={styles.healthStaleLabel}>{t("elder_detail_last_record")}</Text>
                     )}
                   </>
                 ) : (
@@ -266,16 +270,16 @@ export function ElderDetailScreen() {
                 {latestSteps ? (
                   <>
                     <Text style={styles.healthValue}>{Math.round(latestSteps.value).toLocaleString()}</Text>
-                    <Text style={styles.healthUnit}>passos</Text>
+                    <Text style={styles.healthUnit}>{t("elder_detail_steps_unit")}</Text>
                     <Text style={styles.healthTimestamp}>{formatRelativeTime(latestSteps)}</Text>
                     {isOlderThanOneHour(latestSteps) && (
-                      <Text style={styles.healthStaleLabel}>(\u00FAltimo registro)</Text>
+                      <Text style={styles.healthStaleLabel}>{t("elder_detail_last_record")}</Text>
                     )}
                   </>
                 ) : (
                   <>
                     <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
-                    <Text style={styles.healthUnit}>passos</Text>
+                    <Text style={styles.healthUnit}>{t("elder_detail_steps_unit")}</Text>
                   </>
                 )}
               </View>
@@ -284,16 +288,16 @@ export function ElderDetailScreen() {
                 {latestSleep ? (
                   <>
                     <Text style={styles.healthValue}>{Number(latestSleep.value).toFixed(1)}h</Text>
-                    <Text style={styles.healthUnit}>sono</Text>
+                    <Text style={styles.healthUnit}>{t("elder_detail_sleep_unit")}</Text>
                     <Text style={styles.healthTimestamp}>{formatRelativeTime(latestSleep)}</Text>
                     {isOlderThanOneHour(latestSleep) && (
-                      <Text style={styles.healthStaleLabel}>(\u00FAltimo registro)</Text>
+                      <Text style={styles.healthStaleLabel}>{t("elder_detail_last_record")}</Text>
                     )}
                   </>
                 ) : (
                   <>
                     <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
-                    <Text style={styles.healthUnit}>sono</Text>
+                    <Text style={styles.healthUnit}>{t("elder_detail_sleep_unit")}</Text>
                   </>
                 )}
               </View>
@@ -310,7 +314,7 @@ export function ElderDetailScreen() {
                   <Text style={styles.healthUnit}>mmHg</Text>
                   <Text style={styles.healthTimestamp}>{formatRelativeTime(latestBpSystolic || latestBpDiastolic)}</Text>
                   {isOlderThanOneHour(latestBpSystolic || latestBpDiastolic) && (
-                    <Text style={styles.healthStaleLabel}>(\u00FAltimo registro)</Text>
+                    <Text style={styles.healthStaleLabel}>{t("elder_detail_last_record")}</Text>
                   )}
                 </View>
                 <View style={styles.healthGridCell} />
@@ -323,10 +327,10 @@ export function ElderDetailScreen() {
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <Ionicons name="checkmark-circle" size={20} color={COLORS.primary} />
-            <Text style={styles.sectionTitle}>Check-ins hoje</Text>
+            <Text style={styles.sectionTitle}>{t("checkin_today")}</Text>
           </View>
           {todayCheckins.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhum check-in hoje ainda</Text>
+            <Text style={styles.emptyText}>{t("elder_detail_no_checkins_today")}</Text>
           ) : (
             todayCheckins.map((ci) => (
               <View key={ci.id} style={styles.checkinRow}>
@@ -341,10 +345,10 @@ export function ElderDetailScreen() {
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <Ionicons name="medical" size={20} color={COLORS.primary} />
-            <Text style={styles.sectionTitle}>Medicamentos</Text>
+            <Text style={styles.sectionTitle}>{t("meds_title")}</Text>
           </View>
           {medications.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhum medicamento cadastrado</Text>
+            <Text style={styles.emptyText}>{t("meds_empty")}</Text>
           ) : (
             medications.map((m) => (
               <View key={m.id} style={styles.medRow}>
@@ -371,10 +375,10 @@ export function ElderDetailScreen() {
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <Ionicons name="people" size={20} color={COLORS.primary} />
-            <Text style={styles.sectionTitle}>Contatos de emergencia</Text>
+            <Text style={styles.sectionTitle}>{t("sos_emergency_contacts")}</Text>
           </View>
           {elderContacts.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhum contato cadastrado</Text>
+            <Text style={styles.emptyText}>{t("contacts_empty")}</Text>
           ) : (
             elderContacts.map((c: any) => (
               <View key={c.id} style={styles.contactRow}>
@@ -399,7 +403,7 @@ export function ElderDetailScreen() {
           onPress={() => navigation.navigate("MedicalProfile", { userId: elderData?.elderId })}
         >
           <Ionicons name="document-text" size={20} color={COLORS.white} />
-          <Text style={styles.medProfileButtonText}>Ver Perfil Medico Completo</Text>
+          <Text style={styles.medProfileButtonText}>{t("elder_detail_view_medical_profile")}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
