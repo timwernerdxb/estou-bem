@@ -9,7 +9,7 @@ echo "=== TypeScript Check ==="
 npx tsc --noEmit || exit 1
 
 echo ""
-echo "=== API Integration Tests ==="
+echo "=== Full Integration Tests (Elder, Family, Watch, Admin) ==="
 node scripts/test-api.js || exit 1
 
 echo ""
