@@ -14,6 +14,8 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     @Published var streak: Int = 0
     @Published var isPhoneReachable: Bool = false
     @Published var lastSyncTime: Date?
+    /// Scheduled check-in times received from the phone (HH:mm strings)
+    @Published var scheduledCheckinTimes: [String] = []
 
     private var session: WCSession?
 
@@ -226,7 +228,19 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         if let next = data["nextCheckinTime"] as? String { nextCheckinTime = next }
         if let pending = data["hasPendingCheckin"] as? Bool { hasPendingCheckin = pending }
         if let s = data["streak"] as? Int { streak = s }
+        if let times = data["checkinTimes"] as? [String] {
+            scheduledCheckinTimes = times
+            // Persist so we have them after relaunch
+            UserDefaults.standard.set(times, forKey: "scheduledCheckinTimes")
+        }
         lastSyncTime = Date()
+    }
+
+    /// Load persisted scheduled times on launch
+    func loadPersistedSchedule() {
+        if let times = UserDefaults.standard.stringArray(forKey: "scheduledCheckinTimes") {
+            scheduledCheckinTimes = times
+        }
     }
 }
 
