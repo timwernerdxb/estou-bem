@@ -228,29 +228,63 @@ class HealthIntegrationService {
 
   // ─── iOS: Apple HealthKit (via custom expo-healthkit module) ──────
   private async initAppleHealth(): Promise<boolean> {
+    const diag: any = { module_loaded: !!ExpoHealthkit, hk_available: false, hk_authorized: false, error: null };
     try {
       if (!ExpoHealthkit) {
-        console.log("[AppleHealth] Module not loaded, using pedometer only");
+        diag.error = "module_not_loaded";
+        this.sendDiagnostic(diag);
         this.initialized = true;
         return true;
       }
       const available = await ExpoHealthkit.isAvailable();
+      diag.hk_available = available;
       if (!available) {
-        console.log("[AppleHealth] HealthKit not available on this device");
+        diag.error = "healthkit_not_available";
+        this.sendDiagnostic(diag);
         this.initialized = true;
         return true;
       }
 
       this.healthKitAvailable = true;
       this.initialized = true;
-      console.log("[AppleHealth] HealthKit available (custom expo-healthkit module)");
+
+      // Try reading data immediately for diagnostic
+      try {
+        const hr = await ExpoHealthkit.getHeartRate();
+        const steps = await ExpoHealthkit.getStepCount();
+        const spo2 = await ExpoHealthkit.getBloodOxygen();
+        const sleep = await ExpoHealthkit.getSleepHours();
+        diag.heart_rate = hr;
+        diag.steps = steps;
+        diag.spo2 = spo2;
+        diag.sleep = sleep;
+        diag.hk_authorized = true;
+      } catch (readErr) {
+        diag.error = "read_failed: " + (readErr as Error).message;
+      }
+
+      this.sendDiagnostic(diag);
       return true;
     } catch (err) {
-      console.warn("[AppleHealth] Init error:", err);
-      // Still mark as initialized so the app doesn't get stuck
+      diag.error = "init_error: " + (err as Error).message;
+      this.sendDiagnostic(diag);
       this.initialized = true;
       return true;
     }
+  }
+
+  private sendDiagnostic(diag: any): void {
+    try {
+      const url = "https://estou-bem-web-production.up.railway.app/api/health-diagnostic";
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 5000);
+      fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(diag),
+        signal: controller.signal,
+      }).catch(() => {});
+    } catch {}
   }
 
   /**
