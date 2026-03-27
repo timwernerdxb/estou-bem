@@ -20,6 +20,7 @@ import { fallDetectionService } from "../services/FallDetectionService";
 import { postCheckin, fetchCheckins, postFallDetected, postCheckinReward, fetchNapStatus, postActivityUpdate, fetchGamification } from "../services/ApiService";
 import { autoCheckinService } from "../services/AutoCheckinService";
 import { notificationService } from "../services/NotificationService";
+import { healthIntegrationService, HealthSummary } from "../services/HealthIntegrationService";
 import { StatusBadge } from "../components/StatusBadge";
 import { Card } from "../components/Card";
 import { CheckIn, SensorSnapshot } from "../types";
@@ -49,6 +50,7 @@ export function ElderHomeScreen() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [streakDays, setStreakDays] = useState(0);
+  const [healthSummary, setHealthSummary] = useState<HealthSummary>({});
   const elderName = state.elderProfile?.name || state.currentUser?.name || "Voce";
 
   // Read check-in times directly from state (set by SettingsScreen dispatch)
@@ -204,6 +206,64 @@ export function ElderHomeScreen() {
       } catch {}
     })();
   }, []);
+
+  // Initialize HealthKit for elder users and start periodic health sync
+  useEffect(() => {
+    if (state.currentUser?.role !== "elder") return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // Show cached data immediately
+        const cached = await healthIntegrationService.getCachedHealthSummary();
+        if (!cancelled && cached.lastUpdated) {
+          setHealthSummary(cached);
+        }
+
+        // Initialize and request permissions (only prompts once)
+        await healthIntegrationService.initialize();
+        if (Platform.OS === "ios") {
+          await healthIntegrationService.requestAppleHealthPermissions();
+        }
+
+        // Read fresh data
+        const summary = await healthIntegrationService.readAppleHealthSummary(24);
+        if (!cancelled && summary.lastUpdated) {
+          setHealthSummary(summary);
+        }
+
+        // Start periodic sync every 5 minutes
+        const elderId = state.elderProfile?.id || state.currentUser?.id || "elder";
+        healthIntegrationService.startPeriodicSync(state.currentUser, elderId);
+      } catch (err) {
+        console.warn("[ElderHome] HealthKit init error:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      healthIntegrationService.stopPeriodicSync();
+    };
+  }, [state.currentUser?.id]);
+
+  // Refresh health summary every 5 minutes (UI update)
+  useEffect(() => {
+    if (state.currentUser?.role !== "elder") return;
+    if (Platform.OS !== "ios") return;
+
+    const refreshHealth = async () => {
+      try {
+        const summary = await healthIntegrationService.readAppleHealthSummary(24);
+        if (summary.lastUpdated) {
+          setHealthSummary(summary);
+        }
+      } catch {}
+    };
+
+    const healthRefreshInterval = setInterval(refreshHealth, 5 * 60 * 1000);
+    return () => clearInterval(healthRefreshInterval);
+  }, [state.currentUser?.id]);
 
   // Compute state on mount and every 30 seconds
   useEffect(() => {
@@ -534,6 +594,49 @@ export function ElderHomeScreen() {
           </TouchableOpacity>
         )}
 
+        {/* Health Summary Card — only for elders with data */}
+        {state.currentUser?.role === "elder" &&
+          (healthSummary.heartRate || healthSummary.steps || healthSummary.sleepHours || healthSummary.spo2) && (
+          <Card style={styles.healthSummaryCard}>
+            <View style={styles.healthSummaryHeader}>
+              <Ionicons name="heart-circle" size={22} color={SH_GREEN} />
+              <Text style={styles.healthSummaryTitle}>Saúde</Text>
+            </View>
+            <View style={styles.healthSummaryGrid}>
+              {healthSummary.heartRate != null && (
+                <View style={styles.healthSummaryItem}>
+                  <Ionicons name="heart" size={18} color="#E74C3C" />
+                  <Text style={styles.healthSummaryValue}>{healthSummary.heartRate}</Text>
+                  <Text style={styles.healthSummaryUnit}>bpm</Text>
+                </View>
+              )}
+              {healthSummary.steps != null && (
+                <View style={styles.healthSummaryItem}>
+                  <Ionicons name="footsteps" size={18} color={SH_GREEN} />
+                  <Text style={styles.healthSummaryValue}>
+                    {healthSummary.steps.toLocaleString()}
+                  </Text>
+                  <Text style={styles.healthSummaryUnit}>passos</Text>
+                </View>
+              )}
+              {healthSummary.sleepHours != null && (
+                <View style={styles.healthSummaryItem}>
+                  <Ionicons name="moon" size={18} color="#8E44AD" />
+                  <Text style={styles.healthSummaryValue}>{healthSummary.sleepHours}h</Text>
+                  <Text style={styles.healthSummaryUnit}>sono</Text>
+                </View>
+              )}
+              {healthSummary.spo2 != null && (
+                <View style={styles.healthSummaryItem}>
+                  <Ionicons name="water" size={18} color="#3498DB" />
+                  <Text style={styles.healthSummaryValue}>{healthSummary.spo2}%</Text>
+                  <Text style={styles.healthSummaryUnit}>SpO2</Text>
+                </View>
+              )}
+            </View>
+          </Card>
+        )}
+
         {/* Today's Status */}
         <Card style={styles.statusCard}>
           <View style={styles.statusRow}>
@@ -776,6 +879,43 @@ const styles = StyleSheet.create({
   infoLabel: {
     ...FONTS.caption,
     marginTop: SPACING.xs,
+  },
+  // Health summary card
+  healthSummaryCard: {
+    width: "100%",
+    marginBottom: SPACING.md,
+  },
+  healthSummaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  healthSummaryTitle: {
+    ...FONTS.subtitle,
+    fontWeight: "500",
+  },
+  healthSummaryGrid: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    flexWrap: "wrap",
+  },
+  healthSummaryItem: {
+    alignItems: "center",
+    minWidth: 70,
+    paddingVertical: SPACING.xs,
+  },
+  healthSummaryValue: {
+    fontSize: 20,
+    fontWeight: "300",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    color: COLORS.textPrimary,
+    marginTop: 4,
+  },
+  healthSummaryUnit: {
+    ...FONTS.small,
+    color: COLORS.textLight,
+    marginTop: 2,
   },
   sensorCard: {
     width: "100%",

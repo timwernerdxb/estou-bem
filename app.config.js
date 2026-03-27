@@ -76,6 +76,7 @@ export default ({ config }) => ({
     ],
     ["expo-background-fetch"],
     ["expo-task-manager"],
+    ["@kingstinct/react-native-healthkit"],
     ["@bacons/apple-targets"],
     ["./plugins/withAsyncStorageRepo"],
     // ["./plugins/withWearOS"], // Wear OS built separately via GitHub Actions

@@ -206,15 +206,19 @@ export function FamilyDashboardScreen() {
   // Health data from server
   const healthEntries = elderData?.health || [];
   const latestHeartRate = healthEntries.find((h) => h.type === "heart_rate");
-  const latestSteps = healthEntries.find((h) => h.type === "steps");
+  const latestSteps = healthEntries.find(
+    (h) => h.type === "steps" || (h.notes === "steps" && h.type === "blood_glucose")
+  );
   const latestBpSystolic = healthEntries.find(
     (h) => h.type === "blood_pressure_systolic"
   );
   const latestBpDiastolic = healthEntries.find(
     (h) => h.type === "blood_pressure_diastolic"
   );
+  const latestSpo2 = healthEntries.find((h) => h.type === "oxygen_saturation");
+  const latestSleep = healthEntries.find((h) => h.type === "sleep" || h.notes === "sleep");
   const hasHealthData =
-    !!latestHeartRate || !!latestSteps || !!latestBpSystolic;
+    !!latestHeartRate || !!latestSteps || !!latestBpSystolic || !!latestSpo2;
 
   // Last activity
   const lastActivityText = React.useMemo(() => {
@@ -407,12 +411,21 @@ export function FamilyDashboardScreen() {
                   <Text style={styles.healthUnit}>mmHg</Text>
                 </View>
               )}
+              {latestSpo2 && (
+                <View style={styles.healthItem}>
+                  <Ionicons name="water" size={20} color="#3498DB" />
+                  <Text style={styles.healthValue}>
+                    {Math.round(latestSpo2.value)}%
+                  </Text>
+                  <Text style={styles.healthUnit}>SpO2</Text>
+                </View>
+              )}
             </View>
           ) : (
             <View style={{ alignItems: "center", paddingVertical: SPACING.lg }}>
               <Ionicons name="heart-outline" size={32} color={COLORS.textLight} />
               <Text style={{ ...FONTS.caption, color: COLORS.textLight, marginTop: SPACING.sm, textAlign: "center" }}>
-                Aguardando dados de saúde do Apple Watch
+                Aguardando dados de saúde do Apple Health
               </Text>
             </View>
           )}
