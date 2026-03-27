@@ -118,7 +118,7 @@ export function FamilyDashboardScreen() {
         dispatch({
           type: "SET_SUBSCRIPTION",
           payload: {
-            tier: serverSub === "pro" ? "pro" : "free",
+            tier: serverSub !== "free" ? "pro" : "free",
             isActive: true,
           },
         });

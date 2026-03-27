@@ -186,7 +186,7 @@ export function OnboardingScreen() {
       dispatch({
         type: "SET_SUBSCRIPTION",
         payload: {
-          tier: regServerSub === "pro" ? "pro" : "free",
+          tier: regServerSub !== "free" ? "pro" : "free",
           isActive: true,
         },
       });
@@ -284,7 +284,7 @@ export function OnboardingScreen() {
         dispatch({
           type: "SET_SUBSCRIPTION",
           payload: {
-            tier: serverSub === "pro" ? "pro" : "free",
+            tier: serverSub !== "free" ? "pro" : "free",
             isActive: true,
           },
         });
