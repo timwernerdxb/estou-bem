@@ -42,7 +42,15 @@ class FallDetectionManager: NSObject, ObservableObject {
 
     /// Call from view onAppear to start fall detection safely after UI is ready
     func startMonitoring() {
-        setupNativeFallDetection()
+        // Defer all CoreMotion work to avoid crash during initial layout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.safeSetupMonitoring()
+        }
+    }
+
+    private func safeSetupMonitoring() {
+        // Only start accelerometer fallback - skip CMFallDetectionManager entirely
+        // CMFallDetectionManager crashes on some watch models during init
         startAccelerometerFallback()
     }
 

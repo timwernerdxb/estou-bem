@@ -36,7 +36,11 @@ class MotionDetectionManager: NSObject, ObservableObject {
 
         motionManager.accelerometerUpdateInterval = sampleInterval
 
-        motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, error in
+        let queue = OperationQueue()
+        queue.name = "com.estoubem.motion"
+        queue.maxConcurrentOperationCount = 1
+
+        motionManager.startAccelerometerUpdates(to: queue) { [weak self] data, error in
             guard let self = self else { return }
             if let error = error {
                 print("[Motion] Accelerometer error: \(error.localizedDescription)")
