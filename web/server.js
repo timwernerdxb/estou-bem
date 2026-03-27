@@ -1964,33 +1964,36 @@ app.get('/api/family/elder-status', authMiddleware, asyncHandler(async (req, res
 
     // Today's check-ins
     const today = new Date().toISOString().slice(0, 10);
+    const elderIdInt = parseInt(elderId, 10);
+    console.log('[elder-status] Querying for elderId:', elderIdInt);
     const checkins = await pool.query(
-      `SELECT id, time, status, date, confirmed_at, created_at FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
-      [elderId]
-    ).catch(e => { console.warn('[elder-status] checkins query failed:', e.message); return { rows: [] }; });
+      `SELECT id, time, status, date, created_at FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
+      [elderIdInt]
+    );
+    console.log('[elder-status] Checkins found:', checkins.rows.length);
 
     // Medications
     const medications = await pool.query(
       `SELECT id, name, dosage, frequency, time, stock, unit, low_threshold FROM medications WHERE user_id = $1`,
-      [elderId]
+      [elderIdInt]
     ).catch(e => { console.warn('[elder-status] medications query failed:', e.message); return { rows: [] }; });
 
     // Recent health entries (last 30)
     // Merge health data from both tables: health_entries (manual) + health_readings (HealthKit/watch)
     const healthEntries = await pool.query(
       `SELECT id, type, value, unit, time, date, notes, created_at FROM health_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
-      [elderId]
+      [elderIdInt]
     ).catch(() => ({ rows: [] }));
     const healthReadings = await pool.query(
       `SELECT id, reading_type as type, value, 'auto' as unit, created_at::time::text as time, created_at::date::text as date, 'healthkit' as notes, created_at FROM health_readings WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
-      [elderId]
+      [elderIdInt]
     ).catch(() => ({ rows: [] }));
     const health = { rows: [...healthEntries.rows, ...healthReadings.rows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 30) };
 
     // Contacts
     const contacts = await pool.query(
       `SELECT id, name, phone, relationship, priority FROM contacts WHERE user_id = $1 ORDER BY priority`,
-      [elderId]
+      [elderIdInt]
     ).catch(e => { console.warn('[elder-status] contacts query failed:', e.message); return { rows: [] }; });
 
     // Last activity: most recent check-in confirmation or health entry
@@ -5086,6 +5089,13 @@ async function doReset(){
 }
 </script></body></html>`);
 });
+
+// Health diagnostic - app reports its HealthKit status
+app.post('/api/health-diagnostic', asyncHandler(async (req, res) => {
+  const { user_id, link_code, module_loaded, hk_available, hk_authorized, heart_rate, steps, spo2, sleep, error } = req.body;
+  console.log(`[HEALTH-DIAG] user=${user_id} link=${link_code} module=${module_loaded} available=${hk_available} auth=${hk_authorized} hr=${heart_rate} steps=${steps} spo2=${spo2} sleep=${sleep} err=${error}`);
+  res.json({ ok: true });
+}));
 
 // Debug: check all health readings and checkins for a user
 app.get('/api/debug/user/:id', adminAuth, asyncHandler(async (req, res) => {
