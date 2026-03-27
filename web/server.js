@@ -5511,6 +5511,188 @@ app.get('/api/debug/user/:id', adminAuth, asyncHandler(async (req, res) => {
   });
 }));
 
+// ── GPS Tracking & Geofencing ─────────────────────────────
+
+// Haversine distance in meters between two lat/lng points
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth radius in meters
+  const toRad = (d) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+// POST /api/location — elder posts current location
+app.post('/api/location', authMiddleware, asyncHandler(async (req, res) => {
+  const { latitude, longitude, accuracy } = req.body;
+  if (latitude == null || longitude == null) {
+    return res.status(400).json({ error: 'latitude and longitude required' });
+  }
+  const lat = parseFloat(latitude);
+  const lng = parseFloat(longitude);
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: 'Invalid coordinates' });
+  }
+
+  // Save to location_history
+  await pool.query(
+    `INSERT INTO location_history (user_id, latitude, longitude, accuracy) VALUES ($1, $2, $3, $4)`,
+    [req.userId, lat, lng, accuracy ?? null]
+  );
+
+  // Check active geofences for this elder
+  const geofences = await pool.query(
+    `SELECT * FROM geofences WHERE elder_id = $1 AND is_active = true`,
+    [req.userId]
+  );
+
+  for (const gf of geofences.rows) {
+    const dist = haversineDistance(lat, lng, parseFloat(gf.latitude), parseFloat(gf.longitude));
+    const outside = dist > gf.radius_meters;
+    if (outside) {
+      // Check if last alert for this geofence was >30 min ago
+      const lastAlert = await pool.query(
+        `SELECT alerted_at FROM geofence_alerts WHERE elder_id = $1 AND geofence_id = $2 ORDER BY alerted_at DESC LIMIT 1`,
+        [req.userId, gf.id]
+      );
+      const shouldAlert = !lastAlert.rows.length ||
+        (Date.now() - new Date(lastAlert.rows[0].alerted_at).getTime()) > 30 * 60 * 1000;
+
+      if (shouldAlert) {
+        // Record alert
+        await pool.query(
+          `INSERT INTO geofence_alerts (elder_id, geofence_id, breach_type, latitude, longitude) VALUES ($1, $2, 'exit', $3, $4)`,
+          [req.userId, gf.id, lat, lng]
+        );
+
+        // Send push to family members
+        const familyTokens = await pool.query(
+          `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`,
+          [req.userId]
+        );
+        const elderRow = await pool.query(`SELECT name FROM users WHERE id = $1`, [req.userId]);
+        const elderName = elderRow.rows[0]?.name || 'O idoso';
+        if (familyTokens.rows.length > 0) {
+          const tokens = familyTokens.rows.map(r => r.token);
+          await sendPushNotifications(
+            tokens,
+            '⚠️ Saiu da zona segura',
+            `${elderName} saiu da zona ${gf.name} (a ${Math.round(dist)}m)`,
+            { type: 'geofence_exit', elderId: req.userId, geofenceId: gf.id }
+          );
+        }
+        console.log(`[Geofence] Elder ${req.userId} outside ${gf.name} (dist: ${Math.round(dist)}m)`);
+      }
+    }
+  }
+
+  res.json({ ok: true });
+}));
+
+// GET /api/location/latest — family gets elder's latest location + geofences
+app.get('/api/location/latest', authMiddleware, asyncHandler(async (req, res) => {
+  const user = await pool.query(`SELECT linked_elder_id, role FROM users WHERE id = $1`, [req.userId]);
+  if (!user.rows.length) return res.status(404).json({ error: 'User not found' });
+
+  const u = user.rows[0];
+  // Allow both family (linked_elder_id) and elder (own data)
+  const elderId = u.role === 'elder' ? req.userId : u.linked_elder_id;
+  if (!elderId) return res.status(400).json({ error: 'No linked elder' });
+
+  const latest = await pool.query(
+    `SELECT latitude, longitude, accuracy, recorded_at FROM location_history WHERE user_id = $1 ORDER BY recorded_at DESC LIMIT 1`,
+    [elderId]
+  );
+  const geofences = await pool.query(
+    `SELECT * FROM geofences WHERE elder_id = $1 AND is_active = true ORDER BY created_at DESC`,
+    [elderId]
+  );
+
+  res.json({
+    location: latest.rows[0] || null,
+    geofences: geofences.rows,
+  });
+}));
+
+// GET /api/geofences — list geofences for linked elder
+app.get('/api/geofences', authMiddleware, asyncHandler(async (req, res) => {
+  const user = await pool.query(`SELECT linked_elder_id, role FROM users WHERE id = $1`, [req.userId]);
+  if (!user.rows.length) return res.status(404).json({ error: 'User not found' });
+  const u = user.rows[0];
+  const elderId = u.role === 'elder' ? req.userId : u.linked_elder_id;
+  if (!elderId) return res.status(400).json({ error: 'No linked elder' });
+
+  const result = await pool.query(
+    `SELECT * FROM geofences WHERE elder_id = $1 ORDER BY created_at DESC`,
+    [elderId]
+  );
+  res.json(result.rows);
+}));
+
+// POST /api/geofences — create a geofence
+app.post('/api/geofences', authMiddleware, asyncHandler(async (req, res) => {
+  const user = await pool.query(`SELECT linked_elder_id, role FROM users WHERE id = $1`, [req.userId]);
+  if (!user.rows.length) return res.status(404).json({ error: 'User not found' });
+  const u = user.rows[0];
+  const elderId = u.role === 'elder' ? req.userId : u.linked_elder_id;
+  if (!elderId) return res.status(400).json({ error: 'No linked elder' });
+
+  const { name, latitude, longitude, radius_meters } = req.body;
+  if (latitude == null || longitude == null) {
+    return res.status(400).json({ error: 'latitude and longitude required' });
+  }
+  const result = await pool.query(
+    `INSERT INTO geofences (elder_id, name, latitude, longitude, radius_meters, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [elderId, name || 'Zona Segura', parseFloat(latitude), parseFloat(longitude), radius_meters || 200, req.userId]
+  );
+  res.json(result.rows[0]);
+}));
+
+// PUT /api/geofences/:id — update a geofence
+app.put('/api/geofences/:id', authMiddleware, asyncHandler(async (req, res) => {
+  const user = await pool.query(`SELECT linked_elder_id, role FROM users WHERE id = $1`, [req.userId]);
+  if (!user.rows.length) return res.status(404).json({ error: 'User not found' });
+  const u = user.rows[0];
+  const elderId = u.role === 'elder' ? req.userId : u.linked_elder_id;
+  if (!elderId) return res.status(400).json({ error: 'No linked elder' });
+
+  const { name, latitude, longitude, radius_meters, is_active } = req.body;
+  const gfId = parseInt(req.params.id);
+
+  // Verify ownership
+  const existing = await pool.query(`SELECT id FROM geofences WHERE id = $1 AND elder_id = $2`, [gfId, elderId]);
+  if (!existing.rows.length) return res.status(404).json({ error: 'Geofence not found' });
+
+  const result = await pool.query(
+    `UPDATE geofences SET
+      name = COALESCE($1, name),
+      latitude = COALESCE($2, latitude),
+      longitude = COALESCE($3, longitude),
+      radius_meters = COALESCE($4, radius_meters),
+      is_active = COALESCE($5, is_active)
+    WHERE id = $6 RETURNING *`,
+    [name ?? null, latitude != null ? parseFloat(latitude) : null, longitude != null ? parseFloat(longitude) : null, radius_meters ?? null, is_active ?? null, gfId]
+  );
+  res.json(result.rows[0]);
+}));
+
+// DELETE /api/geofences/:id — delete a geofence
+app.delete('/api/geofences/:id', authMiddleware, asyncHandler(async (req, res) => {
+  const user = await pool.query(`SELECT linked_elder_id, role FROM users WHERE id = $1`, [req.userId]);
+  if (!user.rows.length) return res.status(404).json({ error: 'User not found' });
+  const u = user.rows[0];
+  const elderId = u.role === 'elder' ? req.userId : u.linked_elder_id;
+  if (!elderId) return res.status(400).json({ error: 'No linked elder' });
+
+  const gfId = parseInt(req.params.id);
+  const existing = await pool.query(`SELECT id FROM geofences WHERE id = $1 AND elder_id = $2`, [gfId, elderId]);
+  if (!existing.rows.length) return res.status(404).json({ error: 'Geofence not found' });
+
+  await pool.query(`DELETE FROM geofences WHERE id = $1`, [gfId]);
+  res.json({ ok: true });
+}));
+
 // SPA fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));

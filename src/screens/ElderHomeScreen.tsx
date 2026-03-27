@@ -18,6 +18,7 @@ import { useNavigation } from "@react-navigation/native";
 import { checkInService } from "../services/CheckInService";
 import { fallDetectionService } from "../services/FallDetectionService";
 import { postCheckin, putCheckin, fetchCheckins, postFallDetected, postCheckinReward, fetchNapStatus, postActivityUpdate, fetchGamification } from "../services/ApiService";
+import { locationService } from "../services/LocationService";
 import { autoCheckinService } from "../services/AutoCheckinService";
 import { notificationService } from "../services/NotificationService";
 import { healthIntegrationService, HealthSummary } from "../services/HealthIntegrationService";
@@ -254,6 +255,17 @@ export function ElderHomeScreen() {
       } catch {}
     })();
   }, []);
+
+  // Start GPS tracking when elder is logged in
+  useEffect(() => {
+    if (!state.currentUser?.token) return;
+    locationService.startTracking(state.currentUser).catch((err) =>
+      console.warn("[ElderHome] Location tracking failed to start:", err)
+    );
+    return () => {
+      locationService.stopTracking().catch(() => {});
+    };
+  }, [state.currentUser?.token]);
 
   // Fetch gamification data (streak) from server on mount
   useEffect(() => {

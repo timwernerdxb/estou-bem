@@ -17,7 +17,7 @@ import { useApp, useSubscription } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { StatusBadge } from "../components/StatusBadge";
 import { CheckIn } from "../types";
-import { fetchElderStatus, fetchProfile } from "../services/ApiService";
+import { fetchElderStatus, fetchProfile, getElderLatestLocation } from "../services/ApiService";
 import { useI18n } from "../i18n";
 import { healthIntegrationService, HealthSummary } from "../services/HealthIntegrationService";
 
@@ -67,6 +67,11 @@ export function FamilyDashboardScreen() {
   const [loading, setLoading] = React.useState(true);
   const [elderData, setElderData] = React.useState<ElderStatusData | null>(null);
   const [myHealth, setMyHealth] = React.useState<HealthSummary>({});
+  const [elderLocation, setElderLocation] = React.useState<{
+    latitude: number;
+    longitude: number;
+    recorded_at: string;
+  } | null>(null);
 
   // Read MY health data from this device's HealthKit (for debugging)
   React.useEffect(() => {
@@ -91,24 +96,34 @@ export function FamilyDashboardScreen() {
       const data = await fetchElderStatus(state.currentUser);
       if (data && data.elderName) {
         setElderData(data);
-        return;
-      }
-      // Fallback: get elder name from profile endpoint
-      const profile = await fetchProfile(state.currentUser);
-      if (profile?.linked_elder_name) {
-        setElderData({
-          linked: true,
-          elderId: profile.linked_elder_id,
-          elderName: profile.linked_elder_name,
-          checkins: [],
-          medications: [],
-          health: [],
-          contacts: [],
-          lastActivity: null,
-        } as any);
+      } else {
+        // Fallback: get elder name from profile endpoint
+        const profile = await fetchProfile(state.currentUser);
+        if (profile?.linked_elder_name) {
+          setElderData({
+            linked: true,
+            elderId: profile.linked_elder_id,
+            elderName: profile.linked_elder_name,
+            checkins: [],
+            medications: [],
+            health: [],
+            contacts: [],
+            lastActivity: null,
+          } as any);
+        }
       }
     } catch (e) {
       console.warn("[FamilyDashboard] Failed to fetch elder status:", e);
+    }
+
+    // Fetch elder's latest location
+    try {
+      const locData = await getElderLatestLocation(state.currentUser);
+      if (locData?.location) {
+        setElderLocation(locData.location);
+      }
+    } catch (e) {
+      console.warn("[FamilyDashboard] Failed to fetch elder location:", e);
     }
   }, [state.currentUser]);
 
@@ -371,6 +386,41 @@ export function FamilyDashboardScreen() {
             </View>
           </Card>
         </TouchableOpacity>
+
+        {/* Location Card */}
+        <Card style={styles.locationCard}>
+          <View style={styles.locationRow}>
+            <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+              <Ionicons name="location" size={22} color={COLORS.primary} />
+              <View style={{ marginLeft: 10, flex: 1 }}>
+                <Text style={styles.locationTitle}>Localização</Text>
+                {elderLocation ? (
+                  <Text style={styles.locationSubtext}>
+                    Última localização:{" "}
+                    {(() => {
+                      const diffMs = Date.now() - new Date(elderLocation.recorded_at).getTime();
+                      const diffMin = Math.floor(diffMs / 60000);
+                      if (diffMin < 1) return "agora";
+                      if (diffMin < 60) return `há ${diffMin} min`;
+                      const diffH = Math.floor(diffMin / 60);
+                      if (diffH < 24) return `há ${diffH}h`;
+                      return `há ${Math.floor(diffH / 24)} dia(s)`;
+                    })()}
+                  </Text>
+                ) : (
+                  <Text style={styles.locationSubtext}>Sem dados de localização</Text>
+                )}
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.mapButton}
+              onPress={() => navigation.navigate("MapScreen" as any)}
+            >
+              <Ionicons name="map" size={14} color={COLORS.white} />
+              <Text style={styles.mapButtonText}>Ver no Mapa</Text>
+            </TouchableOpacity>
+          </View>
+        </Card>
 
         {/* Overall Status Card */}
         <Card
@@ -868,5 +918,27 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 12,
     letterSpacing: 1,
+  },
+  locationCard: { marginBottom: SPACING.md },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  locationTitle: { ...FONTS.subtitle, fontWeight: "500" },
+  locationSubtext: { ...FONTS.caption, marginTop: 2 },
+  mapButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.md,
+    gap: 4,
+  },
+  mapButtonText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

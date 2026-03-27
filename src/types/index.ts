@@ -180,6 +180,7 @@ export type RootStackParamList = {
   HealthReport: undefined;
   MedicalProfile: undefined;
   ElderDetail: undefined;
+  MapScreen: undefined;
 };
 
 export type ElderTabParamList = {

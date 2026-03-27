@@ -366,6 +366,89 @@ export async function fetchNapStatus(
   return res.json();
 }
 
+// ─── Location & Geofencing ────────────────────────────────
+
+export async function postLocation(
+  user: { apiUrl?: string; token?: string } | null,
+  latitude: number,
+  longitude: number,
+  accuracy?: number
+): Promise<any | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/location`, {
+    method: "POST",
+    headers: getHeaders(user.token),
+    body: JSON.stringify({ latitude, longitude, accuracy }),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
+export async function getElderLatestLocation(
+  user: { apiUrl?: string; token?: string } | null
+): Promise<{ location: any | null; geofences: any[] } | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/location/latest`, {
+    method: "GET",
+    headers: getHeaders(user.token),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
+export async function getGeofences(
+  user: { apiUrl?: string; token?: string } | null
+): Promise<any[] | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/geofences`, {
+    method: "GET",
+    headers: getHeaders(user.token),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
+export async function createGeofence(
+  user: { apiUrl?: string; token?: string } | null,
+  body: { name: string; latitude: number; longitude: number; radius_meters?: number }
+): Promise<any | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/geofences`, {
+    method: "POST",
+    headers: getHeaders(user.token),
+    body: JSON.stringify(body),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
+export async function updateGeofence(
+  user: { apiUrl?: string; token?: string } | null,
+  id: number | string,
+  body: { name?: string; latitude?: number; longitude?: number; radius_meters?: number; is_active?: boolean }
+): Promise<any | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/geofences/${id}`, {
+    method: "PUT",
+    headers: getHeaders(user.token),
+    body: JSON.stringify(body),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
+export async function deleteGeofence(
+  user: { apiUrl?: string; token?: string } | null,
+  id: number | string
+): Promise<boolean> {
+  if (!user?.token) return false;
+  const res = await safeFetch(`${getApiUrl(user)}/api/geofences/${id}`, {
+    method: "DELETE",
+    headers: getHeaders(user.token),
+  });
+  return !!res && res.ok;
+}
+
 export async function putSettings(
   user: { apiUrl?: string; token?: string } | null,
   body: {

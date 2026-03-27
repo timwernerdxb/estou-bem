@@ -29,6 +29,7 @@ import { GamificationScreen } from "../screens/GamificationScreen";
 import { HealthReportScreen } from "../screens/HealthReportScreen";
 import { MedicalProfileScreen } from "../screens/MedicalProfileScreen";
 import { ElderDetailScreen } from "../screens/ElderDetailScreen";
+import { MapScreen } from "../screens/MapScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const ElderTab = createBottomTabNavigator<ElderTabParamList>();
@@ -242,6 +243,7 @@ export function AppNavigator() {
             <Stack.Screen name="Gamification" component={GamificationScreen} />
             <Stack.Screen name="HealthReport" component={HealthReportScreen} />
             <Stack.Screen name="MedicalProfile" component={MedicalProfileScreen} />
+            <Stack.Screen name="MapScreen" component={MapScreen} />
           </>
         ) : (
           <>
@@ -270,6 +272,7 @@ export function AppNavigator() {
             <Stack.Screen name="HealthReport" component={HealthReportScreen} />
             <Stack.Screen name="MedicalProfile" component={MedicalProfileScreen} />
             <Stack.Screen name="ElderDetail" component={ElderDetailScreen} />
+            <Stack.Screen name="MapScreen" component={MapScreen} />
           </>
         )}
       </Stack.Navigator>
