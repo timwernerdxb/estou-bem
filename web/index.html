@@ -1671,9 +1671,9 @@ function renderHealthSection(elderData) {
     if (e.type === 'oxygen_saturation') e.type = 'blood_oxygen';
     if (e.type === 'blood_pressure_systolic') e.type = 'blood_pressure';
   }
-  const typeLabels = { heart_rate:'Freq. Cardíaca', steps:'Passos', blood_pressure:'Pressão', blood_oxygen:'SpO2', oxygen_saturation:'SpO2', temperature:'Temperatura', weight:'Peso', sleep:'Sono', falls:'Quedas', blood_glucose:'Glicose' };
-  const typeIcons = { heart_rate:'❤️', steps:'🚶', blood_pressure:'🩸', blood_oxygen:'💧', oxygen_saturation:'💧', temperature:'🌡️', weight:'⚖️', sleep:'😴', falls:'⚠️', blood_glucose:'📊' };
-  const typeColors = { heart_rate:'var(--danger)', steps:'var(--primary)', blood_pressure:'var(--warning)', blood_oxygen:'#2196F3', oxygen_saturation:'#2196F3', temperature:'#FF5722', weight:'var(--text)', sleep:'#9C27B0', falls:'var(--danger)', blood_glucose:'var(--text)' };
+  const typeLabels = { heart_rate:'Freq. Cardíaca', steps:'Passos', blood_pressure:'Pressão', blood_oxygen:'SpO2', oxygen_saturation:'SpO2', temperature:'Temperatura', weight:'Peso', sleep:'Sono', falls:'Quedas', blood_glucose:'Glicose', active_calories:'Calorias', spo2:'SpO2', movement:'Movimento' };
+  const typeIcons = { heart_rate:'❤️', steps:'🚶', blood_pressure:'🩸', blood_oxygen:'💧', oxygen_saturation:'💧', temperature:'🌡️', weight:'⚖️', sleep:'😴', falls:'⚠️', blood_glucose:'📊', active_calories:'🔥', spo2:'💧', movement:'🏃' };
+  const typeColors = { heart_rate:'var(--danger)', steps:'var(--primary)', blood_pressure:'var(--warning)', blood_oxygen:'#2196F3', oxygen_saturation:'#2196F3', temperature:'#FF5722', weight:'var(--text)', sleep:'#9C27B0', falls:'var(--danger)', blood_glucose:'var(--text)', active_calories:'#FF6B00', spo2:'#2196F3', movement:'var(--primary)' };
 
   return `
     <div class="card">

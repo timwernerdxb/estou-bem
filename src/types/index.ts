@@ -136,7 +136,8 @@ export type HealthMetricType =
   | "temperature"
   | "oxygen_saturation"
   | "steps"
-  | "sleep";
+  | "sleep"
+  | "active_calories";
 
 // ─── Emergency Contacts ─────────────────────────────────────────
 export interface EmergencyContact {

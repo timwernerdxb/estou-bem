@@ -27,6 +27,7 @@ export interface HealthSummary {
   bloodPressureDiastolic?: number;
   spo2?: number;
   sleepHours?: number;
+  activeCalories?: number;
   lastUpdated?: string;
 }
 
@@ -395,6 +396,18 @@ class HealthIntegrationService {
         }
       }
 
+      // Active calories — today (HealthKit only)
+      if (ExpoHealthkit) {
+        try {
+          const kcal = await ExpoHealthkit.getActiveCalories();
+          if (kcal != null && kcal > 0) {
+            summary.activeCalories = kcal;
+          }
+        } catch (e) {
+          console.warn("[AppleHealth] Calories read error:", e);
+        }
+      }
+
       summary.lastUpdated = new Date().toISOString();
 
       // Cache locally for offline access
@@ -493,6 +506,17 @@ class HealthIntegrationService {
       });
     }
 
+    if (summary.activeCalories) {
+      entries.push({
+        id: generateId(),
+        elderId,
+        timestamp: now,
+        type: "active_calories",
+        value: summary.activeCalories,
+        unit: "kcal",
+      });
+    }
+
     return entries;
   }
 
@@ -559,6 +583,7 @@ class HealthIntegrationService {
         steps: summary.steps,
         spo2: summary.spo2,
         sleep_hours: summary.sleepHours,
+        active_calories: summary.activeCalories,
       }).catch(() => {});
     } catch {}
   }

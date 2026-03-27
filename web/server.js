@@ -2347,7 +2347,7 @@ app.post('/api/watch/checkin', asyncHandler(async (req, res) => {
 // The watch reads heart rate, steps, SpO2, and sleep from HealthKit and sends them here every 5 minutes.
 // This bypasses the iPhone entirely — works even when the phone app is closed.
 app.post('/api/watch/health', asyncHandler(async (req, res) => {
-  const { link_code, heart_rate, steps, spo2, sleep_hours, timestamp } = req.body;
+  const { link_code, heart_rate, steps, spo2, sleep_hours, active_calories, timestamp } = req.body;
   if (!link_code) return res.status(400).json({ error: 'link_code required' });
 
   const user = await pool.query('SELECT id, name FROM users WHERE link_code = $1', [link_code]);
@@ -2440,6 +2440,15 @@ app.post('/api/watch/health', asyncHandler(async (req, res) => {
       pool.query(
         `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'sleep', $2)`,
         [userId, sleep_hours]
+      )
+    );
+  }
+
+  if (active_calories != null && active_calories > 0) {
+    insertions.push(
+      pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'active_calories', $2)`,
+        [userId, active_calories]
       )
     );
   }
@@ -2589,7 +2598,7 @@ app.post('/api/health', authMiddleware, asyncHandler(async (req, res) => {
 
 // POST /api/activity-update — receives movement + health data from Apple Watch
 app.post('/api/activity-update', authMiddleware, asyncHandler(async (req, res) => {
-  const { user_id, movement_detected, heart_rate, steps, spo2, sleep_hours } = req.body;
+  const { user_id, movement_detected, heart_rate, steps, spo2, sleep_hours, active_calories } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
   try {
@@ -2746,6 +2755,13 @@ app.post('/api/activity-update', authMiddleware, asyncHandler(async (req, res) =
       await pool.query(
         `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'sleep', $2)`,
         [user_id, sleep_hours]
+      );
+    }
+
+    if (active_calories !== undefined && active_calories !== null && active_calories > 0) {
+      await pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'active_calories', $2)`,
+        [user_id, active_calories]
       );
     }
 
