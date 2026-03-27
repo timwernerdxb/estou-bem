@@ -368,6 +368,21 @@ async function phaseWatchFlow() {
     ok('Watch check-in via link_code');
   });
 
+  // 21b. POST /api/watch/health — watch posts health data (no auth, uses link_code)
+  await test('Watch health data post via link_code', async () => {
+    const res = await request('POST', '/api/watch/health', {
+      link_code: elderProfile.link_code,
+      heart_rate: 72,
+      steps: 3456,
+      spo2: 97,
+      sleep_hours: 7.2,
+      timestamp: new Date().toISOString(),
+    });
+    if (res.status !== 200) throw new Error(`status ${res.status}: ${JSON.stringify(res.data)}`);
+    if (!res.data?.ok) throw new Error('response not ok');
+    ok('Watch health data post via link_code');
+  });
+
   // 22. GET /api/watch/schedule — verify schedule returned
   await test('Watch schedule returns times', async () => {
     const res = await request('GET', `/api/watch/schedule?link_code=${elderProfile.link_code}`);
