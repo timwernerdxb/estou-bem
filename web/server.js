@@ -940,6 +940,7 @@ async function initDB() {
     // Deduplication guards: track when SMS and push were last sent per escalation alert
     await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS sms_sent_at TIMESTAMPTZ`).catch(() => {});
     await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS push_notified_at TIMESTAMPTZ`).catch(() => {});
+    await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS type TEXT`).catch(() => {});
 
     // Migrate legacy blood_glucose → steps where unit is 'passos'
     await client.query(`UPDATE health_entries SET type = 'steps' WHERE type = 'blood_glucose' AND (unit = 'passos' OR notes = 'steps')`).catch(() => {});
@@ -2261,7 +2262,10 @@ app.post('/api/link-elder', authMiddleware, asyncHandler(async (req, res) => {
 // ── Family Elder Status ──────────────────────────────────
 app.get('/api/family/elder-status', authMiddleware, asyncHandler(async (req, res) => {
   try {
-    const user = await pool.query(`SELECT linked_elder_id FROM users WHERE id = $1`, [req.userId]);
+    const user = await pool.query(`SELECT role, linked_elder_id FROM users WHERE id = $1`, [req.userId]);
+    if (user.rows[0]?.role === 'elder') {
+      return res.status(403).json({ error: 'Not authorized', linked: false });
+    }
     const elderId = user.rows[0]?.linked_elder_id;
     if (!elderId) return res.json({ linked: false });
     const elderIdInt = parseInt(elderId, 10);
@@ -2307,7 +2311,11 @@ app.get('/api/family/elder-status', authMiddleware, asyncHandler(async (req, res
        ORDER BY reading_type, recorded_at DESC`,
       [elderIdInt]
     ).catch(() => ({ rows: [] }));
-    const health = { rows: [...healthEntries.rows, ...healthReadings.rows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 30) };
+    const health = {
+      rows: [...healthEntries.rows, ...healthReadings.rows.map(r => ({ ...r, value: parseFloat(r.value) }))]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 30)
+    };
 
     // Contacts
     const contacts = await pool.query(
@@ -2926,7 +2934,10 @@ app.post('/api/health', authMiddleware, asyncHandler(async (req, res) => {
 
 // POST /api/activity-update — receives movement + health data from Apple Watch
 app.post('/api/activity-update', authMiddleware, asyncHandler(async (req, res) => {
-  const { user_id, movement_detected, heart_rate, steps, spo2, sleep_hours, active_calories } = req.body;
+  const { user_id: body_user_id, movement_detected, heart_rate, steps, spo2, sleep_hours, active_calories } = req.body;
+  // Prefer the authenticated user's ID from the token (req.userId set by authMiddleware);
+  // fall back to req.body.user_id for backward-compat with watch clients that embed it in the body
+  const user_id = req.userId || body_user_id;
   if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
   try {
@@ -3104,6 +3115,104 @@ app.post('/api/activity-update', authMiddleware, asyncHandler(async (req, res) =
   } catch (err) {
     console.error('[Activity Update] Error:', err);
     res.status(500).json({ error: 'Failed to update activity' });
+  }
+}));
+
+// ── SOS ───────────────────────────────────────────────────
+
+// POST /api/sos — Elder (or family member on behalf of elder) triggers SOS
+app.post('/api/sos', authMiddleware, asyncHandler(async (req, res) => {
+  try {
+    // Determine the elder: if the calling user is a family member, use their linked elder
+    const callerResult = await pool.query(
+      `SELECT id, name, phone, role, linked_elder_id FROM users WHERE id = $1`,
+      [req.userId]
+    );
+    if (!callerResult.rows[0]) return res.status(404).json({ error: 'User not found' });
+    const caller = callerResult.rows[0];
+
+    let elderId, elderName, elderPhone;
+    if (caller.role === 'elder') {
+      elderId = caller.id;
+      elderName = caller.name;
+      elderPhone = caller.phone;
+    } else if (caller.linked_elder_id) {
+      const elderResult = await pool.query(
+        `SELECT id, name, phone FROM users WHERE id = $1`,
+        [caller.linked_elder_id]
+      );
+      if (!elderResult.rows[0]) return res.status(404).json({ error: 'Linked elder not found' });
+      elderId = elderResult.rows[0].id;
+      elderName = elderResult.rows[0].name;
+      elderPhone = elderResult.rows[0].phone;
+    } else {
+      return res.status(400).json({ error: 'No elder associated with this account' });
+    }
+
+    console.log(`[SOS] Triggered for elder ${elderName} (ID: ${elderId}) by user ${caller.id}`);
+
+    // Get emergency contacts from contacts table
+    const contactsResult = await pool.query(
+      `SELECT name, phone, priority FROM contacts WHERE user_id = $1 ORDER BY priority`,
+      [elderId]
+    );
+
+    // Create escalation alert (level 3 = highest priority, type = 'sos')
+    const alertResult = await pool.query(
+      `INSERT INTO escalation_alerts (elder_id, level, status, type, notified_contacts)
+       VALUES ($1, 3, 'active', 'sos', $2) RETURNING id`,
+      [elderId, JSON.stringify(contactsResult.rows.map(c => ({ name: c.name, phone: c.phone })))]
+    ).catch(async (err) => {
+      // type column may not exist yet; insert without it
+      console.warn('[SOS] type column missing, inserting without it:', err.message);
+      return pool.query(
+        `INSERT INTO escalation_alerts (elder_id, level, status, notified_contacts)
+         VALUES ($1, 3, 'active', $2) RETURNING id`,
+        [elderId, JSON.stringify(contactsResult.rows.map(c => ({ name: c.name, phone: c.phone })))]
+      );
+    });
+    const escalationId = alertResult.rows[0]?.id;
+
+    // Send push notifications to ALL linked family members
+    const { tokens: sosTokens, userIds: sosFamilyUserIds } = await getFamilyPushTokens(elderId);
+    if (sosTokens.length > 0) {
+      await sendPushNotifications(
+        sosTokens,
+        'SOS — EMERGENCIA!',
+        `${elderName} acionou o botao SOS e precisa de ajuda imediata!`,
+        { type: 'sos', elderId, escalationId },
+        true,
+        sosFamilyUserIds
+      );
+    }
+
+    // Insert notifications for each family member not already captured by sendPushNotifications
+    // (handles family members without push tokens)
+    const allFamilyIds = await getFamilyUserIds(elderId);
+    const pushedIds = new Set(sosFamilyUserIds);
+    for (const uid of allFamilyIds) {
+      if (!pushedIds.has(uid)) {
+        pool.query(
+          `INSERT INTO notifications (user_id, title, body, type, related_id) VALUES ($1, $2, $3, $4, $5)`,
+          [uid, 'SOS — EMERGENCIA!', `${elderName} acionou o botao SOS e precisa de ajuda imediata!`, 'sos', escalationId]
+        ).catch(err => console.error('[SOS] Failed to insert notification:', err.message));
+      }
+    }
+
+    // Attempt to send 1 SMS to the primary (lowest priority number) emergency contact
+    const primaryContact = contactsResult.rows[0];
+    if (primaryContact?.phone) {
+      await sendSMS(
+        primaryContact.phone,
+        `EMERGENCIA Estou Bem: ${elderName} acionou o botao SOS e precisa de ajuda imediata! Ligue agora.`
+      ).catch(err => console.error('[SOS] SMS failed:', err.message));
+    }
+
+    const contactsNotified = sosTokens.length + allFamilyIds.length;
+    res.json({ ok: true, contacts_notified: contactsNotified });
+  } catch (err) {
+    console.error('[SOS] Error:', err);
+    res.status(500).json({ error: 'Failed to trigger SOS' });
   }
 }));
 
