@@ -2,32 +2,50 @@ import ExpoModulesCore
 import HealthKit
 
 public class ExpoHealthkitModule: Module {
-  private let healthStore = HKHealthStore()
+  // Lazy-initialize HKHealthStore to avoid crash on module load
+  // when HealthKit entitlement is missing or unavailable
+  private lazy var healthStore: HKHealthStore? = {
+    guard HKHealthStore.isHealthDataAvailable() else { return nil }
+    return HKHealthStore()
+  }()
 
   public func definition() -> ModuleDefinition {
     Name("ExpoHealthkit")
 
     AsyncFunction("requestAuthorization") { (promise: Promise) in
-      guard HKHealthStore.isHealthDataAvailable() else {
-        promise.resolve(false)
-        return
-      }
-
-      let readTypes: Set<HKObjectType> = [
-        HKObjectType.quantityType(forIdentifier: .heartRate)!,
-        HKObjectType.quantityType(forIdentifier: .stepCount)!,
-        HKObjectType.quantityType(forIdentifier: .oxygenSaturation)!,
-        HKObjectType.quantityType(forIdentifier: .bloodPressureSystolic)!,
-        HKObjectType.quantityType(forIdentifier: .bloodPressureDiastolic)!,
-        HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!,
-      ]
-
-      self.healthStore.requestAuthorization(toShare: nil, read: readTypes) { success, error in
-        if let error = error {
-          promise.reject("HEALTHKIT_AUTH_ERROR", error.localizedDescription)
-        } else {
-          promise.resolve(success)
+      do {
+        guard #available(iOS 13.0, *) else {
+          promise.resolve(false)
+          return
         }
+
+        guard HKHealthStore.isHealthDataAvailable(), let store = self.healthStore else {
+          promise.resolve(false)
+          return
+        }
+
+        var readTypes = Set<HKObjectType>()
+        if let hr = HKObjectType.quantityType(forIdentifier: .heartRate) { readTypes.insert(hr) }
+        if let sc = HKObjectType.quantityType(forIdentifier: .stepCount) { readTypes.insert(sc) }
+        if let ox = HKObjectType.quantityType(forIdentifier: .oxygenSaturation) { readTypes.insert(ox) }
+        if let sys = HKObjectType.quantityType(forIdentifier: .bloodPressureSystolic) { readTypes.insert(sys) }
+        if let dia = HKObjectType.quantityType(forIdentifier: .bloodPressureDiastolic) { readTypes.insert(dia) }
+        if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) { readTypes.insert(sleep) }
+
+        guard !readTypes.isEmpty else {
+          promise.resolve(false)
+          return
+        }
+
+        store.requestAuthorization(toShare: nil, read: readTypes) { success, error in
+          if let error = error {
+            promise.reject("HEALTHKIT_AUTH_ERROR", error.localizedDescription)
+          } else {
+            promise.resolve(success)
+          }
+        }
+      } catch {
+        promise.resolve(false)
       }
     }
 
@@ -63,6 +81,7 @@ public class ExpoHealthkitModule: Module {
     }
 
     AsyncFunction("isAvailable") { () -> Bool in
+      guard #available(iOS 13.0, *) else { return false }
       return HKHealthStore.isHealthDataAvailable()
     }
   }
@@ -76,13 +95,26 @@ public class ExpoHealthkitModule: Module {
     promise: Promise,
     multiplyBy100: Bool = false
   ) {
+    guard #available(iOS 13.0, *) else {
+      promise.resolve(nil)
+      return
+    }
+
+    guard let store = self.healthStore else {
+      promise.resolve(nil)
+      return
+    }
+
     guard let sampleType = HKSampleType.quantityType(forIdentifier: typeIdentifier) else {
       promise.resolve(nil)
       return
     }
 
     let now = Date()
-    let startDate = Calendar.current.date(byAdding: .hour, value: -hoursBack, to: now)!
+    guard let startDate = Calendar.current.date(byAdding: .hour, value: -hoursBack, to: now) else {
+      promise.resolve(nil)
+      return
+    }
     let predicate = HKQuery.predicateForSamples(withStart: startDate, end: now, options: .strictStartDate)
     let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
 
@@ -107,12 +139,22 @@ public class ExpoHealthkitModule: Module {
       promise.resolve(round(value * 10) / 10)
     }
 
-    healthStore.execute(query)
+    store.execute(query)
   }
 
   // MARK: - Query today's step count (cumulative)
 
   private func queryStepCount(promise: Promise) {
+    guard #available(iOS 13.0, *) else {
+      promise.resolve(0)
+      return
+    }
+
+    guard let store = self.healthStore else {
+      promise.resolve(0)
+      return
+    }
+
     guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else {
       promise.resolve(0)
       return
@@ -127,27 +169,40 @@ public class ExpoHealthkitModule: Module {
       quantitySamplePredicate: predicate,
       options: .cumulativeSum
     ) { _, statistics, error in
-      if let error = error {
-        promise.reject("HEALTHKIT_QUERY_ERROR", error.localizedDescription)
+      if error != nil {
+        promise.resolve(0)
         return
       }
       let steps = statistics?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0
       promise.resolve(Int(steps))
     }
 
-    healthStore.execute(query)
+    store.execute(query)
   }
 
   // MARK: - Query last night's sleep hours
 
   private func querySleepHours(promise: Promise) {
+    guard #available(iOS 13.0, *) else {
+      promise.resolve(nil)
+      return
+    }
+
+    guard let store = self.healthStore else {
+      promise.resolve(nil)
+      return
+    }
+
     guard let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else {
       promise.resolve(nil)
       return
     }
 
     let now = Date()
-    let startDate = Calendar.current.date(byAdding: .hour, value: -24, to: now)!
+    guard let startDate = Calendar.current.date(byAdding: .hour, value: -24, to: now) else {
+      promise.resolve(nil)
+      return
+    }
     let predicate = HKQuery.predicateForSamples(withStart: startDate, end: now, options: .strictStartDate)
     let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
 
@@ -157,8 +212,8 @@ public class ExpoHealthkitModule: Module {
       limit: HKObjectQueryNoLimit,
       sortDescriptors: [sortDescriptor]
     ) { _, samples, error in
-      if let error = error {
-        promise.reject("HEALTHKIT_QUERY_ERROR", error.localizedDescription)
+      if error != nil {
+        promise.resolve(nil)
         return
       }
       guard let categorySamples = samples as? [HKCategorySample] else {
@@ -168,7 +223,6 @@ public class ExpoHealthkitModule: Module {
 
       var totalSleepSeconds: TimeInterval = 0
       for sample in categorySamples {
-        // Asleep states: asleepUnspecified(1), asleepCore(3), asleepDeep(4), asleepREM(5)
         let value = sample.value
         if value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue
           || value == HKCategoryValueSleepAnalysis.asleepCore.rawValue
@@ -187,19 +241,32 @@ public class ExpoHealthkitModule: Module {
       }
     }
 
-    healthStore.execute(query)
+    store.execute(query)
   }
 
   // MARK: - Query latest blood pressure
 
   private func queryBloodPressure(promise: Promise) {
+    guard #available(iOS 13.0, *) else {
+      promise.resolve(nil)
+      return
+    }
+
+    guard let store = self.healthStore else {
+      promise.resolve(nil)
+      return
+    }
+
     guard let sysType = HKSampleType.quantityType(forIdentifier: .bloodPressureSystolic) else {
       promise.resolve(nil)
       return
     }
 
     let now = Date()
-    let startDate = Calendar.current.date(byAdding: .hour, value: -24, to: now)!
+    guard let startDate = Calendar.current.date(byAdding: .hour, value: -24, to: now) else {
+      promise.resolve(nil)
+      return
+    }
     let predicate = HKQuery.predicateForSamples(withStart: startDate, end: now, options: .strictStartDate)
     let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
 
@@ -209,8 +276,8 @@ public class ExpoHealthkitModule: Module {
       limit: 1,
       sortDescriptors: [sortDescriptor]
     ) { _, samples, error in
-      if let error = error {
-        promise.reject("HEALTHKIT_QUERY_ERROR", error.localizedDescription)
+      if error != nil {
+        promise.resolve(nil)
         return
       }
       guard let sample = samples?.first as? HKQuantitySample else {
@@ -220,7 +287,6 @@ public class ExpoHealthkitModule: Module {
       let mmHg = HKUnit.millimeterOfMercury()
       let systolic = Int(sample.quantity.doubleValue(for: mmHg))
 
-      // Now query diastolic
       guard let diaType = HKSampleType.quantityType(forIdentifier: .bloodPressureDiastolic) else {
         promise.resolve(["systolic": systolic, "diastolic": 0])
         return
@@ -241,9 +307,9 @@ public class ExpoHealthkitModule: Module {
         promise.resolve(["systolic": systolic, "diastolic": diastolic])
       }
 
-      self.healthStore.execute(diaQuery)
+      store.execute(diaQuery)
     }
 
-    healthStore.execute(query)
+    store.execute(query)
   }
 }

@@ -6,8 +6,15 @@ interface BloodPressure {
 }
 
 // Only load the native module on iOS
-const ExpoHealthkit =
-  Platform.OS === "ios" ? requireNativeModule("ExpoHealthkit") : null;
+let ExpoHealthkit: any = null;
+try {
+  if (Platform.OS === "ios") {
+    ExpoHealthkit = requireNativeModule("ExpoHealthkit");
+  }
+} catch {
+  // Module failed to load — HealthKit unavailable or native module missing
+  ExpoHealthkit = null;
+}
 
 /**
  * Check if HealthKit is available on this device.
@@ -27,7 +34,11 @@ export async function isAvailable(): Promise<boolean> {
  */
 export async function requestAuthorization(): Promise<boolean> {
   if (!ExpoHealthkit) return false;
-  return await ExpoHealthkit.requestAuthorization();
+  try {
+    return await ExpoHealthkit.requestAuthorization();
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -36,7 +47,11 @@ export async function requestAuthorization(): Promise<boolean> {
  */
 export async function getHeartRate(): Promise<number | null> {
   if (!ExpoHealthkit) return null;
-  return await ExpoHealthkit.getHeartRate();
+  try {
+    return await ExpoHealthkit.getHeartRate();
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -44,7 +59,11 @@ export async function getHeartRate(): Promise<number | null> {
  */
 export async function getStepCount(): Promise<number> {
   if (!ExpoHealthkit) return 0;
-  return await ExpoHealthkit.getStepCount();
+  try {
+    return (await ExpoHealthkit.getStepCount()) ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 /**
@@ -53,7 +72,11 @@ export async function getStepCount(): Promise<number> {
  */
 export async function getBloodOxygen(): Promise<number | null> {
   if (!ExpoHealthkit) return null;
-  return await ExpoHealthkit.getBloodOxygen();
+  try {
+    return await ExpoHealthkit.getBloodOxygen();
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -62,7 +85,11 @@ export async function getBloodOxygen(): Promise<number | null> {
  */
 export async function getSleepHours(): Promise<number | null> {
   if (!ExpoHealthkit) return null;
-  return await ExpoHealthkit.getSleepHours();
+  try {
+    return await ExpoHealthkit.getSleepHours();
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -71,5 +98,9 @@ export async function getSleepHours(): Promise<number | null> {
  */
 export async function getBloodPressure(): Promise<BloodPressure | null> {
   if (!ExpoHealthkit) return null;
-  return await ExpoHealthkit.getBloodPressure();
+  try {
+    return await ExpoHealthkit.getBloodPressure();
+  } catch {
+    return null;
+  }
 }
