@@ -76,11 +76,9 @@ export default ({ config }) => ({
     ],
     ["expo-background-fetch"],
     ["expo-task-manager"],
-    ["@kingstinct/react-native-healthkit", {
-      NSHealthShareUsageDescription: "Estou Bem usa dados de saúde para monitorar o bem-estar do idoso e alertar familiares.",
-      NSHealthUpdateUsageDescription: "Estou Bem registra check-ins de saúde para acompanhamento familiar.",
-      background: false,
-    }],
+    // HealthKit library disabled - incompatible with Xcode 26/Swift 6.2
+    // Using pedometer + watch relay instead
+    // ["@kingstinct/react-native-healthkit", {...}],
     ["@bacons/apple-targets"],
     ["./plugins/withAsyncStorageRepo"],
     // ["./plugins/withWearOS"], // Wear OS built separately via GitHub Actions
