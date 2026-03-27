@@ -1955,17 +1955,16 @@ app.get('/api/family/elder-status', authMiddleware, asyncHandler(async (req, res
     const user = await pool.query(`SELECT linked_elder_id FROM users WHERE id = $1`, [req.userId]);
     const elderId = user.rows[0]?.linked_elder_id;
     if (!elderId) return res.json({ linked: false });
+    const elderIdInt = parseInt(elderId, 10);
 
     // Elder info
-    const elder = await pool.query(`SELECT id, name, phone, email, created_at FROM users WHERE id = $1`, [elderId]);
+    const elder = await pool.query(`SELECT id, name, phone, email, created_at FROM users WHERE id = $1`, [elderIdInt]);
     if (elder.rows.length === 0) return res.json({ linked: false });
 
     const elderName = elder.rows[0].name;
 
     // Today's check-ins
     const today = new Date().toISOString().slice(0, 10);
-    const elderIdInt = parseInt(elderId, 10);
-    console.log('[elder-status] Querying for elderId:', elderIdInt);
     const checkins = await pool.query(
       `SELECT id, time, status, date, created_at FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
       [elderIdInt]
