@@ -37,7 +37,8 @@
     "production": {
       "ios": {
         "appleId": "t@paired-minds.com",
-        "appleTeamId": "7Q97Z7U42U"
+        "appleTeamId": "7Q97Z7U42U",
+        "ascAppId": "6761190539"
       },
       "android": {
         "serviceAccountKeyPath": "./play-store-service-account.json",
