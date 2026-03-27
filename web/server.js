@@ -1984,7 +1984,7 @@ app.get('/api/family/elder-status', authMiddleware, asyncHandler(async (req, res
       [elderIdInt]
     ).catch(() => ({ rows: [] }));
     const healthReadings = await pool.query(
-      `SELECT id, reading_type as type, value, 'auto' as unit, created_at::time::text as time, created_at::date::text as date, 'healthkit' as notes, created_at FROM health_readings WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
+      `SELECT id, reading_type as type, value, 'auto' as unit, recorded_at::time::text as time, recorded_at::date::text as date, 'healthkit' as notes, recorded_at as created_at FROM health_readings WHERE user_id = $1 ORDER BY recorded_at DESC LIMIT 20`,
       [elderIdInt]
     ).catch(() => ({ rows: [] }));
     const health = { rows: [...healthEntries.rows, ...healthReadings.rows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 30) };
@@ -2302,7 +2302,7 @@ app.post('/api/watch/checkin', asyncHandler(async (req, res) => {
   const date = now.toISOString().slice(0, 10);
 
   const result = await pool.query(
-    'INSERT INTO checkins (user_id, time, status, date, confirmed_at) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+    'INSERT INTO checkins (user_id, time, status, date, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING *',
     [userId, time, 'confirmed', date, now.toISOString()]
   );
 
@@ -2313,6 +2313,123 @@ app.post('/api/watch/checkin', asyncHandler(async (req, res) => {
   await pool.query('UPDATE users SET streak_days = $1, total_points = total_points + 10 WHERE id = $2', [newStreak, userId]);
 
   res.json({ ok: true, checkin: result.rows[0], streak: newStreak });
+}));
+
+// POST /api/watch/health — Apple Watch posts health data directly (uses link_code, no auth token)
+// The watch reads heart rate, steps, SpO2, and sleep from HealthKit and sends them here every 5 minutes.
+// This bypasses the iPhone entirely — works even when the phone app is closed.
+app.post('/api/watch/health', asyncHandler(async (req, res) => {
+  const { link_code, heart_rate, steps, spo2, sleep_hours, timestamp } = req.body;
+  if (!link_code) return res.status(400).json({ error: 'link_code required' });
+
+  const user = await pool.query('SELECT id, name FROM users WHERE link_code = $1', [link_code]);
+  if (user.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+  const userId = user.rows[0].id;
+  const insertions = [];
+
+  if (heart_rate != null && heart_rate > 0) {
+    insertions.push(
+      pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'heart_rate', $2)`,
+        [userId, heart_rate]
+      )
+    );
+  }
+
+  if (steps != null && steps > 0) {
+    insertions.push(
+      pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'steps', $2)`,
+        [userId, steps]
+      )
+    );
+  }
+
+  if (spo2 != null && spo2 > 0) {
+    insertions.push(
+      pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'spo2', $2)`,
+        [userId, spo2]
+      )
+    );
+
+    // SpO2 alert logic (same as activity-update)
+    if (spo2 < 85) {
+      console.log(`[Watch Health] CRITICAL SpO2=${spo2}% for user ${userId}`);
+      const elder = await pool.query(`SELECT id, name, phone FROM users WHERE id = $1`, [userId]);
+      if (elder.rows[0]) {
+        const family = await pool.query(
+          `SELECT id, name, phone, email FROM users WHERE linked_elder_id = $1`, [userId]
+        );
+        const familyTokens = await pool.query(
+          `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`, [userId]
+        );
+        if (familyTokens.rows.length > 0) {
+          await sendPushNotifications(
+            familyTokens.rows.map(r => r.token),
+            'EMERGENCIA: Oxigenio CRITICO!',
+            `${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Procure ajuda medica IMEDIATAMENTE.`,
+            { type: 'spo2_critical', elderId: userId, spo2 },
+            true
+          );
+        }
+        await sendWsAlertToFamily(userId, {
+          type: 'spo2_critical', level: 2,
+          elder: { id: userId, name: elder.rows[0].name },
+          spo2, message: `EMERGENCIA: SpO2 em ${spo2}%`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } else if (spo2 < 90) {
+      console.log(`[Watch Health] LOW SpO2=${spo2}% for user ${userId}`);
+      const elder = await pool.query(`SELECT id, name, phone FROM users WHERE id = $1`, [userId]);
+      if (elder.rows[0]) {
+        const familyTokens = await pool.query(
+          `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`, [userId]
+        );
+        if (familyTokens.rows.length > 0) {
+          await sendPushNotifications(
+            familyTokens.rows.map(r => r.token),
+            'ALERTA: Oxigenio baixo!',
+            `${elder.rows[0].name} esta com oxigenio no sangue em ${spo2}%. Monitore de perto.`,
+            { type: 'spo2_low', elderId: userId, spo2 },
+            true
+          );
+        }
+        await sendWsAlertToFamily(userId, {
+          type: 'spo2_low', level: 1,
+          elder: { id: userId, name: elder.rows[0].name },
+          spo2, message: `ALERTA: SpO2 em ${spo2}%`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
+  if (sleep_hours != null && sleep_hours > 0) {
+    insertions.push(
+      pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'sleep', $2)`,
+        [userId, sleep_hours]
+      )
+    );
+  }
+
+  // Also update activity log to show the watch is active
+  insertions.push(
+    pool.query(`
+      INSERT INTO activity_logs (user_id, last_movement_at, updated_at)
+      VALUES ($1, NOW(), NOW())
+      ON CONFLICT (user_id)
+      DO UPDATE SET updated_at = NOW(), last_movement_at = CASE WHEN $2 > 0 THEN NOW() ELSE activity_logs.last_movement_at END
+    `, [userId, steps || 0])
+  );
+
+  await Promise.all(insertions);
+
+  console.log(`[Watch Health] user=${userId} hr=${heart_rate || '-'} steps=${steps || '-'} spo2=${spo2 || '-'} sleep=${sleep_hours || '-'}`);
+  res.json({ ok: true, readings_saved: insertions.length });
 }));
 
 app.put('/api/checkins/:id', authMiddleware, asyncHandler(async (req, res) => {
@@ -5112,7 +5229,7 @@ app.post('/api/health-diagnostic', asyncHandler(async (req, res) => {
 // Debug: check all health readings and checkins for a user
 app.get('/api/debug/user/:id', adminAuth, asyncHandler(async (req, res) => {
   const userId = req.params.id;
-  const health = await pool.query('SELECT * FROM health_readings WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10', [userId]).catch(() => ({ rows: [] }));
+  const health = await pool.query('SELECT * FROM health_readings WHERE user_id = $1 ORDER BY recorded_at DESC LIMIT 10', [userId]).catch(() => ({ rows: [] }));
   const checkins = await pool.query('SELECT * FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10', [userId]).catch(() => ({ rows: [] }));
   const activity = await pool.query('SELECT * FROM activity_logs WHERE user_id = $1 LIMIT 1', [userId]).catch(() => ({ rows: [] }));
   res.json({
