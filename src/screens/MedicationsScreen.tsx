@@ -44,6 +44,7 @@ export function MedicationsScreen() {
   };
   const isFamily = state.currentUser?.role === "family" || state.currentUser?.role === "caregiver";
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingMed, setEditingMed] = useState<Medication | null>(null);
   const [elderMedications, setElderMedications] = useState<Medication[]>([]);
   const [newMed, setNewMed] = useState({
     name: "",
@@ -214,6 +215,44 @@ export function MedicationsScreen() {
     Alert.alert("Registrado", `${med.name} tomado com sucesso.`);
   };
 
+  const handleEditMedication = (med: Medication) => {
+    setEditingMed(med);
+    setNewMed({
+      name: med.name,
+      dosage: med.dosage || "",
+      frequency: med.frequency,
+      time: med.times?.[0] || "08:00",
+      stockQuantity: String(med.stockQuantity),
+      stockUnit: med.stockUnit || "comprimidos",
+    });
+    setShowAddModal(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingMed || !newMed.name.trim()) return;
+    const updated: Medication = {
+      ...editingMed,
+      name: newMed.name.trim(),
+      dosage: newMed.dosage.trim(),
+      frequency: newMed.frequency,
+      times: [newMed.time],
+      stockQuantity: parseInt(newMed.stockQuantity) || 0,
+      stockUnit: newMed.stockUnit,
+    };
+    dispatch({ type: "UPDATE_MEDICATION", payload: updated });
+    putMedication(state.currentUser, editingMed.id, {
+      name: updated.name,
+      dosage: updated.dosage,
+      frequency: updated.frequency,
+      time: newMed.time,
+      stock: updated.stockQuantity,
+      unit: updated.stockUnit,
+    }).catch(() => {});
+    setShowAddModal(false);
+    setEditingMed(null);
+    setNewMed({ name: "", dosage: "", frequency: "daily", time: "08:00", stockQuantity: "30", stockUnit: "comprimidos" });
+  };
+
   const handleDeleteMedication = (med: Medication) => {
     Alert.alert(
       "Remover medicamento",
@@ -261,9 +300,14 @@ export function MedicationsScreen() {
                   </Text>
                 </View>
                 {!isFamily && (
-                  <TouchableOpacity onPress={() => handleDeleteMedication(med)}>
-                    <Ionicons name="trash-outline" size={22} color={COLORS.danger} />
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <TouchableOpacity onPress={() => handleEditMedication(med)}>
+                      <Ionicons name="create-outline" size={22} color={COLORS.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDeleteMedication(med)}>
+                      <Ionicons name="trash-outline" size={22} color={COLORS.danger} />
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
 
@@ -319,8 +363,8 @@ export function MedicationsScreen() {
       <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t("meds_new")}</Text>
-            <TouchableOpacity onPress={() => setShowAddModal(false)}>
+            <Text style={styles.modalTitle}>{editingMed ? "Editar Medicamento" : t("meds_new")}</Text>
+            <TouchableOpacity onPress={() => { setShowAddModal(false); setEditingMed(null); }}>
               <Ionicons name="close" size={28} color={COLORS.textPrimary} />
             </TouchableOpacity>
           </View>
@@ -400,7 +444,7 @@ export function MedicationsScreen() {
 
             <Button
               title={t("meds_save")}
-              onPress={handleAddMedication}
+              onPress={editingMed ? handleSaveEdit : handleAddMedication}
               size="large"
               style={{ marginTop: SPACING.lg, width: "100%" }}
             />

@@ -120,7 +120,7 @@ export async function postMedication(
 export async function putMedication(
   user: { apiUrl?: string; token?: string } | null,
   id: number | string,
-  body: { stock: number }
+  body: { stock?: number; name?: string; dosage?: string; frequency?: string; time?: string; unit?: string; low_threshold?: number }
 ): Promise<any | null> {
   if (!user?.token) return null;
   const res = await safeFetch(`${getApiUrl(user)}/api/medications/${id}`, {

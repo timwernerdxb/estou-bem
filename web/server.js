@@ -2536,10 +2536,23 @@ app.post('/api/medications', authMiddleware, asyncHandler(async (req, res) => {
 }));
 
 app.put('/api/medications/:id', authMiddleware, asyncHandler(async (req, res) => {
-  const { stock } = req.body;
+  const { stock, name, dosage, frequency, time, unit, low_threshold } = req.body;
+  // Build dynamic update
+  const sets = [];
+  const vals = [];
+  let idx = 1;
+  if (stock !== undefined) { sets.push(`stock = $${idx++}`); vals.push(stock); }
+  if (name !== undefined) { sets.push(`name = $${idx++}`); vals.push(name); }
+  if (dosage !== undefined) { sets.push(`dosage = $${idx++}`); vals.push(dosage); }
+  if (frequency !== undefined) { sets.push(`frequency = $${idx++}`); vals.push(frequency); }
+  if (time !== undefined) { sets.push(`time = $${idx++}`); vals.push(time); }
+  if (unit !== undefined) { sets.push(`unit = $${idx++}`); vals.push(unit); }
+  if (low_threshold !== undefined) { sets.push(`low_threshold = $${idx++}`); vals.push(low_threshold); }
+  if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+  vals.push(req.params.id, req.userId);
   const result = await pool.query(
-    `UPDATE medications SET stock = $1 WHERE id = $2 AND user_id = $3 RETURNING *`,
-    [stock, req.params.id, req.userId]
+    `UPDATE medications SET ${sets.join(', ')} WHERE id = $${idx++} AND user_id = $${idx} RETURNING *`,
+    vals
   );
   res.json(result.rows[0]);
 }));

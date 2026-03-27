@@ -49,6 +49,7 @@ export function SettingsScreen() {
   const [linkCode, setLinkCode] = useState("");
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkedElderName, setLinkedElderName] = useState<string | null>(null);
+  const [linkedFamily, setLinkedFamily] = useState<Array<{ id: number; name: string; phone: string }>>([]);
   const [escalationMinutes, setEscalationMinutes] = useState("30");
   const [samuAutoCall, setSamuAutoCall] = useState(true);
   const [fallDetectionEnabled, setFallDetectionEnabled] = useState(fallDetectionService.isActive());
@@ -155,6 +156,11 @@ export function SettingsScreen() {
         // Set linked elder name for family/caregiver users
         if (profile.linked_elder_name) {
           setLinkedElderName(profile.linked_elder_name);
+        }
+
+        // Set linked family members for elder users
+        if (profile.linked_family && Array.isArray(profile.linked_family)) {
+          setLinkedFamily(profile.linked_family);
         }
       } catch (e) {
         console.warn("[Settings] Failed to fetch profile from server:", e);
@@ -735,13 +741,34 @@ export function SettingsScreen() {
               ) : (
                 <Text style={styles.sectionSubtitle}>Codigo de vinculacao nao disponivel.</Text>
               )}
+              {linkedFamily.length > 0 && (
+                <View style={{ marginTop: SPACING.md }}>
+                  <Text style={{ ...FONTS.caption, color: COLORS.textSecondary, marginBottom: SPACING.xs }}>
+                    Familiares conectados ({linkedFamily.length}):
+                  </Text>
+                  {linkedFamily.map((f) => (
+                    <View key={f.id} style={{ flexDirection: "row", alignItems: "center", paddingVertical: SPACING.xs, gap: SPACING.sm }}>
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.primary, justifyContent: "center", alignItems: "center" }}>
+                        <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>{f.name?.charAt(0)?.toUpperCase() || "?"}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ ...FONTS.body, fontWeight: "500" }}>{f.name}</Text>
+                        {f.phone ? <Text style={{ ...FONTS.small, color: COLORS.textLight }}>{f.phone}</Text> : null}
+                      </View>
+                      <View style={{ backgroundColor: "#E8F5E9", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 11, color: COLORS.primary, fontWeight: "600" }}>Familiar</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
             </>
           ) : (
             <>
               {(linkedElderName || state.currentUser?.linked_elder_id) && (
                 <View style={{ backgroundColor: COLORS.successLight, padding: SPACING.md, borderRadius: RADIUS.md, marginBottom: SPACING.sm }}>
                   <Text style={{ ...FONTS.body, color: COLORS.primary, fontWeight: "500" }}>
-                    Conectado com: {linkedElderName || `Idoso #${state.currentUser?.linked_elder_id}`}
+                    Conectado com: {linkedElderName || "Idoso vinculado"}
                   </Text>
                 </View>
               )}
