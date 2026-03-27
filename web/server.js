@@ -941,6 +941,8 @@ async function initDB() {
     await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS sms_sent_at TIMESTAMPTZ`).catch(() => {});
     await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS push_notified_at TIMESTAMPTZ`).catch(() => {});
     await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS type TEXT`).catch(() => {});
+    // WhatsApp reminder deduplication: track when outgoing WhatsApp was sent for each check-in
+    await client.query(`ALTER TABLE checkins ADD COLUMN IF NOT EXISTS whatsapp_reminded_at TIMESTAMPTZ`).catch(() => {});
 
     // Migrate legacy blood_glucose → steps where unit is 'passos'
     await client.query(`UPDATE health_entries SET type = 'steps' WHERE type = 'blood_glucose' AND (unit = 'passos' OR notes = 'steps')`).catch(() => {});
@@ -1607,6 +1609,15 @@ async function sendAlert(to, body) {
   return await sendSMS(to, body);
 }
 
+// Send a plain WhatsApp message via Twilio (top-level helper)
+async function sendWhatsApp(to, body) {
+  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+    console.log(`[WhatsApp] No Twilio creds. Would send to ${to}: ${body}`);
+    return;
+  }
+  await sendWhatsAppBusiness(to, body);
+}
+
 async function sendSMS(to, body) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -1810,8 +1821,13 @@ async function callSAMUWithConference(elder, familyPhones) {
 // ── Twilio Webhook Signature Verification ────────────────
 function twilioWebhookAuth(req, res, next) {
   const authToken = process.env.TWILIO_AUTH_TOKEN;
-  if (!authToken || !twilioValidateRequest) {
-    // Dev mode: skip verification if no auth token or twilio not installed
+  if (!authToken) {
+    // TWILIO_AUTH_TOKEN not set — skipping signature validation (set it in Railway for production security)
+    console.warn('[Twilio] WARNING: TWILIO_AUTH_TOKEN not set — skipping webhook signature validation. Set this env var in production.');
+    return next();
+  }
+  if (!twilioValidateRequest) {
+    // twilio library not available — skip validation
     return next();
   }
   const signature = req.headers['x-twilio-signature'];
@@ -6046,26 +6062,6 @@ async function start() {
   app.post('/api/whatsapp/webhook', whatsappWebhook);
   app.post('/api/twilio/whatsapp', whatsappWebhook);
 
-  // Helper: send WhatsApp via Twilio
-  async function sendWhatsApp(to, body) {
-    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-      console.log(`[WhatsApp] No Twilio creds. Would send to ${to}: ${body}`);
-      return;
-    }
-    try {
-      const twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      const waNumber = TWILIO_WHATSAPP_NUMBER;
-      await twilioClient.messages.create({
-        from: `whatsapp:${waNumber}`,
-        to: `whatsapp:${to.replace('whatsapp:', '')}`,
-        body
-      });
-      console.log(`[WhatsApp] Sent to ${to}: ${body.substring(0, 50)}...`);
-    } catch (err) {
-      console.error(`[WhatsApp] Failed to send to ${to}:`, err.message);
-    }
-  }
-
   // ── WhatsApp Test Endpoint ──
   app.post('/api/whatsapp/test', asyncHandler(async (req, res) => {
     const { phone } = req.body;
@@ -6141,7 +6137,7 @@ async function checkMissedCheckins() {
         // Auto-create pending check-ins for today if they don't exist yet
         for (const time of effectiveCheckinTimes) {
           const existing = await pool.query(
-            `SELECT id, status FROM checkins WHERE user_id = $1 AND date = $2 AND time = $3`,
+            `SELECT id, status, whatsapp_reminded_at FROM checkins WHERE user_id = $1 AND date = $2 AND time = $3`,
             [elder.id, today, time]
           );
           if (existing.rows.length === 0) {
@@ -6149,11 +6145,30 @@ async function checkMissedCheckins() {
             const [th, tm] = time.split(':').map(Number);
             const scheduledMin = th * 60 + tm;
             if (nowMinutes > scheduledMin + 240) continue; // Only skip if more than 4h overdue
-            await pool.query(
-              `INSERT INTO checkins (user_id, date, time, status) VALUES ($1, $2, $3, 'pending')`,
+            const newCheckin = await pool.query(
+              `INSERT INTO checkins (user_id, date, time, status) VALUES ($1, $2, $3, 'pending') RETURNING id`,
               [elder.id, today, time]
             );
             console.log(`[Escalation] Auto-created pending check-in for ${elder.name} at ${time}`);
+            // Send WhatsApp reminder to elder (if phone set and not already sent)
+            if (elder.phone) {
+              const waMsg = `⏰ Hora do check-in, ${elder.name}! Responda *SIM* se você está bem, ou *SOS* se precisar de ajuda. 💚`;
+              await sendWhatsApp(elder.phone, waMsg);
+              const newCheckinId = newCheckin.rows[0]?.id;
+              if (newCheckinId) {
+                pool.query(`UPDATE checkins SET whatsapp_reminded_at = NOW() WHERE id = $1`, [newCheckinId]).catch(() => {});
+              }
+              console.log(`[WhatsApp] Sent check-in reminder to ${elder.name} (${elder.phone})`);
+            }
+          } else {
+            // Check-in row exists — send WhatsApp reminder if not yet sent and check-in is still pending
+            const row = existing.rows[0];
+            if (row.status === 'pending' && !row.whatsapp_reminded_at && elder.phone) {
+              const waMsg = `⏰ Hora do check-in, ${elder.name}! Responda *SIM* se você está bem, ou *SOS* se precisar de ajuda. 💚`;
+              await sendWhatsApp(elder.phone, waMsg);
+              pool.query(`UPDATE checkins SET whatsapp_reminded_at = NOW() WHERE id = $1`, [row.id]).catch(() => {});
+              console.log(`[WhatsApp] Sent check-in reminder to ${elder.name} (${elder.phone}) for existing pending check-in`);
+            }
           }
         }
 
@@ -6288,6 +6303,15 @@ async function checkMissedCheckins() {
 
             // Send email notifications to family members (capped at 5 per escalation)
             await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel, escalationAlertId);
+
+            // Send WhatsApp to family members notifying them of missed check-in
+            for (const fm of family.rows) {
+              if (fm.phone) {
+                const fmMsg = `⚠️ ${elder.name} não confirmou o check-in das ${checkin.time}. Por favor verifique se está bem.`;
+                await sendWhatsApp(fm.phone, fmMsg);
+                console.log(`[WhatsApp] Notified family member ${fm.name} (${fm.phone}) of missed check-in for ${elder.name}`);
+              }
+            }
           } else {
             console.log(`[Push] Skipping push for ${elder.name} — already notified at level ${targetLevel} (push_notified_at: ${existingPushNotifiedAt})`);
           }
@@ -6522,6 +6546,18 @@ async function checkMissedCheckins() {
 
               // Send email notifications to family members (capped at 5 per escalation)
               await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel, escalationAlertIdInterval);
+
+              // Send WhatsApp to family members notifying them of missed check-in (interval mode)
+              const checkinTimeLabel = lastTime
+                ? lastTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                : 'horário programado';
+              for (const fm of family.rows) {
+                if (fm.phone) {
+                  const fmMsg = `⚠️ ${elder.name} não confirmou o check-in das ${checkinTimeLabel}. Por favor verifique se está bem.`;
+                  await sendWhatsApp(fm.phone, fmMsg);
+                  console.log(`[WhatsApp] Notified family member ${fm.name} (${fm.phone}) of missed check-in for ${elder.name} (interval)`);
+                }
+              }
             } else {
               console.log(`[Push] Skipping push for ${elder.name} (interval) — already notified at level ${targetLevel}`);
             }
