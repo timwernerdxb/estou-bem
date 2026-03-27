@@ -28,6 +28,7 @@ import { affiliateService } from "../services/AffiliateService";
 import { fallDetectionService } from "../services/FallDetectionService";
 import { notificationService } from "../services/NotificationService";
 import { putSettings, fetchSettings, postFallDetected, fetchProfile } from "../services/ApiService";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import Constants from "expo-constants";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
@@ -43,6 +44,8 @@ export function SettingsScreen() {
 
   const [checkinTimes, setCheckinTimes] = useState(state.checkinTimes);
   const [newTime, setNewTime] = useState("");
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickerDate, setPickerDate] = useState(new Date());
   const [autoCheckinMode, setAutoCheckinMode] = useState<CheckinMode>("manual");
   const [healthConnected, setHealthConnected] = useState(false);
   const [myReferralCode, setMyReferralCode] = useState("");
@@ -544,15 +547,22 @@ export function SettingsScreen() {
 
                 {checkinTimes.length < maxCheckins && (
                   <View style={styles.addTimeRow}>
-                    <TextInput
-                      style={styles.timeInput}
-                      placeholder="HH:MM"
-                      value={newTime}
-                      onChangeText={(text) => setNewTime(formatTimeInput(text))}
-                      keyboardType="numbers-and-punctuation"
-                      maxLength={5}
-                      placeholderTextColor={COLORS.textLight}
-                    />
+                    <TouchableOpacity
+                      style={[styles.timeInput, { justifyContent: "center" }]}
+                      onPress={() => {
+                        const now = new Date();
+                        if (newTime.match(/^\d{2}:\d{2}$/)) {
+                          const [h, m] = newTime.split(":").map(Number);
+                          now.setHours(h, m, 0, 0);
+                        }
+                        setPickerDate(now);
+                        setShowTimePicker(true);
+                      }}
+                    >
+                      <Text style={{ color: newTime ? COLORS.textPrimary : COLORS.textLight, fontSize: 16 }}>
+                        {newTime || "Toque para escolher"}
+                      </Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.addTimeBtn}
                       onPress={handleAddTime}
@@ -560,6 +570,33 @@ export function SettingsScreen() {
                       <Ionicons name="add-circle" size={32} color={COLORS.primary} />
                     </TouchableOpacity>
                   </View>
+                )}
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={pickerDate}
+                    mode="time"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    is24Hour={true}
+                    onChange={(event, selectedDate) => {
+                      if (Platform.OS === "android") setShowTimePicker(false);
+                      if (event.type === "dismissed") { setShowTimePicker(false); return; }
+                      if (selectedDate) {
+                        const h = String(selectedDate.getHours()).padStart(2, "0");
+                        const m = String(selectedDate.getMinutes()).padStart(2, "0");
+                        setNewTime(`${h}:${m}`);
+                        setPickerDate(selectedDate);
+                      }
+                      if (Platform.OS === "android") setShowTimePicker(false);
+                    }}
+                  />
+                )}
+                {showTimePicker && Platform.OS === "ios" && (
+                  <TouchableOpacity
+                    style={{ alignSelf: "center", marginTop: 4, paddingVertical: 6, paddingHorizontal: 20, backgroundColor: COLORS.primary, borderRadius: 8 }}
+                    onPress={() => setShowTimePicker(false)}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "600" }}>OK</Text>
+                  </TouchableOpacity>
                 )}
               </>
             ) : (
