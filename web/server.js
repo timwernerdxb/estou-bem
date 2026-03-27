@@ -223,7 +223,23 @@ function buildEscalationEmailHtml(elderName, alertTitle, alertLevel) {
 }
 
 // Send escalation emails + log to email_alerts table
-async function sendEscalationEmails(familyRows, elder, alertTitle, alertLevel) {
+// Capped at MAX_ESCALATION_EMAILS (5) per escalation event to prevent email floods
+const MAX_ESCALATION_EMAILS = 5;
+
+async function sendEscalationEmails(familyRows, elder, alertTitle, alertLevel, escalationAlertId) {
+  // Check how many emails have already been sent for this escalation
+  if (escalationAlertId) {
+    const alertRow = await pool.query(
+      `SELECT notifications_sent FROM escalation_alerts WHERE id = $1`,
+      [escalationAlertId]
+    );
+    const sent = alertRow.rows[0]?.notifications_sent || 0;
+    if (sent >= MAX_ESCALATION_EMAILS) {
+      console.log(`[Email] Cap reached (${sent}/${MAX_ESCALATION_EMAILS}) for escalation ${escalationAlertId} — skipping emails`);
+      return;
+    }
+  }
+
   for (const fm of familyRows) {
     if (fm.email) {
       const html = buildEscalationEmailHtml(elder.name, alertTitle, alertLevel);
@@ -238,6 +254,14 @@ async function sendEscalationEmails(familyRows, elder, alertTitle, alertLevel) {
         console.error('[Email] Failed to log email alert:', logErr.message);
       }
     }
+  }
+
+  // Increment notifications_sent counter for this escalation
+  if (escalationAlertId) {
+    await pool.query(
+      `UPDATE escalation_alerts SET notifications_sent = notifications_sent + 1 WHERE id = $1`,
+      [escalationAlertId]
+    ).catch(err => console.error('[Email] Failed to increment notifications_sent:', err.message));
   }
 }
 
@@ -821,6 +845,7 @@ async function initDB() {
     // Migrations: add columns if missing
     await client.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'pt-BR'`).catch(() => {});
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS nap_until TIMESTAMPTZ`).catch(() => {});
+    await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS notifications_sent INTEGER DEFAULT 0`).catch(() => {});
 
     // Backfill: create contacts for all existing family→elder links
     const linked = await client.query(`
@@ -1742,7 +1767,7 @@ app.post('/api/twilio/gather', express.urlencoded({ extended: false }), twilioWe
     const elder = await pool.query('SELECT id, name FROM users WHERE phone = $1 AND role = $2', [callerPhone, 'elder']).catch(() => ({ rows: [] }));
     if (elder.rows[0]) {
       await pool.query(
-        "UPDATE escalation_alerts SET status = 'resolved' WHERE elder_id = $1 AND status = 'active'",
+        "UPDATE escalation_alerts SET status = 'resolved', notifications_sent = 0 WHERE elder_id = $1 AND status = 'active'",
         [elder.rows[0].id]
       );
       const today = new Date().toISOString().slice(0, 10);
@@ -1783,7 +1808,7 @@ app.post('/api/twilio/sms', express.urlencoded({ extended: false }), twilioWebho
         [elder.rows[0].id, today]
       );
       await pool.query(
-        "UPDATE escalation_alerts SET status = 'resolved' WHERE elder_id = $1 AND status = 'active'",
+        "UPDATE escalation_alerts SET status = 'resolved', notifications_sent = 0 WHERE elder_id = $1 AND status = 'active'",
         [elder.rows[0].id]
       );
       console.log(`[SMS] ${elder.rows[0].name} confirmed check-in via SMS`);
@@ -1828,7 +1853,7 @@ app.post('/api/twilio/whatsapp', express.urlencoded({ extended: false }), twilio
         [elder.rows[0].id, today]
       );
       await pool.query(
-        "UPDATE escalation_alerts SET status = 'resolved' WHERE elder_id = $1 AND status = 'active'",
+        "UPDATE escalation_alerts SET status = 'resolved', notifications_sent = 0 WHERE elder_id = $1 AND status = 'active'",
         [elder.rows[0].id]
       );
       // Notify family that elder confirmed via WhatsApp
@@ -2909,7 +2934,7 @@ app.post('/api/fall-cancelled', authMiddleware, asyncHandler(async (req, res) =>
       [user_id]
     );
     await pool.query(
-      `UPDATE escalation_alerts SET status = 'resolved' WHERE elder_id = $1 AND status = 'active'`,
+      `UPDATE escalation_alerts SET status = 'resolved', notifications_sent = 0 WHERE elder_id = $1 AND status = 'active'`,
       [user_id]
     );
 
@@ -4688,7 +4713,7 @@ app.get('/api/admin/escalations', adminAuth, asyncHandler(async (req, res) => {
 
 app.put('/api/admin/escalations/:id/resolve', adminAuth, asyncHandler(async (req, res) => {
   try {
-    await pool.query(`UPDATE escalation_alerts SET status = 'resolved' WHERE id = $1`, [req.params.id]);
+    await pool.query(`UPDATE escalation_alerts SET status = 'resolved', notifications_sent = 0 WHERE id = $1`, [req.params.id]);
     res.json({ ok: true });
   } catch (err) {
     console.error('Resolve escalation error:', err);
@@ -5525,6 +5550,7 @@ async function checkMissedCheckins() {
             ...contacts.rows.map(c => ({ type: 'emergency', name: c.name, phone: c.phone, relationship: c.relationship }))
           ];
 
+          let escalationAlertId;
           if (existingAlert.rows.length > 0) {
             const currentLevel = existingAlert.rows[0].level;
             if (targetLevel <= currentLevel) continue; // Already at this level or higher
@@ -5534,16 +5560,19 @@ async function checkMissedCheckins() {
               `UPDATE escalation_alerts SET level = $1, notified_contacts = $2 WHERE id = $3`,
               [targetLevel, JSON.stringify(notifiedContacts), existingAlert.rows[0].id]
             );
+            escalationAlertId = existingAlert.rows[0].id;
             console.log(`[Escalation] UPGRADED to level ${targetLevel} for elder ${elder.name} (ID: ${elder.id}) scheduled at ${checkin.time}`);
           } else {
             // Create new alert at level 1 (or higher if already very overdue)
             // ON CONFLICT handles race condition if another process inserted simultaneously
-            await pool.query(
+            const insertResult = await pool.query(
               `INSERT INTO escalation_alerts (elder_id, checkin_id, level, status, notified_contacts)
                VALUES ($1, $2, $3, 'active', $4)
-               ON CONFLICT (checkin_id) WHERE status = 'active' DO NOTHING`,
+               ON CONFLICT (checkin_id) WHERE status = 'active' DO UPDATE SET level = EXCLUDED.level
+               RETURNING id`,
               [elder.id, checkin.id, targetLevel, JSON.stringify(notifiedContacts)]
             );
+            escalationAlertId = insertResult.rows[0]?.id;
             console.log(`[Escalation] MISSED check-in for elder ${elder.name} (ID: ${elder.id}) scheduled at ${checkin.time} — level ${targetLevel}`);
           }
 
@@ -5582,8 +5611,8 @@ async function checkMissedCheckins() {
           });
           if (wsSent > 0) console.log(`[WS] Sent ${wsSent} real-time alerts for ${elder.name}`);
 
-          // Send email notifications to family members
-          await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel);
+          // Send email notifications to family members (capped at 5 per escalation)
+          await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel, escalationAlertId);
 
           // ── Twilio SMS & Voice escalation (scheduled mode) ──
           if (targetLevel >= 1 && elder.phone) {
@@ -5724,6 +5753,7 @@ async function checkMissedCheckins() {
               ...contacts.rows.map(c => ({ type: 'emergency', name: c.name, phone: c.phone, relationship: c.relationship }))
             ];
 
+            let escalationAlertIdInterval;
             if (existingAlert.rows.length > 0) {
               const currentLevel = existingAlert.rows[0].level;
               if (targetLevel <= currentLevel) continue; // Already at this level or higher
@@ -5732,15 +5762,18 @@ async function checkMissedCheckins() {
                 `UPDATE escalation_alerts SET level = $1, notified_contacts = $2 WHERE id = $3`,
                 [targetLevel, JSON.stringify(notifiedContacts), existingAlert.rows[0].id]
               );
+              escalationAlertIdInterval = existingAlert.rows[0].id;
               console.log(`[Escalation] UPGRADED to level ${targetLevel} for elder ${elder.name} (ID: ${elder.id}) — interval mode`);
             } else {
               // ON CONFLICT handles race condition if another process inserted simultaneously
-              await pool.query(
+              const insertResult = await pool.query(
                 `INSERT INTO escalation_alerts (elder_id, checkin_id, level, status, notified_contacts)
                  VALUES ($1, $2, $3, 'active', $4)
-                 ON CONFLICT (checkin_id) WHERE status = 'active' DO NOTHING`,
+                 ON CONFLICT (checkin_id) WHERE status = 'active' DO UPDATE SET level = EXCLUDED.level
+                 RETURNING id`,
                 [elder.id, checkinId, targetLevel, JSON.stringify(notifiedContacts)]
               );
+              escalationAlertIdInterval = insertResult.rows[0]?.id;
               console.log(`[Escalation] MISSED check-in for elder ${elder.name} (ID: ${elder.id}) — interval mode, last confirmed: ${lastTime ? lastTime.toISOString() : 'never'} — level ${targetLevel}`);
             }
 
@@ -5779,8 +5812,8 @@ async function checkMissedCheckins() {
             });
             if (wsSentInterval > 0) console.log(`[WS] Sent ${wsSentInterval} real-time alerts for ${elder.name} (interval)`);
 
-            // Send email notifications to family members
-            await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel);
+            // Send email notifications to family members (capped at 5 per escalation)
+            await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel, escalationAlertIdInterval);
 
             // ── Twilio SMS & Voice escalation (interval mode) ──
             if (targetLevel >= 1 && elder.phone) {
