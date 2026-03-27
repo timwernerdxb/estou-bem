@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -11,6 +11,7 @@ import {
   ElderTabParamList,
   FamilyTabParamList,
 } from "../types";
+import { startProfileSync, stopProfileSync } from "../services/ProfileSyncService";
 
 // Screens
 import { OnboardingScreen } from "../screens/OnboardingScreen";
@@ -27,6 +28,7 @@ import { CheckInHistoryScreen } from "../screens/CheckInHistoryScreen";
 import { GamificationScreen } from "../screens/GamificationScreen";
 import { HealthReportScreen } from "../screens/HealthReportScreen";
 import { MedicalProfileScreen } from "../screens/MedicalProfileScreen";
+import { ElderDetailScreen } from "../screens/ElderDetailScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const ElderTab = createBottomTabNavigator<ElderTabParamList>();
@@ -175,7 +177,17 @@ function FamilyTabNavigator() {
 
 // ─── Root Navigator ──────────────────────────────────────────
 export function AppNavigator() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
+
+  // Start periodic profile sync when user is logged in
+  useEffect(() => {
+    if (state.isOnboarded && state.currentUser?.token) {
+      startProfileSync(state.currentUser, dispatch);
+    }
+    return () => {
+      stopProfileSync();
+    };
+  }, [state.isOnboarded, state.currentUser?.token]);
 
   if (state.isLoading) {
     return (
@@ -257,6 +269,7 @@ export function AppNavigator() {
             <Stack.Screen name="Gamification" component={GamificationScreen} />
             <Stack.Screen name="HealthReport" component={HealthReportScreen} />
             <Stack.Screen name="MedicalProfile" component={MedicalProfileScreen} />
+            <Stack.Screen name="ElderDetail" component={ElderDetailScreen} />
           </>
         )}
       </Stack.Navigator>

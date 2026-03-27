@@ -24,6 +24,7 @@ import {
   postMedication,
   putMedication,
   deleteMedication as deleteMedicationApi,
+  fetchElderStatus,
 } from "../services/ApiService";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
@@ -39,7 +40,9 @@ const FREQUENCY_LABELS: Record<MedicationFrequency, string> = {
 export function MedicationsScreen() {
   const { state, dispatch } = useApp();
   const { isFamilia } = useSubscription();
+  const isFamily = state.currentUser?.role === "family" || state.currentUser?.role === "caregiver";
   const [showAddModal, setShowAddModal] = useState(false);
+  const [elderMedications, setElderMedications] = useState<Medication[]>([]);
   const [newMed, setNewMed] = useState({
     name: "",
     dosage: "",
@@ -49,31 +52,53 @@ export function MedicationsScreen() {
     stockUnit: "comprimidos",
   });
 
-  // Fetch medications from server on mount and merge with local
+  // Fetch medications from server on mount
   useEffect(() => {
     (async () => {
       try {
-        const rows = await fetchMedications(state.currentUser);
-        if (rows && rows.length > 0) {
-          for (const row of rows) {
-            const exists = state.medications.some(
-              (m) => m.id === String(row.id) || m.name === row.name
-            );
-            if (!exists) {
-              const med: Medication = {
-                id: String(row.id),
-                elderId: String(row.user_id),
-                name: row.name,
-                dosage: row.dosage || "",
-                frequency: (row.frequency as MedicationFrequency) || "daily",
-                times: row.time ? [row.time] : ["08:00"],
-                stockQuantity: row.stock ?? 30,
-                stockUnit: row.unit || "comprimidos",
-                lowStockThreshold: row.low_threshold ?? 5,
-                autoReorderEnabled: false,
-                createdAt: row.created_at || new Date().toISOString(),
-              };
-              dispatch({ type: "ADD_MEDICATION", payload: med });
+        if (isFamily) {
+          // Family user: fetch elder's medications via elder-status endpoint
+          const data = await fetchElderStatus(state.currentUser);
+          if (data?.medications) {
+            const meds: Medication[] = data.medications.map((row: any) => ({
+              id: String(row.id),
+              elderId: String(row.user_id),
+              name: row.name,
+              dosage: row.dosage || "",
+              frequency: (row.frequency as MedicationFrequency) || "daily",
+              times: row.time ? [row.time] : ["08:00"],
+              stockQuantity: row.stock ?? 30,
+              stockUnit: row.unit || "comprimidos",
+              lowStockThreshold: row.low_threshold ?? 5,
+              autoReorderEnabled: false,
+              createdAt: row.created_at || new Date().toISOString(),
+            }));
+            setElderMedications(meds);
+          }
+        } else {
+          // Elder user: fetch own medications and merge with local
+          const rows = await fetchMedications(state.currentUser);
+          if (rows && rows.length > 0) {
+            for (const row of rows) {
+              const exists = state.medications.some(
+                (m) => m.id === String(row.id) || m.name === row.name
+              );
+              if (!exists) {
+                const med: Medication = {
+                  id: String(row.id),
+                  elderId: String(row.user_id),
+                  name: row.name,
+                  dosage: row.dosage || "",
+                  frequency: (row.frequency as MedicationFrequency) || "daily",
+                  times: row.time ? [row.time] : ["08:00"],
+                  stockQuantity: row.stock ?? 30,
+                  stockUnit: row.unit || "comprimidos",
+                  lowStockThreshold: row.low_threshold ?? 5,
+                  autoReorderEnabled: false,
+                  createdAt: row.created_at || new Date().toISOString(),
+                };
+                dispatch({ type: "ADD_MEDICATION", payload: med });
+              }
             }
           }
         }
@@ -82,6 +107,8 @@ export function MedicationsScreen() {
       }
     })();
   }, []);
+
+  const displayMedications = isFamily ? elderMedications : state.medications;
 
   const handleAddMedication = () => {
     if (!newMed.name.trim()) {
@@ -208,18 +235,20 @@ export function MedicationsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>Medicamentos</Text>
 
-        {state.medications.length === 0 ? (
+        {displayMedications.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Ionicons name="medical-outline" size={48} color={COLORS.textLight} />
             <Text style={styles.emptyText}>
               Nenhum medicamento cadastrado
             </Text>
-            <Text style={styles.emptySubtext}>
-              Adicione seus medicamentos para receber lembretes
-            </Text>
+            {!isFamily && (
+              <Text style={styles.emptySubtext}>
+                Adicione seus medicamentos para receber lembretes
+              </Text>
+            )}
           </Card>
         ) : (
-          state.medications.map((med) => (
+          displayMedications.map((med) => (
             <Card key={med.id} style={styles.medCard}>
               <View style={styles.medHeader}>
                 <View style={styles.medInfo}>
@@ -229,9 +258,11 @@ export function MedicationsScreen() {
                     {FREQUENCY_LABELS[med.frequency]} -- {med.times.join(", ")}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => handleDeleteMedication(med)}>
-                  <Ionicons name="trash-outline" size={22} color={COLORS.danger} />
-                </TouchableOpacity>
+                {!isFamily && (
+                  <TouchableOpacity onPress={() => handleDeleteMedication(med)}>
+                    <Ionicons name="trash-outline" size={22} color={COLORS.danger} />
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Stock indicator */}
@@ -259,23 +290,27 @@ export function MedicationsScreen() {
                 </Text>
               </View>
 
-              <TouchableOpacity
-                style={styles.takeButton}
-                onPress={() => handleTakeMedication(med)}
-              >
-                <Ionicons name="checkmark-circle" size={24} color={COLORS.white} />
-                <Text style={styles.takeButtonText}>TOMEI</Text>
-              </TouchableOpacity>
+              {!isFamily && (
+                <TouchableOpacity
+                  style={styles.takeButton}
+                  onPress={() => handleTakeMedication(med)}
+                >
+                  <Ionicons name="checkmark-circle" size={24} color={COLORS.white} />
+                  <Text style={styles.takeButtonText}>TOMEI</Text>
+                </TouchableOpacity>
+              )}
             </Card>
           ))
         )}
 
-        <Button
-          title="Adicionar Medicamento"
-          onPress={() => setShowAddModal(true)}
-          size="large"
-          style={{ marginTop: SPACING.md, width: "100%" }}
-        />
+        {!isFamily && (
+          <Button
+            title="Adicionar Medicamento"
+            onPress={() => setShowAddModal(true)}
+            size="large"
+            style={{ marginTop: SPACING.md, width: "100%" }}
+          />
+        )}
       </ScrollView>
 
       {/* Add Medication Modal */}

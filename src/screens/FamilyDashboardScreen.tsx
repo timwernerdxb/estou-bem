@@ -265,7 +265,7 @@ export function FamilyDashboardScreen() {
 
         {/* Elder Profile Card - tappable */}
         <TouchableOpacity
-          onPress={() => navigation.navigate("MedicalProfile" as any, { userId: elderData?.elderId })}
+          onPress={() => navigation.navigate("ElderDetail" as any)}
           activeOpacity={0.7}
         >
           <Card style={styles.elderProfileCard}>

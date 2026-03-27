@@ -1918,6 +1918,12 @@ app.get('/api/family/elder-status', authMiddleware, async (req, res) => {
       [elderId]
     );
 
+    // Contacts
+    const contacts = await pool.query(
+      `SELECT * FROM contacts WHERE user_id = $1 ORDER BY priority`,
+      [elderId]
+    );
+
     // Last activity: most recent check-in confirmation or health entry
     const lastCheckin = checkins.rows.find(c => c.status === 'confirmed' || c.status === 'auto_confirmed');
     const lastHealth = health.rows[0];
@@ -1935,6 +1941,7 @@ app.get('/api/family/elder-status', authMiddleware, async (req, res) => {
       checkins: checkins.rows,
       medications: medications.rows,
       health: health.rows,
+      contacts: contacts.rows,
       lastActivity,
     });
   } catch (err) {
