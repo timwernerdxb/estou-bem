@@ -118,10 +118,10 @@ export function SettingsScreen() {
         if (serverSettings?.samu_auto_call != null) {
           setSamuAutoCall(serverSettings.samu_auto_call);
         }
-        // Apply server language preference
-        if (serverSettings?.language) {
-          setLang(serverSettings.language as any);
-        }
+        // Note: do NOT apply server language here — the I18nProvider already
+        // loads the saved language from AsyncStorage on startup, and overwriting
+        // lang here would race with (and clobber) any language change the user
+        // just made before the network response arrived.
       } catch (e) {
         console.warn("[Settings] Failed to fetch settings from server:", e);
       }
