@@ -59,6 +59,7 @@ const METRIC_LABELS: Record<string, { label: string; icon: string }> = {
 export function HealthReportScreen() {
   const navigation = useNavigation();
   const { state } = useApp();
+  const isFamily = state.currentUser?.role === "family" || state.currentUser?.role === "caregiver";
   const [report, setReport] = useState<HealthSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +83,11 @@ export function HealthReportScreen() {
         setLoading(false);
         return;
       }
-      const res = await fetch(`${API_URL}/api/health-report/${selectedMonth}`, {
+      // Family users fetch the elder's report; elders fetch their own
+      const endpoint = isFamily
+        ? `${API_URL}/api/health-report/elder/${selectedMonth}`
+        : `${API_URL}/api/health-report/${selectedMonth}`;
+      const res = await fetch(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.status === 403) {

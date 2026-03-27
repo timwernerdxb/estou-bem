@@ -17,7 +17,7 @@ import { useApp } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { HealthEntry, HealthMetricType } from "../types";
-import { postHealth, fetchHealth } from "../services/ApiService";
+import { postHealth, fetchHealth, fetchElderStatus } from "../services/ApiService";
 
 const METRIC_CONFIG: Record<
   HealthMetricType,
@@ -35,30 +35,50 @@ const METRIC_CONFIG: Record<
 export function HealthLogScreen() {
   const navigation = useNavigation();
   const { state, dispatch } = useApp();
+  const isFamily = state.currentUser?.role === "family" || state.currentUser?.role === "caregiver";
   const [showAdd, setShowAdd] = useState(false);
   const [selectedType, setSelectedType] = useState<HealthMetricType>("blood_pressure_systolic");
   const [value, setValue] = useState("");
   const [notes, setNotes] = useState("");
+  const [elderHealthEntries, setElderHealthEntries] = useState<HealthEntry[]>([]);
 
-  // Fetch health entries from server on mount and merge with local state
+  // Fetch health entries from server on mount
   useEffect(() => {
     (async () => {
       try {
-        const rows = await fetchHealth(state.currentUser, 200);
-        if (rows && rows.length > 0) {
-          for (const row of rows) {
-            const exists = state.healthEntries.some((e) => e.id === String(row.id));
-            if (!exists) {
-              const entry: HealthEntry = {
-                id: String(row.id),
-                elderId: String(row.user_id),
-                timestamp: row.created_at || new Date().toISOString(),
-                type: row.type as HealthMetricType,
-                value: row.value,
-                unit: row.unit || "",
-                notes: row.notes || undefined,
-              };
-              dispatch({ type: "ADD_HEALTH_ENTRY", payload: entry });
+        if (isFamily) {
+          // Family user: fetch elder's health entries via elder-status endpoint
+          const data = await fetchElderStatus(state.currentUser);
+          if (data?.health) {
+            const entries: HealthEntry[] = data.health.map((row: any) => ({
+              id: String(row.id),
+              elderId: String(row.user_id),
+              timestamp: row.created_at || new Date().toISOString(),
+              type: row.type as HealthMetricType,
+              value: row.value,
+              unit: row.unit || "",
+              notes: row.notes || undefined,
+            }));
+            setElderHealthEntries(entries);
+          }
+        } else {
+          // Elder user: fetch own health entries and merge with local state
+          const rows = await fetchHealth(state.currentUser, 200);
+          if (rows && rows.length > 0) {
+            for (const row of rows) {
+              const exists = state.healthEntries.some((e) => e.id === String(row.id));
+              if (!exists) {
+                const entry: HealthEntry = {
+                  id: String(row.id),
+                  elderId: String(row.user_id),
+                  timestamp: row.created_at || new Date().toISOString(),
+                  type: row.type as HealthMetricType,
+                  value: row.value,
+                  unit: row.unit || "",
+                  notes: row.notes || undefined,
+                };
+                dispatch({ type: "ADD_HEALTH_ENTRY", payload: entry });
+              }
             }
           }
         }
@@ -67,6 +87,8 @@ export function HealthLogScreen() {
       }
     })();
   }, []);
+
+  const displayHealthEntries = isFamily ? elderHealthEntries : state.healthEntries;
 
   const handleAdd = () => {
     const numValue = parseFloat(value);
@@ -105,7 +127,7 @@ export function HealthLogScreen() {
 
   // Group entries by date
   const groupedEntries: Record<string, HealthEntry[]> = {};
-  for (const entry of state.healthEntries) {
+  for (const entry of displayHealthEntries) {
     const dateKey = new Date(entry.timestamp).toLocaleDateString("pt-BR");
     if (!groupedEntries[dateKey]) groupedEntries[dateKey] = [];
     groupedEntries[dateKey].push(entry);
@@ -168,12 +190,14 @@ export function HealthLogScreen() {
           ))
         )}
 
-        <Button
-          title="+ Registrar Medição"
-          onPress={() => setShowAdd(true)}
-          size="large"
-          style={{ marginTop: SPACING.md, width: "100%" }}
-        />
+        {!isFamily && (
+          <Button
+            title="+ Registrar Medição"
+            onPress={() => setShowAdd(true)}
+            size="large"
+            style={{ marginTop: SPACING.md, width: "100%" }}
+          />
+        )}
       </ScrollView>
 
       <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet">

@@ -235,7 +235,7 @@ export function EmergencyContactsScreen() {
           </>
         )}
 
-        {state.emergencyContacts
+        {displayContacts
           .sort((a, b) => a.priority - b.priority)
           .map((contact, index) => (
             <Card key={contact.id} style={styles.contactCard}>
@@ -256,19 +256,21 @@ export function EmergencyContactsScreen() {
                   >
                     <Ionicons name="call" size={24} color={COLORS.success} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDelete(contact)}>
-                    <Ionicons
-                      name="trash-outline"
-                      size={24}
-                      color={COLORS.danger}
-                    />
-                  </TouchableOpacity>
+                  {!isFamily && (
+                    <TouchableOpacity onPress={() => handleDelete(contact)}>
+                      <Ionicons
+                        name="trash-outline"
+                        size={24}
+                        color={COLORS.danger}
+                      />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             </Card>
           ))}
 
-        {state.emergencyContacts.length === 0 && (
+        {displayContacts.length === 0 && (
           <Card style={styles.emptyCard}>
             <Ionicons name="people-outline" size={48} color={COLORS.textLight} />
             <Text style={styles.emptyText}>
@@ -277,12 +279,14 @@ export function EmergencyContactsScreen() {
           </Card>
         )}
 
-        <Button
-          title="+ Adicionar Contato"
-          onPress={() => setShowAdd(true)}
-          size="large"
-          style={{ marginTop: SPACING.md, width: "100%" }}
-        />
+        {!isFamily && (
+          <Button
+            title="+ Adicionar Contato"
+            onPress={() => setShowAdd(true)}
+            size="large"
+            style={{ marginTop: SPACING.md, width: "100%" }}
+          />
+        )}
       </ScrollView>
 
       <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet">
