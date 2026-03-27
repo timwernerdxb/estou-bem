@@ -31,7 +31,7 @@ export default ({ config }) => ({
     },
     entitlements: {
       "com.apple.developer.healthkit": true,
-      "com.apple.developer.healthkit.access": [],
+      "com.apple.developer.healthkit.access": ["health-records"],
     },
     config: {
       usesNonExemptEncryption: false,
@@ -76,6 +76,7 @@ export default ({ config }) => ({
     ],
     ["expo-background-fetch"],
     ["expo-task-manager"],
+    ["./plugins/withHealthKit"],
     // Custom HealthKit module autolinked via expo-module.config.json (not a plugin)
     ["@bacons/apple-targets"],
     ["./plugins/withAsyncStorageRepo"],
