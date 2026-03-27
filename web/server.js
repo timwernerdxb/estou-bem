@@ -1756,6 +1756,44 @@ app.delete('/api/push-token', authMiddleware, asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ── Push Notification Debug & Test ───────────────────────
+// GET /api/push-debug — returns push tokens and linking status for current user
+app.get('/api/push-debug', authMiddleware, asyncHandler(async (req, res) => {
+  const user = await pool.query(`SELECT id, name, role, linked_elder_id FROM users WHERE id = $1`, [req.userId]);
+  if (!user.rows[0]) return res.status(404).json({ error: 'User not found' });
+  const u = user.rows[0];
+
+  // My push tokens
+  const myTokens = await pool.query(`SELECT token, platform, created_at FROM push_tokens WHERE user_id = $1`, [req.userId]);
+
+  // If family: check elder's data
+  let elderInfo = null;
+  if (u.linked_elder_id) {
+    const elder = await pool.query(`SELECT id, name FROM users WHERE id = $1`, [u.linked_elder_id]);
+    const elderTokens = await pool.query(`SELECT pt.token, pt.platform FROM push_tokens pt WHERE pt.user_id = $1`, [u.linked_elder_id]);
+    const familyTokensForElder = await pool.query(
+      `SELECT pt.token, pt.platform, u2.name FROM push_tokens pt JOIN users u2 ON pt.user_id = u2.id WHERE u2.linked_elder_id = $1`,
+      [u.linked_elder_id]
+    );
+    elderInfo = { elder: elder.rows[0], elderTokens: elderTokens.rows, familyTokensForElder: familyTokensForElder.rows };
+  }
+
+  res.json({ user: u, myTokens: myTokens.rows, elderInfo });
+}));
+
+// POST /api/push-test — send a test push to yourself
+app.post('/api/push-test', authMiddleware, asyncHandler(async (req, res) => {
+  const tokens = await pool.query(`SELECT token FROM push_tokens WHERE user_id = $1`, [req.userId]);
+  if (!tokens.rows.length) return res.status(404).json({ error: 'No push tokens registered for this user' });
+  await sendPushNotifications(
+    tokens.rows.map(r => r.token),
+    'Estou Bem - Teste',
+    'Push notification funcionando! ✅',
+    { type: 'test' }
+  );
+  res.json({ ok: true, tokenCount: tokens.rows.length, tokens: tokens.rows.map(r => r.token.substring(0, 30) + '...') });
+}));
+
 // ── Twilio Webhooks ──────────────────────────────────────
 
 // Twilio voice call gather callback
@@ -2011,8 +2049,19 @@ app.get('/api/family/elder-status', authMiddleware, asyncHandler(async (req, res
       `SELECT id, type, value, unit, time, date, notes, created_at FROM health_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
       [elderIdInt]
     ).catch(() => ({ rows: [] }));
+    // Get the most recent reading of EACH type (not just top 20 overall which could all be steps)
+    // Also normalize 'spo2' → 'oxygen_saturation' to match what the app expects
     const healthReadings = await pool.query(
-      `SELECT id, reading_type as type, value, 'auto' as unit, recorded_at::time::text as time, recorded_at::date::text as date, 'healthkit' as notes, recorded_at as created_at FROM health_readings WHERE user_id = $1 ORDER BY recorded_at DESC LIMIT 20`,
+      `SELECT DISTINCT ON (reading_type)
+         id,
+         CASE WHEN reading_type = 'spo2' THEN 'oxygen_saturation' ELSE reading_type END as type,
+         value, 'auto' as unit,
+         recorded_at::time::text as time,
+         recorded_at::date::text as date,
+         'healthkit' as notes,
+         recorded_at as created_at
+       FROM health_readings WHERE user_id = $1
+       ORDER BY reading_type, recorded_at DESC`,
       [elderIdInt]
     ).catch(() => ({ rows: [] }));
     const health = { rows: [...healthEntries.rows, ...healthReadings.rows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 30) };
@@ -5534,10 +5583,10 @@ async function checkMissedCheckins() {
             [elder.id, today, time]
           );
           if (existing.rows.length === 0) {
-            // Only create if the scheduled time hasn't passed yet (within 5 min grace)
+            // Create pending check-in up to 4 hours after scheduled time so we don't miss a window
             const [th, tm] = time.split(':').map(Number);
             const scheduledMin = th * 60 + tm;
-            if (nowMinutes > scheduledMin + 30) continue; // Too late, don't create
+            if (nowMinutes > scheduledMin + 240) continue; // Only skip if more than 4h overdue
             await pool.query(
               `INSERT INTO checkins (user_id, date, time, status) VALUES ($1, $2, $3, 'pending')`,
               [elder.id, today, time]
