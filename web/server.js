@@ -847,6 +847,9 @@ async function initDB() {
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS nap_until TIMESTAMPTZ`).catch(() => {});
     await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS notifications_sent INTEGER DEFAULT 0`).catch(() => {});
 
+    // Migrate legacy blood_glucose → steps where unit is 'passos'
+    await client.query(`UPDATE health_entries SET type = 'steps' WHERE type = 'blood_glucose' AND (unit = 'passos' OR notes = 'steps')`).catch(() => {});
+
     // Backfill: create contacts for all existing family→elder links
     const linked = await client.query(`
       SELECT f.id as family_id, f.name as family_name, f.phone as family_phone, f.linked_elder_id
@@ -3019,27 +3022,35 @@ app.get('/api/elder-dashboard', authMiddleware, asyncHandler(async (req, res) =>
   if (!elderId) return res.status(404).json({ error: 'No linked elder' });
 
   const today = new Date().toISOString().slice(0, 10);
-  const [elder, checkins, meds, health, contacts, activityLog, latestSpo2, latestSleep] = await Promise.all([
+  const [elder, checkins, meds, health, contacts, activityLog, healthReadings] = await Promise.all([
     pool.query(`SELECT name, phone, subscription, trial_start FROM users WHERE id = $1`, [elderId]),
     pool.query(`SELECT * FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [elderId]),
     pool.query(`SELECT * FROM medications WHERE user_id = $1`, [elderId]),
     pool.query(`SELECT * FROM health_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`, [elderId]),
     pool.query(`SELECT * FROM contacts WHERE user_id = $1 ORDER BY priority`, [elderId]),
     pool.query(`SELECT * FROM activity_logs WHERE user_id = $1`, [elderId]),
-    pool.query(`SELECT value, recorded_at FROM health_readings WHERE user_id = $1 AND reading_type = 'spo2' ORDER BY recorded_at DESC LIMIT 1`, [elderId]),
-    pool.query(`SELECT value, recorded_at FROM health_readings WHERE user_id = $1 AND reading_type = 'sleep' ORDER BY recorded_at DESC LIMIT 1`, [elderId]),
+    pool.query(`SELECT id, reading_type as type, value, 'auto' as unit, recorded_at::time::text as time, recorded_at::date::text as date, 'healthkit' as notes, recorded_at as created_at FROM health_readings WHERE user_id = $1 ORDER BY recorded_at DESC LIMIT 30`, [elderId]),
   ]);
+
+  // Merge health_entries + health_readings, sorted by created_at desc
+  const mergedHealth = [...health.rows, ...healthReadings.rows]
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+    .slice(0, 30);
+
+  // Extract latest SpO2 and sleep from health_readings for backwards compatibility
+  const latestSpo2 = healthReadings.rows.find(r => r.type === 'spo2') || null;
+  const latestSleep = healthReadings.rows.find(r => r.type === 'sleep') || null;
 
   res.json({
     elder: elder.rows[0],
     checkins: checkins.rows,
     medications: meds.rows,
-    healthEntries: health.rows,
+    healthEntries: mergedHealth,
     contacts: contacts.rows,
     todayCheckins: checkins.rows.filter(c => c.date === today),
     activityLog: activityLog.rows[0] || null,
-    latestSpo2: latestSpo2.rows[0] || null,
-    latestSleep: latestSleep.rows[0] || null,
+    latestSpo2,
+    latestSleep,
   });
 }));
 
@@ -4112,6 +4123,14 @@ app.delete('/api/admin/team/:id', adminAuth, requireRole('super_admin'), asyncHa
   const targetId = parseInt(req.params.id);
   if (req.adminUser.id === targetId) {
     return res.status(400).json({ error: 'Cannot deactivate your own account' });
+  }
+  // Prevent deactivating the last super_admin
+  const target = await pool.query(`SELECT role FROM admin_users WHERE id = $1`, [targetId]);
+  if (target.rows[0]?.role === 'super_admin') {
+    const count = await pool.query(`SELECT COUNT(*) FROM admin_users WHERE role = 'super_admin' AND is_active = true`);
+    if (parseInt(count.rows[0].count) <= 1) {
+      return res.status(400).json({ error: 'Cannot deactivate the last super admin' });
+    }
   }
   const result = await pool.query(
     `UPDATE admin_users SET is_active = false WHERE id = $1 RETURNING id, email, name, role`,

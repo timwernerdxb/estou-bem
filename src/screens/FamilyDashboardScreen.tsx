@@ -411,7 +411,7 @@ export function FamilyDashboardScreen() {
         {/* Health Card - always visible, shows ALL metrics with timestamps */}
         <Card style={styles.healthCard}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Sa\u00FAde</Text>
+            <Text style={styles.sectionTitle}>Saúde</Text>
           </View>
           <View style={styles.healthGridWrap}>
             {/* Row 1: Heart rate | SpO2 */}

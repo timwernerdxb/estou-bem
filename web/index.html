@@ -1665,9 +1665,15 @@ function renderHealthSection(elderData) {
   for (const e of entries) {
     if (!byType[e.type]) byType[e.type] = e;
   }
-  const typeLabels = { heart_rate:'Freq. Cardíaca', steps:'Passos', blood_pressure:'Pressão', blood_oxygen:'Oxigênio', temperature:'Temperatura', weight:'Peso', sleep:'Sono', falls:'Quedas' };
-  const typeIcons = { heart_rate:'❤️', steps:'🚶', blood_pressure:'🩸', blood_oxygen:'🫁', temperature:'🌡️', weight:'⚖️', sleep:'😴', falls:'⚠️' };
-  const typeColors = { heart_rate:'var(--danger)', steps:'var(--primary)', blood_pressure:'var(--warning)', blood_oxygen:'#2196F3', temperature:'#FF5722', weight:'var(--text)', sleep:'#9C27B0', falls:'var(--danger)' };
+  // Normalize legacy types: blood_glucose with unit "passos" → steps
+  for (const e of entries) {
+    if (e.type === 'blood_glucose' && (e.unit === 'passos' || e.notes === 'steps')) e.type = 'steps';
+    if (e.type === 'oxygen_saturation') e.type = 'blood_oxygen';
+    if (e.type === 'blood_pressure_systolic') e.type = 'blood_pressure';
+  }
+  const typeLabels = { heart_rate:'Freq. Cardíaca', steps:'Passos', blood_pressure:'Pressão', blood_oxygen:'SpO2', oxygen_saturation:'SpO2', temperature:'Temperatura', weight:'Peso', sleep:'Sono', falls:'Quedas', blood_glucose:'Glicose' };
+  const typeIcons = { heart_rate:'❤️', steps:'🚶', blood_pressure:'🩸', blood_oxygen:'💧', oxygen_saturation:'💧', temperature:'🌡️', weight:'⚖️', sleep:'😴', falls:'⚠️', blood_glucose:'📊' };
+  const typeColors = { heart_rate:'var(--danger)', steps:'var(--primary)', blood_pressure:'var(--warning)', blood_oxygen:'#2196F3', oxygen_saturation:'#2196F3', temperature:'#FF5722', weight:'var(--text)', sleep:'#9C27B0', falls:'var(--danger)', blood_glucose:'var(--text)' };
 
   return `
     <div class="card">
