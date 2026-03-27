@@ -19,6 +19,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { CheckIn } from "../types";
 import { fetchElderStatus, fetchProfile } from "../services/ApiService";
 import { useI18n } from "../i18n";
+import { healthIntegrationService, HealthSummary } from "../services/HealthIntegrationService";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -65,6 +66,20 @@ export function FamilyDashboardScreen() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [elderData, setElderData] = React.useState<ElderStatusData | null>(null);
+  const [myHealth, setMyHealth] = React.useState<HealthSummary>({});
+
+  // Read MY health data from this device's HealthKit (for debugging)
+  React.useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    (async () => {
+      try {
+        await healthIntegrationService.initialize();
+        await healthIntegrationService.requestAppleHealthPermissions();
+        const summary = await healthIntegrationService.readAppleHealthSummary(24);
+        if (summary.lastUpdated) setMyHealth(summary);
+      } catch {}
+    })();
+  }, []);
 
   const loadElderData = React.useCallback(async () => {
     try {
@@ -513,6 +528,64 @@ export function FamilyDashboardScreen() {
             )}
           </View>
         </Card>
+
+        {/* My Health — debug card reading THIS device's HealthKit */}
+        {(myHealth.heartRate != null || myHealth.steps != null || myHealth.spo2 != null || myHealth.sleepHours != null || myHealth.activeCalories != null) && (
+          <Card style={styles.healthCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Minha Saúde (este dispositivo)</Text>
+            </View>
+            <View style={styles.healthGridWrap}>
+              <View style={styles.healthGridRow}>
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="heart" size={20} color={COLORS.danger} />
+                  <Text style={myHealth.heartRate != null ? styles.healthValue : styles.healthValueEmpty}>
+                    {myHealth.heartRate != null ? Math.round(myHealth.heartRate) : "\u2014"}
+                  </Text>
+                  <Text style={styles.healthUnit}>bpm</Text>
+                </View>
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="water" size={20} color="#3498DB" />
+                  <Text style={myHealth.spo2 != null ? styles.healthValue : styles.healthValueEmpty}>
+                    {myHealth.spo2 != null ? `${Math.round(myHealth.spo2)}%` : "\u2014"}
+                  </Text>
+                  <Text style={styles.healthUnit}>SpO2</Text>
+                </View>
+              </View>
+              <View style={styles.healthGridRow}>
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="footsteps" size={20} color={COLORS.primary} />
+                  <Text style={myHealth.steps != null ? styles.healthValue : styles.healthValueEmpty}>
+                    {myHealth.steps != null ? myHealth.steps.toLocaleString() : "\u2014"}
+                  </Text>
+                  <Text style={styles.healthUnit}>passos</Text>
+                </View>
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="moon" size={20} color="#8E44AD" />
+                  <Text style={myHealth.sleepHours != null ? styles.healthValue : styles.healthValueEmpty}>
+                    {myHealth.sleepHours != null ? `${myHealth.sleepHours}h` : "\u2014"}
+                  </Text>
+                  <Text style={styles.healthUnit}>sono</Text>
+                </View>
+              </View>
+              {myHealth.activeCalories != null && (
+                <View style={styles.healthGridRow}>
+                  <View style={styles.healthGridCell}>
+                    <Ionicons name="flame" size={20} color="#FF6B00" />
+                    <Text style={styles.healthValue}>{myHealth.activeCalories}</Text>
+                    <Text style={styles.healthUnit}>kcal</Text>
+                  </View>
+                  <View style={styles.healthGridCell} />
+                </View>
+              )}
+            </View>
+            {myHealth.lastUpdated && (
+              <Text style={{ fontSize: 11, color: COLORS.textLight, textAlign: "center", marginTop: 4 }}>
+                Atualizado: {new Date(myHealth.lastUpdated).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </Text>
+            )}
+          </Card>
+        )}
 
         {/* Recent Check-ins */}
         <Card style={styles.sectionCard}>
