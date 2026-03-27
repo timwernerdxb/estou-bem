@@ -5482,10 +5482,14 @@ async function checkMissedCheckins() {
         // Auto-create pending check-ins for today if they don't exist yet
         for (const time of checkinTimes) {
           const existing = await pool.query(
-            `SELECT id FROM checkins WHERE user_id = $1 AND date = $2 AND time = $3`,
+            `SELECT id, status FROM checkins WHERE user_id = $1 AND date = $2 AND time = $3`,
             [elder.id, today, time]
           );
           if (existing.rows.length === 0) {
+            // Only create if the scheduled time hasn't passed yet (within 5 min grace)
+            const [th, tm] = time.split(':').map(Number);
+            const scheduledMin = th * 60 + tm;
+            if (nowMinutes > scheduledMin + 30) continue; // Too late, don't create
             await pool.query(
               `INSERT INTO checkins (user_id, date, time, status) VALUES ($1, $2, $3, 'pending')`,
               [elder.id, today, time]
@@ -5685,13 +5689,20 @@ async function checkMissedCheckins() {
         const isOverdue = !lastTime || (now - lastTime > maxGapMs);
 
         // Ensure a pending check-in exists for interval mode
-        const pendingExists = await pool.query(
-          `SELECT id FROM checkins WHERE user_id = $1 AND date = $2 AND status = 'pending'`,
+        // Only create if there's no recent missed one (avoid creating duplicates every 5 min)
+        const recentCheckin = await pool.query(
+          `SELECT id, status, created_at FROM checkins WHERE user_id = $1 AND date = $2 ORDER BY created_at DESC LIMIT 1`,
           [elder.id, today]
         );
 
-        if (pendingExists.rows.length === 0) {
-          // Create a pending check-in for interval mode
+        const lastCheckinAge = recentCheckin.rows.length > 0
+          ? (now - new Date(recentCheckin.rows[0].created_at)) / (60 * 1000)
+          : Infinity;
+        const hasPending = recentCheckin.rows.length > 0 && recentCheckin.rows[0].status === 'pending';
+        const hasRecentMissed = recentCheckin.rows.length > 0 && recentCheckin.rows[0].status === 'missed' && lastCheckinAge < intervalHours * 60;
+
+        if (!hasPending && !hasRecentMissed) {
+          // Create a pending check-in for interval mode (only if enough time passed since last one)
           const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
           await pool.query(
             `INSERT INTO checkins (user_id, date, time, status) VALUES ($1, $2, $3, 'pending')`,
