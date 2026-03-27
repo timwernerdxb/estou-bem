@@ -1919,25 +1919,25 @@ app.get('/api/family/elder-status', authMiddleware, async (req, res) => {
     const checkins = await pool.query(
       `SELECT id, time, status, date, confirmed_at, created_at FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
       [elderId]
-    );
+    ).catch(e => { console.warn('[elder-status] checkins query failed:', e.message); return { rows: [] }; });
 
     // Medications
     const medications = await pool.query(
       `SELECT id, name, dosage, frequency, time, stock, unit, low_threshold FROM medications WHERE user_id = $1`,
       [elderId]
-    );
+    ).catch(e => { console.warn('[elder-status] medications query failed:', e.message); return { rows: [] }; });
 
     // Recent health entries (last 30)
     const health = await pool.query(
       `SELECT id, type, value, unit, time, date, notes, created_at FROM health_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 30`,
       [elderId]
-    );
+    ).catch(e => { console.warn('[elder-status] health query failed:', e.message); return { rows: [] }; });
 
     // Contacts
     const contacts = await pool.query(
-      `SELECT * FROM contacts WHERE user_id = $1 ORDER BY priority`,
+      `SELECT id, name, phone, relationship, priority FROM contacts WHERE user_id = $1 ORDER BY priority`,
       [elderId]
-    );
+    ).catch(e => { console.warn('[elder-status] contacts query failed:', e.message); return { rows: [] }; });
 
     // Last activity: most recent check-in confirmation or health entry
     const lastCheckin = checkins.rows.find(c => c.status === 'confirmed' || c.status === 'auto_confirmed');
@@ -4061,7 +4061,7 @@ app.post('/api/admin/users/:id/reset-password', adminAuth, async (req, res) => {
     const bcrypt = require('bcryptjs');
     const hashed = await bcrypt.hash(new_password, 12);
     const result = await pool.query(
-      `UPDATE users SET password = $1 WHERE id = $2 RETURNING id, name, email`,
+      `UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id, name, email`,
       [hashed, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
