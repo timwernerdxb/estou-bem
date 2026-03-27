@@ -817,7 +817,45 @@ async function initDB() {
       );
       CREATE INDEX IF NOT EXISTS idx_admin_users_email ON admin_users(email);
 
-      -- Admin audit log
+      -- Location history for elders
+      CREATE TABLE IF NOT EXISTS location_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        latitude DECIMAL(10, 8) NOT NULL,
+        longitude DECIMAL(11, 8) NOT NULL,
+        accuracy FLOAT,
+        recorded_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_location_history_user ON location_history(user_id, recorded_at DESC);
+
+      -- Geofence zones (configurable per elder)
+      CREATE TABLE IF NOT EXISTS geofences (
+        id SERIAL PRIMARY KEY,
+        elder_id INTEGER REFERENCES users(id),
+        name VARCHAR(100),
+        latitude DECIMAL(10, 8) NOT NULL,
+        longitude DECIMAL(11, 8) NOT NULL,
+        radius_meters INTEGER DEFAULT 200,
+        is_active BOOLEAN DEFAULT true,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_geofences_elder ON geofences(elder_id);
+
+      -- Geofence breach alerts
+      CREATE TABLE IF NOT EXISTS geofence_alerts (
+        id SERIAL PRIMARY KEY,
+        elder_id INTEGER REFERENCES users(id),
+        geofence_id INTEGER REFERENCES geofences(id),
+        breach_type VARCHAR(20),
+        latitude DECIMAL(10, 8),
+        longitude DECIMAL(11, 8),
+        alerted_at TIMESTAMP DEFAULT NOW(),
+        acknowledged_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_geofence_alerts_elder ON geofence_alerts(elder_id, alerted_at DESC);
+
+            -- Admin audit log
       CREATE TABLE IF NOT EXISTS admin_audit_log (
         id SERIAL PRIMARY KEY,
         admin_user_id INTEGER REFERENCES admin_users(id),
@@ -1781,6 +1819,89 @@ app.get('/api/push-debug', authMiddleware, asyncHandler(async (req, res) => {
   res.json({ user: u, myTokens: myTokens.rows, elderInfo });
 }));
 
+// GET /api/debug/notification-status — full diagnostic for push notification pipeline
+// Returns: caller's linked_elder_id, their push tokens, all family tokens for the elder,
+// recent check-in history, and (if caller is elder) all linked family members.
+app.get('/api/debug/notification-status', authMiddleware, asyncHandler(async (req, res) => {
+  const userRow = await pool.query(
+    `SELECT id, name, role, linked_elder_id FROM users WHERE id = $1`,
+    [req.userId]
+  );
+  if (!userRow.rows[0]) return res.status(404).json({ error: 'User not found' });
+  const u = userRow.rows[0];
+
+  // My push tokens
+  const myTokens = await pool.query(
+    `SELECT token, platform, created_at FROM push_tokens WHERE user_id = $1`,
+    [req.userId]
+  );
+
+  let elderInfo = null;
+  let familyMembersOfElder = null;
+
+  if (u.linked_elder_id) {
+    // Caller is a family member — look up the elder they are linked to
+    const elder = await pool.query(
+      `SELECT id, name, role FROM users WHERE id = $1`,
+      [u.linked_elder_id]
+    );
+    const elderPushTokens = await pool.query(
+      `SELECT token, platform, created_at FROM push_tokens WHERE user_id = $1`,
+      [u.linked_elder_id]
+    );
+    // All family push tokens that would be used in checkMissedCheckins
+    const familyTokensForElder = await pool.query(
+      `SELECT pt.token, pt.platform, u2.id as user_id, u2.name
+       FROM push_tokens pt
+       JOIN users u2 ON pt.user_id = u2.id
+       WHERE u2.linked_elder_id = $1`,
+      [u.linked_elder_id]
+    );
+    // Recent check-in history for the elder
+    const recentCheckins = await pool.query(
+      `SELECT id, date, time, status, confirmed_at, created_at
+       FROM checkins WHERE user_id = $1
+       ORDER BY created_at DESC LIMIT 20`,
+      [u.linked_elder_id]
+    );
+    elderInfo = {
+      elder: elder.rows[0] || null,
+      elderPushTokens: elderPushTokens.rows,
+      familyTokensForElder: familyTokensForElder.rows,
+      recentElderCheckins: recentCheckins.rows,
+    };
+  }
+
+  if (u.role === 'elder') {
+    // Caller is the elder — show all linked family members and their tokens
+    const linkedFamily = await pool.query(
+      `SELECT u2.id, u2.name, u2.email, u2.phone,
+              (SELECT json_agg(json_build_object('token', pt.token, 'platform', pt.platform, 'created_at', pt.created_at))
+               FROM push_tokens pt WHERE pt.user_id = u2.id) as push_tokens
+       FROM users u2 WHERE u2.linked_elder_id = $1`,
+      [req.userId]
+    );
+    // Recent check-in history for the elder (self)
+    const recentCheckins = await pool.query(
+      `SELECT id, date, time, status, confirmed_at, created_at
+       FROM checkins WHERE user_id = $1
+       ORDER BY created_at DESC LIMIT 20`,
+      [req.userId]
+    );
+    familyMembersOfElder = {
+      linkedFamily: linkedFamily.rows,
+      recentCheckins: recentCheckins.rows,
+    };
+  }
+
+  res.json({
+    user: { id: u.id, name: u.name, role: u.role, linked_elder_id: u.linked_elder_id },
+    myPushTokens: myTokens.rows,
+    elderInfo,
+    familyMembersOfElder,
+  });
+}));
+
 // POST /api/push-test — send a test push to yourself
 app.post('/api/push-test', authMiddleware, asyncHandler(async (req, res) => {
   const tokens = await pool.query(`SELECT token FROM push_tokens WHERE user_id = $1`, [req.userId]);
@@ -2358,9 +2479,32 @@ app.get('/api/nap', authMiddleware, asyncHandler(async (req, res) => {
 
 app.post('/api/checkins', authMiddleware, asyncHandler(async (req, res) => {
   const { time, status, date } = req.body;
+  const checkinDate = date || new Date().toISOString().slice(0, 10);
+  const checkinStatus = status || 'pending';
+
+  // Guard against duplicate confirmed check-ins within a 30-minute window for the same user/date/time-slot
+  if (checkinStatus === 'confirmed' && time) {
+    const [h, m] = time.split(':').map(Number);
+    const slotMinutes = h * 60 + m;
+    const existing = await pool.query(
+      `SELECT id FROM checkins
+       WHERE user_id = $1
+         AND date = $2
+         AND status = 'confirmed'
+         AND ABS(
+           (EXTRACT(HOUR FROM time::time)::int * 60 + EXTRACT(MINUTE FROM time::time)::int) - $3
+         ) <= 30`,
+      [req.userId, checkinDate, slotMinutes]
+    );
+    if (existing.rows.length > 0) {
+      console.log(`[Checkin] Duplicate confirmed check-in suppressed for user ${req.userId} on ${checkinDate} at ${time}`);
+      return res.json(existing.rows[0]); // Return the existing one silently
+    }
+  }
+
   const result = await pool.query(
     `INSERT INTO checkins (user_id, time, status, date) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [req.userId, time, status || 'pending', date || new Date().toISOString().slice(0, 10)]
+    [req.userId, time, checkinStatus, checkinDate]
   );
   res.json(result.rows[0]);
 }));
@@ -5682,12 +5826,13 @@ async function checkMissedCheckins() {
 
           // Send push notifications to family members
           const familyTokens = await pool.query(
-            `SELECT pt.token FROM push_tokens pt
+            `SELECT pt.token, u.name as family_name FROM push_tokens pt
              JOIN users u ON pt.user_id = u.id
              WHERE u.linked_elder_id = $1`,
             [elder.id]
           );
 
+          console.log(`[Push] Family push tokens for ${elder.name} (elder ID ${elder.id}): ${familyTokens.rows.length} token(s) — ${familyTokens.rows.map(r => `${r.family_name}:${r.token.substring(0,20)}…`).join(', ') || 'NONE'}`);
           if (familyTokens.rows.length > 0) {
             const tokens = familyTokens.rows.map(r => r.token);
             await sendPushNotifications(
@@ -5697,7 +5842,9 @@ async function checkMissedCheckins() {
               { type: 'missed_checkin', elderId: elder.id, checkinId: checkin.id, level: targetLevel },
               targetLevel >= 2 // critical for level 2+
             );
-            console.log(`[Push] Sent ${tokens.length} level-${targetLevel} alerts for ${elder.name}`);
+            console.log(`[Push] Sent ${tokens.length} level-${targetLevel} push alert(s) for ${elder.name}`);
+          } else {
+            console.log(`[Push] WARNING: No push tokens found for family of ${elder.name} — push notification NOT sent for level-${targetLevel} alert`);
           }
 
           // Send real-time WebSocket alert to family
@@ -5890,12 +6037,13 @@ async function checkMissedCheckins() {
 
             // Send push notifications to family members
             const familyTokens = await pool.query(
-              `SELECT pt.token FROM push_tokens pt
+              `SELECT pt.token, u.name as family_name FROM push_tokens pt
                JOIN users u ON pt.user_id = u.id
                WHERE u.linked_elder_id = $1`,
               [elder.id]
             );
 
+            console.log(`[Push] Family push tokens for ${elder.name} (elder ID ${elder.id}, interval mode): ${familyTokens.rows.length} token(s) — ${familyTokens.rows.map(r => `${r.family_name}:${r.token.substring(0,20)}…`).join(', ') || 'NONE'}`);
             if (familyTokens.rows.length > 0) {
               const tokens = familyTokens.rows.map(r => r.token);
               await sendPushNotifications(
@@ -5905,7 +6053,9 @@ async function checkMissedCheckins() {
                 { type: 'missed_checkin', elderId: elder.id, checkinId: checkinId, level: targetLevel },
                 targetLevel >= 2
               );
-              console.log(`[Push] Sent ${tokens.length} level-${targetLevel} alerts for ${elder.name}`);
+              console.log(`[Push] Sent ${tokens.length} level-${targetLevel} push alert(s) for ${elder.name} (interval)`);
+            } else {
+              console.log(`[Push] WARNING: No push tokens found for family of ${elder.name} — push notification NOT sent for level-${targetLevel} alert (interval mode)`);
             }
 
             // Send real-time WebSocket alert to family
