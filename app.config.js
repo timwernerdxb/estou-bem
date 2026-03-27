@@ -76,7 +76,11 @@ export default ({ config }) => ({
     ],
     ["expo-background-fetch"],
     ["expo-task-manager"],
-    ["@kingstinct/react-native-healthkit"],
+    ["@kingstinct/react-native-healthkit", {
+      NSHealthShareUsageDescription: "Estou Bem usa dados de saúde para monitorar o bem-estar do idoso e alertar familiares.",
+      NSHealthUpdateUsageDescription: "Estou Bem registra check-ins de saúde para acompanhamento familiar.",
+      background: false,
+    }],
     ["@bacons/apple-targets"],
     ["./plugins/withAsyncStorageRepo"],
     // ["./plugins/withWearOS"], // Wear OS built separately via GitHub Actions
