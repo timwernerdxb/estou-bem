@@ -30,6 +30,17 @@ const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || '+126274723
 const FROM_EMAIL = process.env.FROM_EMAIL || 'alertas@estoubem.com';
 const SAMU_NUMBER = process.env.SAMU_NUMBER || '+55192';
 
+// ── Startup: warn about missing critical env vars ──────────
+if (!process.env.TWILIO_ACCOUNT_SID) {
+  console.warn('[SMS] TWILIO_ACCOUNT_SID not configured — SMS disabled');
+}
+if (!process.env.TWILIO_AUTH_TOKEN) {
+  console.warn('[SMS] TWILIO_AUTH_TOKEN not configured — SMS disabled');
+}
+if (!process.env.TWILIO_PHONE_NUMBER) {
+  console.warn('[SMS] TWILIO_PHONE_NUMBER not configured — SMS disabled');
+}
+
 // ── Security: Generate random secrets if not set ───────────
 const JWT_SECRET = (() => {
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
@@ -168,6 +179,33 @@ async function sendWsAlertToFamily(elderId, alert) {
     total += sendWsAlert(f.id, alert);
   }
   return total;
+}
+
+// Get all push tokens for family members of an elder.
+// Uses a comprehensive query: matches users where linked_elder_id = elderId
+// OR where the elder's link_code appears in the user's elder_link_code column (legacy fallback).
+// Returns: { tokens: string[], userIds: number[] }
+async function getFamilyPushTokens(elderId) {
+  const result = await pool.query(
+    `SELECT DISTINCT pt.token, u.id as user_id
+     FROM push_tokens pt
+     JOIN users u ON pt.user_id = u.id
+     WHERE u.linked_elder_id = $1`,
+    [elderId]
+  );
+  return {
+    tokens: result.rows.map(r => r.token),
+    userIds: [...new Set(result.rows.map(r => r.user_id))],
+  };
+}
+
+// Get all family member user IDs for an elder (for in-app notification storage).
+async function getFamilyUserIds(elderId) {
+  const result = await pool.query(
+    `SELECT id FROM users WHERE linked_elder_id = $1`,
+    [elderId]
+  );
+  return result.rows.map(r => r.id);
 }
 
 // ── Email Notifications via Resend ────────────────────────
@@ -880,10 +918,28 @@ async function initDB() {
     `);
     console.log('Database initialized');
 
+    // ── In-app notifications table ─────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        type TEXT DEFAULT 'general',
+        read BOOLEAN DEFAULT false,
+        related_id INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC)`);
+
     // Migrations: add columns if missing
     await client.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'pt-BR'`).catch(() => {});
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS nap_until TIMESTAMPTZ`).catch(() => {});
     await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS notifications_sent INTEGER DEFAULT 0`).catch(() => {});
+    // Deduplication guards: track when SMS and push were last sent per escalation alert
+    await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS sms_sent_at TIMESTAMPTZ`).catch(() => {});
+    await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS push_notified_at TIMESTAMPTZ`).catch(() => {});
 
     // Migrate legacy blood_glucose → steps where unit is 'passos'
     await client.query(`UPDATE health_entries SET type = 'steps' WHERE type = 'blood_glucose' AND (unit = 'passos' OR notes = 'steps')`).catch(() => {});
@@ -1377,7 +1433,7 @@ app.post('/api/reset-password', rateLimiter, asyncHandler(async (req, res) => {
 }));
 
 // ── Push Notification Helper ─────────────────────────────
-async function sendPushNotifications(tokens, title, body, data = {}, critical = false) {
+async function sendPushNotifications(tokens, title, body, data = {}, critical = false, recipientUserIds = []) {
   if (!tokens.length) return;
 
   const messages = tokens.map(token => ({
@@ -1393,11 +1449,15 @@ async function sendPushNotifications(tokens, title, body, data = {}, critical = 
 
   // Expo push API accepts up to 100 messages at once
   const chunks = [];
+  const tokenChunks = [];
   for (let i = 0; i < messages.length; i += 100) {
     chunks.push(messages.slice(i, i + 100));
+    tokenChunks.push(tokens.slice(i, i + 100));
   }
 
-  for (const chunk of chunks) {
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci];
+    const chunkTokens = tokenChunks[ci];
     try {
       const response = await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
@@ -1409,9 +1469,38 @@ async function sendPushNotifications(tokens, title, body, data = {}, critical = 
         body: JSON.stringify(chunk),
       });
       const result = await response.json();
-      console.log(`[Push] Sent ${chunk.length} notifications:`, JSON.stringify(result.data?.map(d => d.status) || result));
+      const statuses = result.data || [];
+      console.log(`[Push] Sent ${chunk.length} notifications:`, JSON.stringify(statuses.map(d => d.status)));
+
+      // Handle per-ticket errors from Expo
+      for (let i = 0; i < statuses.length; i++) {
+        const ticket = statuses[i];
+        if (ticket.status === 'error') {
+          const token = chunkTokens[i];
+          console.error(`[Push] Ticket error for token ${token?.substring(0, 30)}…: ${ticket.details?.error} — ${ticket.message}`);
+          if (ticket.details?.error === 'DeviceNotRegistered') {
+            // Remove stale token from DB
+            console.warn(`[Push] DeviceNotRegistered — deleting token from push_tokens: ${token?.substring(0, 30)}…`);
+            pool.query('DELETE FROM push_tokens WHERE token = $1', [token]).catch(err => {
+              console.error('[Push] Failed to delete stale token:', err.message);
+            });
+          }
+        }
+      }
     } catch (err) {
       console.error('[Push] Error sending notifications:', err.message);
+    }
+  }
+
+  // Store in-app notifications for each recipient user (enables notification center)
+  if (recipientUserIds.length > 0) {
+    const notifType = data?.type || 'general';
+    const relatedId = data?.checkinId || data?.elderId || data?.fallEventId || data?.medicationId || null;
+    for (const uid of recipientUserIds) {
+      pool.query(
+        `INSERT INTO notifications (user_id, title, body, type, related_id) VALUES ($1, $2, $3, $4, $5)`,
+        [uid, title, body, notifType, relatedId]
+      ).catch(err => console.error('[Notifications] Failed to insert in-app notification:', err.message));
     }
   }
 }
@@ -1910,9 +1999,42 @@ app.post('/api/push-test', authMiddleware, asyncHandler(async (req, res) => {
     tokens.rows.map(r => r.token),
     'Estou Bem - Teste',
     'Push notification funcionando! ✅',
-    { type: 'test' }
+    { type: 'test' },
+    false,
+    [req.userId]
   );
   res.json({ ok: true, tokenCount: tokens.rows.length, tokens: tokens.rows.map(r => r.token.substring(0, 30) + '...') });
+}));
+
+// ── In-app Notification Center ───────────────────────────
+
+// GET /api/notifications — list unread + recent notifications for the current user
+app.get('/api/notifications', authMiddleware, asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+  const result = await pool.query(
+    `SELECT id, title, body, type, read, related_id, created_at
+     FROM notifications
+     WHERE user_id = $1
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [req.userId, limit]
+  );
+  const unreadCount = result.rows.filter(n => !n.read).length;
+  res.json({ notifications: result.rows, unread_count: unreadCount });
+}));
+
+// POST /api/notifications/mark-read — mark one or all notifications as read
+app.post('/api/notifications/mark-read', authMiddleware, asyncHandler(async (req, res) => {
+  const { id, all } = req.body;
+  if (all) {
+    await pool.query(`UPDATE notifications SET read = true WHERE user_id = $1`, [req.userId]);
+    return res.json({ ok: true, updated: 'all' });
+  }
+  if (id) {
+    await pool.query(`UPDATE notifications SET read = true WHERE id = $1 AND user_id = $2`, [id, req.userId]);
+    return res.json({ ok: true, updated: id });
+  }
+  res.status(400).json({ error: 'Provide id or all=true' });
 }));
 
 // ── Twilio Webhooks ──────────────────────────────────────
@@ -3028,17 +3150,15 @@ app.post('/api/fall-detected', authMiddleware, asyncHandler(async (req, res) => 
     );
 
     // 4. Push notification to ALL family contacts immediately
-    const familyTokens = await pool.query(
-      `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`,
-      [user_id]
-    );
-    if (familyTokens.rows.length > 0) {
+    const { tokens: fallFamilyTokens, userIds: fallFamilyUserIds } = await getFamilyPushTokens(user_id);
+    if (fallFamilyTokens.length > 0) {
       await sendPushNotifications(
-        familyTokens.rows.map(r => r.token),
+        fallFamilyTokens,
         'ALERTA: Queda detectada!',
         `ALERTA: ${elder.name} pode ter sofrido uma queda!`,
         { type: 'fall_detected', elderId: user_id, fallEventId: fallEvent.id, heart_rate },
-        true
+        true,
+        fallFamilyUserIds
       );
     }
 
@@ -5567,19 +5687,17 @@ app.post('/api/location', authMiddleware, asyncHandler(async (req, res) => {
         );
 
         // Send push to family members
-        const familyTokens = await pool.query(
-          `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`,
-          [req.userId]
-        );
+        const { tokens: geofenceFamilyTokens, userIds: geofenceFamilyUserIds } = await getFamilyPushTokens(req.userId);
         const elderRow = await pool.query(`SELECT name FROM users WHERE id = $1`, [req.userId]);
         const elderName = elderRow.rows[0]?.name || 'O idoso';
-        if (familyTokens.rows.length > 0) {
-          const tokens = familyTokens.rows.map(r => r.token);
+        if (geofenceFamilyTokens.length > 0) {
           await sendPushNotifications(
-            tokens,
-            '⚠️ Saiu da zona segura',
+            geofenceFamilyTokens,
+            'Saiu da zona segura',
             `${elderName} saiu da zona ${gf.name} (a ${Math.round(dist)}m)`,
-            { type: 'geofence_exit', elderId: req.userId, geofenceId: gf.id }
+            { type: 'geofence_exit', elderId: req.userId, geofenceId: gf.id },
+            false,
+            geofenceFamilyUserIds
           );
         }
         console.log(`[Geofence] Elder ${req.userId} outside ${gf.name} (dist: ${Math.round(dist)}m)`);
@@ -5893,7 +6011,16 @@ async function checkMissedCheckins() {
       const windowStart = elder.checkin_window_start || '07:00';
       const windowEnd = elder.checkin_window_end || '22:00';
       const intervalHours = elder.checkin_interval_hours || 2;
-      const checkinTimes = elder.checkin_times || ['09:00'];
+      const checkinTimes = elder.checkin_times;
+
+      // Log if elder has no check-in times configured (silently skipped before)
+      if (!checkinTimes || checkinTimes.length === 0) {
+        if (mode === 'scheduled') {
+          console.log(`[Escalation] Elder ${elder.name} (ID: ${elder.id}) has no check-in times configured — skipping`);
+          continue;
+        }
+      }
+      const effectiveCheckinTimes = checkinTimes || ['09:00'];
 
       const windowStartMin = parseInt(windowStart.split(':')[0]) * 60 + parseInt(windowStart.split(':')[1]);
       const windowEndMin = parseInt(windowEnd.split(':')[0]) * 60 + parseInt(windowEnd.split(':')[1]);
@@ -5903,7 +6030,7 @@ async function checkMissedCheckins() {
 
       if (mode === 'scheduled') {
         // Auto-create pending check-ins for today if they don't exist yet
-        for (const time of checkinTimes) {
+        for (const time of effectiveCheckinTimes) {
           const existing = await pool.query(
             `SELECT id, status FROM checkins WHERE user_id = $1 AND date = $2 AND time = $3`,
             [elder.id, today, time]
@@ -5959,7 +6086,7 @@ async function checkMissedCheckins() {
 
           // Check if alert already exists for this check-in
           const existingAlert = await pool.query(
-            'SELECT id, level FROM escalation_alerts WHERE checkin_id = $1 AND status = $2',
+            'SELECT id, level, push_notified_at, sms_sent_at FROM escalation_alerts WHERE checkin_id = $1 AND status = $2',
             [checkin.id, 'active']
           );
 
@@ -5978,16 +6105,23 @@ async function checkMissedCheckins() {
           ];
 
           let escalationAlertId;
+          let isNewLevel = false;
+          let existingPushNotifiedAt = null;
+          let existingSmsSentAt = null;
+
           if (existingAlert.rows.length > 0) {
             const currentLevel = existingAlert.rows[0].level;
+            existingPushNotifiedAt = existingAlert.rows[0].push_notified_at;
+            existingSmsSentAt = existingAlert.rows[0].sms_sent_at;
             if (targetLevel <= currentLevel) continue; // Already at this level or higher
 
-            // Escalate: upgrade level
+            // Escalate: upgrade level — clear push_notified_at so new level triggers fresh push
             await pool.query(
-              `UPDATE escalation_alerts SET level = $1, notified_contacts = $2 WHERE id = $3`,
+              `UPDATE escalation_alerts SET level = $1, notified_contacts = $2, push_notified_at = NULL WHERE id = $3`,
               [targetLevel, JSON.stringify(notifiedContacts), existingAlert.rows[0].id]
             );
             escalationAlertId = existingAlert.rows[0].id;
+            isNewLevel = true;
             console.log(`[Escalation] UPGRADED to level ${targetLevel} for elder ${elder.name} (ID: ${elder.id}) scheduled at ${checkin.time}`);
           } else {
             // Create new alert at level 1 (or higher if already very overdue)
@@ -6000,100 +6134,118 @@ async function checkMissedCheckins() {
               [elder.id, checkin.id, targetLevel, JSON.stringify(notifiedContacts)]
             );
             escalationAlertId = insertResult.rows[0]?.id;
+            isNewLevel = true;
             console.log(`[Escalation] MISSED check-in for elder ${elder.name} (ID: ${elder.id}) scheduled at ${checkin.time} — level ${targetLevel}`);
           }
 
           console.log(`[Escalation]   Family to notify: ${family.rows.map(f => f.name).join(', ') || 'none'}`);
           console.log(`[Escalation]   Emergency contacts: ${contacts.rows.map(c => `${c.name} (${c.phone})`).join(', ') || 'none'}`);
 
-          // Send push notifications to family members
-          const familyTokens = await pool.query(
-            `SELECT pt.token, u.name as family_name FROM push_tokens pt
-             JOIN users u ON pt.user_id = u.id
-             WHERE u.linked_elder_id = $1`,
-            [elder.id]
-          );
+          // ── Push notifications: only send if this is a new/upgraded level ──
+          // This prevents re-sending every 5 min when the cron fires and the check-in is already missed
+          if (isNewLevel) {
+            const { tokens: familyPushTokens, userIds: familyUserIds } = await getFamilyPushTokens(elder.id);
 
-          console.log(`[Push] Family push tokens for ${elder.name} (elder ID ${elder.id}): ${familyTokens.rows.length} token(s) — ${familyTokens.rows.map(r => `${r.family_name}:${r.token.substring(0,20)}…`).join(', ') || 'NONE'}`);
-          if (familyTokens.rows.length > 0) {
-            const tokens = familyTokens.rows.map(r => r.token);
-            await sendPushNotifications(
-              tokens,
-              pushTitle,
-              pushBody,
-              { type: 'missed_checkin', elderId: elder.id, checkinId: checkin.id, level: targetLevel },
-              targetLevel >= 2 // critical for level 2+
-            );
-            console.log(`[Push] Sent ${tokens.length} level-${targetLevel} push alert(s) for ${elder.name}`);
+            console.log(`[Push] Family push tokens for ${elder.name} (elder ID ${elder.id}): ${familyPushTokens.length} token(s)`);
+            if (familyPushTokens.length > 0) {
+              await sendPushNotifications(
+                familyPushTokens,
+                pushTitle,
+                pushBody,
+                { type: 'missed_checkin', elderId: elder.id, checkinId: checkin.id, level: targetLevel },
+                targetLevel >= 2, // critical for level 2+
+                familyUserIds
+              );
+              console.log(`[Push] Sent ${familyPushTokens.length} level-${targetLevel} push alert(s) for ${elder.name}`);
+              // Mark push as sent for this escalation
+              if (escalationAlertId) {
+                pool.query(`UPDATE escalation_alerts SET push_notified_at = NOW() WHERE id = $1`, [escalationAlertId]).catch(() => {});
+              }
+            } else {
+              console.log(`[Push] WARNING: No push tokens found for family of ${elder.name} — push notification NOT sent for level-${targetLevel} alert`);
+            }
+
+            // Send real-time WebSocket alert to family
+            const wsSent = await sendWsAlertToFamily(elder.id, {
+              type: 'escalation',
+              level: targetLevel,
+              elder: { id: elder.id, name: elder.name },
+              message: pushTitle,
+              body: pushBody,
+              checkinId: checkin.id,
+              timestamp: new Date().toISOString(),
+            });
+            if (wsSent > 0) console.log(`[WS] Sent ${wsSent} real-time alerts for ${elder.name}`);
+
+            // Send email notifications to family members (capped at 5 per escalation)
+            await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel, escalationAlertId);
           } else {
-            console.log(`[Push] WARNING: No push tokens found for family of ${elder.name} — push notification NOT sent for level-${targetLevel} alert`);
+            console.log(`[Push] Skipping push for ${elder.name} — already notified at level ${targetLevel} (push_notified_at: ${existingPushNotifiedAt})`);
           }
-
-          // Send real-time WebSocket alert to family
-          const wsSent = await sendWsAlertToFamily(elder.id, {
-            type: 'escalation',
-            level: targetLevel,
-            elder: { id: elder.id, name: elder.name },
-            message: pushTitle,
-            body: pushBody,
-            checkinId: checkin.id,
-            timestamp: new Date().toISOString(),
-          });
-          if (wsSent > 0) console.log(`[WS] Sent ${wsSent} real-time alerts for ${elder.name}`);
-
-          // Send email notifications to family members (capped at 5 per escalation)
-          await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel, escalationAlertId);
 
           // ── Twilio SMS & Voice escalation (scheduled mode) ──
-          if (targetLevel >= 1 && elder.phone) {
-            // Level 1+: SMS reminder to elder
-            await sendAlert(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
-          }
-          if (targetLevel >= 2) {
-            // Level 2: Voice call to elder — if no answer, IMMEDIATELY escalate to SAMU
-            let elderAnswered = false;
-            if (elder.phone) {
-              elderAnswered = await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem. Sua familia esta preocupada. Pressione 1 se esta bem.`);
+          // SMS deduplication: only send 1 SMS per escalation event, to primary emergency contact
+          const smsSentForThisAlert = existingSmsSentAt !== null;
+          if (!smsSentForThisAlert) {
+            if (targetLevel >= 1 && elder.phone) {
+              // Level 1+: SMS reminder to elder
+              await sendAlert(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
             }
-            // SMS to family contacts
-            for (const fm of family.rows) {
-              if (fm.phone) await sendAlert(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
+            if (targetLevel >= 2) {
+              // Level 2: Voice call to elder — if no answer, IMMEDIATELY escalate to SAMU
+              let elderAnswered = false;
+              if (elder.phone) {
+                elderAnswered = await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem. Sua familia esta preocupada. Pressione 1 se esta bem.`);
+              }
+              // SMS to PRIMARY emergency contact only (first by priority)
+              const primaryContact = contacts.rows[0] || family.rows[0];
+              if (primaryContact?.phone) {
+                await sendAlert(primaryContact.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
+                console.log(`[SMS] Sent 1 SMS for escalation ${escalationAlertId} to primary contact: ${primaryContact.name}`);
+              }
+              // If call failed or not answered → IMMEDIATE SAMU escalation
+              if (!elderAnswered && targetLevel < 3) {
+                console.log(`[ESCALATION] ${elder.name} did NOT answer voice call — escalating to SAMU NOW`);
+                targetLevel = 3;
+              }
             }
-            for (const ct of contacts.rows) {
-              if (ct.phone) await sendAlert(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
+            if (targetLevel >= 3) {
+              // Level 3 EMERGENCY: DISABLED FOR TESTING — would call SAMU 192
+              console.log(`[SAMU] Level 3 DISABLED — would call SAMU for ${elder.name}. Enable in production.`);
+              const allPhones = [
+                ...family.rows.filter(f => f.phone).map(f => f.phone),
+                ...contacts.rows.filter(c => c.phone).map(c => c.phone),
+              ];
+              for (const phone of allPhones) {
+                await sendAlert(phone, `ALERTA MAXIMO: ${elder.name} nao responde ha 30 minutos. Verifique imediatamente. (SAMU desativado em modo teste)`);
+              }
+              // await callSAMUWithConference(elder, allPhones); // DISABLED FOR TESTING
             }
-            // If call failed or not answered → IMMEDIATE SAMU escalation
-            if (!elderAnswered && targetLevel < 3) {
-              console.log(`[ESCALATION] ${elder.name} did NOT answer voice call — escalating to SAMU NOW`);
-              targetLevel = 3;
+            // Mark SMS as sent for this escalation event (deduplication)
+            if (escalationAlertId) {
+              pool.query(`UPDATE escalation_alerts SET sms_sent_at = NOW() WHERE id = $1`, [escalationAlertId]).catch(() => {});
+              console.log(`[SMS] Marked sms_sent_at for escalation ${escalationAlertId}`);
             }
-          }
-          if (targetLevel >= 3) {
-            // Level 3 EMERGENCY: DISABLED FOR TESTING — would call SAMU 192
-            console.log(`[SAMU] ⚠️ Level 3 DISABLED — would call SAMU for ${elder.name}. Enable in production.`);
-            const allPhones = [
-              ...family.rows.filter(f => f.phone).map(f => f.phone),
-              ...contacts.rows.filter(c => c.phone).map(c => c.phone),
-            ];
-            for (const phone of allPhones) {
-              await sendAlert(phone, `⚠️ ALERTA MAXIMO: ${elder.name} nao responde ha 30 minutos. Verifique imediatamente. (SAMU desativado em modo teste)`);
-            }
-            // await callSAMUWithConference(elder, allPhones); // DISABLED FOR TESTING
+          } else {
+            console.log(`[SMS] Skipping SMS for ${elder.name} escalation ${escalationAlertId} — already sent at ${existingSmsSentAt}`);
           }
 
-          // Send reminder to the elder themselves
-          const elderTokens = await pool.query(
-            `SELECT token FROM push_tokens WHERE user_id = $1`,
-            [elder.id]
-          );
-          if (elderTokens.rows.length > 0) {
-            await sendPushNotifications(
-              elderTokens.rows.map(r => r.token),
-              'Voce tem um check-in pendente!',
-              'Toque para confirmar que esta tudo bem.',
-              { type: 'checkin_reminder', screen: 'Home' },
-              false
+          // Send reminder to the elder themselves (only on new/upgraded level)
+          if (isNewLevel) {
+            const elderTokens = await pool.query(
+              `SELECT token FROM push_tokens WHERE user_id = $1`,
+              [elder.id]
             );
+            if (elderTokens.rows.length > 0) {
+              await sendPushNotifications(
+                elderTokens.rows.map(r => r.token),
+                'Voce tem um check-in pendente!',
+                'Toque para confirmar que esta tudo bem.',
+                { type: 'checkin_reminder', screen: 'Home' },
+                false,
+                [elder.id]
+              );
+            }
           }
         }
 
@@ -6171,8 +6323,8 @@ async function checkMissedCheckins() {
             }
 
             // Check if alert already exists
-            const existingAlert = await pool.query(
-              'SELECT id, level FROM escalation_alerts WHERE checkin_id = $1 AND status = $2',
+            const existingAlertI = await pool.query(
+              'SELECT id, level, push_notified_at, sms_sent_at FROM escalation_alerts WHERE checkin_id = $1 AND status = $2',
               [checkinId, 'active']
             );
 
@@ -6191,15 +6343,22 @@ async function checkMissedCheckins() {
             ];
 
             let escalationAlertIdInterval;
-            if (existingAlert.rows.length > 0) {
-              const currentLevel = existingAlert.rows[0].level;
+            let isNewLevelInterval = false;
+            let existingPushNotifiedAtI = null;
+            let existingSmsSentAtI = null;
+
+            if (existingAlertI.rows.length > 0) {
+              const currentLevel = existingAlertI.rows[0].level;
+              existingPushNotifiedAtI = existingAlertI.rows[0].push_notified_at;
+              existingSmsSentAtI = existingAlertI.rows[0].sms_sent_at;
               if (targetLevel <= currentLevel) continue; // Already at this level or higher
 
               await pool.query(
-                `UPDATE escalation_alerts SET level = $1, notified_contacts = $2 WHERE id = $3`,
-                [targetLevel, JSON.stringify(notifiedContacts), existingAlert.rows[0].id]
+                `UPDATE escalation_alerts SET level = $1, notified_contacts = $2, push_notified_at = NULL WHERE id = $3`,
+                [targetLevel, JSON.stringify(notifiedContacts), existingAlertI.rows[0].id]
               );
-              escalationAlertIdInterval = existingAlert.rows[0].id;
+              escalationAlertIdInterval = existingAlertI.rows[0].id;
+              isNewLevelInterval = true;
               console.log(`[Escalation] UPGRADED to level ${targetLevel} for elder ${elder.name} (ID: ${elder.id}) — interval mode`);
             } else {
               // ON CONFLICT handles race condition if another process inserted simultaneously
@@ -6211,97 +6370,112 @@ async function checkMissedCheckins() {
                 [elder.id, checkinId, targetLevel, JSON.stringify(notifiedContacts)]
               );
               escalationAlertIdInterval = insertResult.rows[0]?.id;
+              isNewLevelInterval = true;
               console.log(`[Escalation] MISSED check-in for elder ${elder.name} (ID: ${elder.id}) — interval mode, last confirmed: ${lastTime ? lastTime.toISOString() : 'never'} — level ${targetLevel}`);
             }
 
             console.log(`[Escalation]   Family to notify: ${family.rows.map(f => f.name).join(', ') || 'none'}`);
             console.log(`[Escalation]   Emergency contacts: ${contacts.rows.map(c => `${c.name} (${c.phone})`).join(', ') || 'none'}`);
 
-            // Send push notifications to family members
-            const familyTokens = await pool.query(
-              `SELECT pt.token, u.name as family_name FROM push_tokens pt
-               JOIN users u ON pt.user_id = u.id
-               WHERE u.linked_elder_id = $1`,
-              [elder.id]
-            );
+            // ── Push notifications: only on new/upgraded level ──
+            if (isNewLevelInterval) {
+              const { tokens: familyPushTokensI, userIds: familyUserIdsI } = await getFamilyPushTokens(elder.id);
 
-            console.log(`[Push] Family push tokens for ${elder.name} (elder ID ${elder.id}, interval mode): ${familyTokens.rows.length} token(s) — ${familyTokens.rows.map(r => `${r.family_name}:${r.token.substring(0,20)}…`).join(', ') || 'NONE'}`);
-            if (familyTokens.rows.length > 0) {
-              const tokens = familyTokens.rows.map(r => r.token);
-              await sendPushNotifications(
-                tokens,
-                pushTitle,
-                pushBody,
-                { type: 'missed_checkin', elderId: elder.id, checkinId: checkinId, level: targetLevel },
-                targetLevel >= 2
-              );
-              console.log(`[Push] Sent ${tokens.length} level-${targetLevel} push alert(s) for ${elder.name} (interval)`);
+              console.log(`[Push] Family push tokens for ${elder.name} (elder ID ${elder.id}, interval): ${familyPushTokensI.length} token(s)`);
+              if (familyPushTokensI.length > 0) {
+                await sendPushNotifications(
+                  familyPushTokensI,
+                  pushTitle,
+                  pushBody,
+                  { type: 'missed_checkin', elderId: elder.id, checkinId: checkinId, level: targetLevel },
+                  targetLevel >= 2,
+                  familyUserIdsI
+                );
+                console.log(`[Push] Sent ${familyPushTokensI.length} level-${targetLevel} push alert(s) for ${elder.name} (interval)`);
+                if (escalationAlertIdInterval) {
+                  pool.query(`UPDATE escalation_alerts SET push_notified_at = NOW() WHERE id = $1`, [escalationAlertIdInterval]).catch(() => {});
+                }
+              } else {
+                console.log(`[Push] WARNING: No push tokens found for family of ${elder.name} — push NOT sent for level-${targetLevel} alert (interval)`);
+              }
+
+              // Real-time WebSocket alert to family
+              const wsSentInterval = await sendWsAlertToFamily(elder.id, {
+                type: 'escalation',
+                level: targetLevel,
+                elder: { id: elder.id, name: elder.name },
+                message: pushTitle,
+                body: pushBody,
+                checkinId: checkinId,
+                timestamp: new Date().toISOString(),
+              });
+              if (wsSentInterval > 0) console.log(`[WS] Sent ${wsSentInterval} real-time alerts for ${elder.name} (interval)`);
+
+              // Send email notifications to family members (capped at 5 per escalation)
+              await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel, escalationAlertIdInterval);
             } else {
-              console.log(`[Push] WARNING: No push tokens found for family of ${elder.name} — push notification NOT sent for level-${targetLevel} alert (interval mode)`);
+              console.log(`[Push] Skipping push for ${elder.name} (interval) — already notified at level ${targetLevel}`);
             }
-
-            // Send real-time WebSocket alert to family
-            const wsSentInterval = await sendWsAlertToFamily(elder.id, {
-              type: 'escalation',
-              level: targetLevel,
-              elder: { id: elder.id, name: elder.name },
-              message: pushTitle,
-              body: pushBody,
-              checkinId: checkinId,
-              timestamp: new Date().toISOString(),
-            });
-            if (wsSentInterval > 0) console.log(`[WS] Sent ${wsSentInterval} real-time alerts for ${elder.name} (interval)`);
-
-            // Send email notifications to family members (capped at 5 per escalation)
-            await sendEscalationEmails(family.rows, elder, pushTitle, targetLevel, escalationAlertIdInterval);
 
             // ── Twilio SMS & Voice escalation (interval mode) ──
-            if (targetLevel >= 1 && elder.phone) {
-              // Level 1+: SMS reminder to elder
-              await sendAlert(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
-            }
-            if (targetLevel >= 2) {
-              // Level 2: Voice call — if no answer, IMMEDIATELY call SAMU
-              let elderAnswered = false;
-              if (elder.phone) {
-                elderAnswered = await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem. Sua familia esta preocupada. Pressione 1 se esta bem.`);
+            // SMS deduplication: only 1 SMS per escalation event to primary contact
+            const smsSentForThisAlertI = existingSmsSentAtI !== null;
+            if (!smsSentForThisAlertI) {
+              if (targetLevel >= 1 && elder.phone) {
+                // Level 1+: SMS reminder to elder
+                await sendAlert(elder.phone, `Estou Bem: Voce tem um check-in pendente. Responda SIM se esta tudo bem.`);
               }
-              for (const fm of family.rows) {
-                if (fm.phone) await sendAlert(fm.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
+              if (targetLevel >= 2) {
+                // Level 2: Voice call — if no answer, IMMEDIATELY call SAMU
+                let elderAnswered = false;
+                if (elder.phone) {
+                  elderAnswered = await makeVoiceCall(elder.phone, `Ola ${elder.name}. Voce tem um check-in pendente no Estou Bem. Sua familia esta preocupada. Pressione 1 se esta bem.`);
+                }
+                // SMS to PRIMARY emergency contact only
+                const primaryContactI = contacts.rows[0] || family.rows[0];
+                if (primaryContactI?.phone) {
+                  await sendAlert(primaryContactI.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
+                  console.log(`[SMS] Sent 1 SMS for escalation ${escalationAlertIdInterval} to primary contact: ${primaryContactI.name}`);
+                }
+                if (!elderAnswered && targetLevel < 3) {
+                  console.log(`[ESCALATION] ${elder.name} did NOT answer voice call — escalating to SAMU NOW`);
+                  targetLevel = 3;
+                }
               }
-              for (const ct of contacts.rows) {
-                if (ct.phone) await sendAlert(ct.phone, `ALERTA: ${elder.name} nao respondeu ao check-in ha 15 minutos. Por favor verifique.`);
+              if (targetLevel >= 3) {
+                const allPhones = [
+                  ...family.rows.filter(f => f.phone).map(f => f.phone),
+                  ...contacts.rows.filter(c => c.phone).map(c => c.phone),
+                ];
+                const medIntSMS = await getMedicalInfoForSMS(elder.id);
+                for (const phone of allPhones) {
+                  await sendAlert(phone, `EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medIntSMS}`);
+                }
+                await callSAMUWithConference(elder, allPhones);
+                console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);
               }
-              if (!elderAnswered && targetLevel < 3) {
-                console.log(`[ESCALATION] ${elder.name} did NOT answer voice call — escalating to SAMU NOW`);
-                targetLevel = 3;
+              // Mark SMS as sent for this escalation event
+              if (escalationAlertIdInterval) {
+                pool.query(`UPDATE escalation_alerts SET sms_sent_at = NOW() WHERE id = $1`, [escalationAlertIdInterval]).catch(() => {});
+                console.log(`[SMS] Marked sms_sent_at for escalation ${escalationAlertIdInterval} (interval)`);
               }
-            }
-            if (targetLevel >= 3) {
-              const allPhones = [
-                ...family.rows.filter(f => f.phone).map(f => f.phone),
-                ...contacts.rows.filter(c => c.phone).map(c => c.phone),
-              ];
-              const medIntSMS = await getMedicalInfoForSMS(elder.id);
-              for (const phone of allPhones) {
-                await sendAlert(phone, `🆘 EMERGENCIA: ${elder.name} nao responde e nao atendeu ligacao. SAMU 192 sendo acionado AGORA. Voce sera conectado.${medIntSMS}`);
-              }
-              await callSAMUWithConference(elder, allPhones);
-              console.log(`[SAMU] Emergency conference call initiated for ${elder.name} with ${allPhones.length} contacts`);
+            } else {
+              console.log(`[SMS] Skipping SMS for ${elder.name} escalation ${escalationAlertIdInterval} — already sent at ${existingSmsSentAtI}`);
             }
 
-            // Send reminder to the elder themselves
-            const elderTokens = await pool.query(
+            // Send reminder to the elder themselves (always, so they see it even if family was already notified)
+            const elderTokensI = await pool.query(
               `SELECT token FROM push_tokens WHERE user_id = $1`,
               [elder.id]
             );
-            if (elderTokens.rows.length > 0) {
+            if (elderTokensI.rows.length > 0 && isNewLevelInterval) {
               await sendPushNotifications(
-                elderTokens.rows.map(r => r.token),
+                elderTokensI.rows.map(r => r.token),
                 'Voce tem um check-in pendente!',
                 'Toque para confirmar que esta tudo bem.',
                 { type: 'checkin_reminder', screen: 'Home' },
-                false
+                false,
+                [elder.id]
               );
             }
           }
@@ -6440,31 +6614,30 @@ async function checkMissedCheckins() {
         );
 
         // Push notification to elder
-        const elderTokens = await pool.query(
+        const elderMedTokens = await pool.query(
           `SELECT token FROM push_tokens WHERE user_id = $1`, [med.user_id]
         );
-        if (elderTokens.rows.length > 0) {
+        if (elderMedTokens.rows.length > 0) {
           await sendPushNotifications(
-            elderTokens.rows.map(r => r.token),
+            elderMedTokens.rows.map(r => r.token),
             'Medicamento acabando',
             `Seu medicamento ${med.name} esta acabando. Restam ${med.stock} unidades.`,
             { type: 'low_stock', medicationId: med.id },
-            false
+            false,
+            [med.user_id]
           );
         }
 
         // Push notification to family
-        const familyTokens = await pool.query(
-          `SELECT pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id WHERE u.linked_elder_id = $1`,
-          [med.user_id]
-        );
-        if (familyTokens.rows.length > 0) {
+        const { tokens: medFamilyTokens, userIds: medFamilyUserIds } = await getFamilyPushTokens(med.user_id);
+        if (medFamilyTokens.length > 0) {
           await sendPushNotifications(
-            familyTokens.rows.map(r => r.token),
+            medFamilyTokens,
             'Medicamento acabando',
             `${med.elder_name} esta com estoque baixo de ${med.name}. Restam ${med.stock} unidades.`,
             { type: 'low_stock', elderId: med.user_id, medicationId: med.id },
-            false
+            false,
+            medFamilyUserIds
           );
         }
 
