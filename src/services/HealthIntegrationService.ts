@@ -153,10 +153,9 @@ class HealthIntegrationService {
           id: generateId(),
           elderId,
           timestamp: record.endTime || record.startTime,
-          type: "blood_glucose" as HealthMetricType, // reuse as steps
+          type: "steps",
           value: record.count || 0,
           unit: "passos",
-          notes: "steps",
         });
       }
 
@@ -444,10 +443,20 @@ class HealthIntegrationService {
         id: generateId(),
         elderId,
         timestamp: now,
-        type: "blood_glucose" as HealthMetricType, // reuse field as steps
+        type: "steps",
         value: summary.steps,
         unit: "passos",
-        notes: "steps",
+      });
+    }
+
+    if (summary.sleepHours) {
+      entries.push({
+        id: generateId(),
+        elderId,
+        timestamp: now,
+        type: "sleep",
+        value: summary.sleepHours,
+        unit: "hours",
       });
     }
 
@@ -503,10 +512,9 @@ class HealthIntegrationService {
           id: generateId(),
           elderId,
           timestamp: end.toISOString(),
-          type: "blood_glucose" as HealthMetricType, // reuse as steps
+          type: "steps",
           value: result.steps,
           unit: "passos",
-          notes: "steps",
         });
       }
     } catch (err) {

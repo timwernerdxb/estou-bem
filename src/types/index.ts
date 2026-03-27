@@ -134,7 +134,9 @@ export type HealthMetricType =
   | "blood_glucose"
   | "weight"
   | "temperature"
-  | "oxygen_saturation";
+  | "oxygen_saturation"
+  | "steps"
+  | "sleep";
 
 // ─── Emergency Contacts ─────────────────────────────────────────
 export interface EmergencyContact {

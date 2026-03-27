@@ -217,7 +217,7 @@ export function ElderDetailScreen() {
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <Ionicons name="heart" size={20} color={COLORS.danger} />
-            <Text style={styles.sectionTitle}>Sa\u00FAde</Text>
+            <Text style={styles.sectionTitle}>Saúde</Text>
           </View>
           <View style={styles.healthGridWrap}>
             {/* Row 1: Heart rate | SpO2 */}

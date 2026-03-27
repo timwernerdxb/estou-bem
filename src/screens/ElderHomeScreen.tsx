@@ -754,7 +754,7 @@ export function ElderHomeScreen() {
   );
 }
 
-const BUTTON_SIZE = Math.min(SCREEN.width * 0.6, 250);
+const BUTTON_SIZE = Math.min(SCREEN.width * 0.7, 320);
 
 const styles = StyleSheet.create({
   container: {
@@ -807,9 +807,10 @@ const styles = StyleSheet.create({
   checkinButtonInner: {
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 16,
   },
   checkinButtonTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "700",
     color: COLORS.white,
     letterSpacing: 3,
@@ -819,12 +820,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 1,
     backgroundColor: "rgba(255,255,255,0.5)",
-    marginVertical: 10,
+    marginVertical: 8,
   },
   checkinButtonSub: {
-    fontSize: 13,
+    fontSize: 12,
     color: "rgba(255,255,255,0.85)",
-    marginTop: 8,
+    marginTop: 6,
     letterSpacing: 1,
     textTransform: "uppercase",
   },
