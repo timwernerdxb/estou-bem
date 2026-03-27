@@ -550,7 +550,7 @@ export function ElderHomeScreen() {
               <View style={styles.checkinButtonInner}>
                 <Text style={styles.checkinButtonTitle}>{t("checkin_done")}</Text>
                 <View style={styles.checkinDivider} />
-                <Ionicons name="finger-print" size={48} color={COLORS.white} />
+                <Ionicons name="finger-print" size={44} color={COLORS.white} />
                 <Text style={styles.checkinButtonSub}>Toque para confirmar</Text>
               </View>
             </TouchableOpacity>
@@ -596,7 +596,7 @@ export function ElderHomeScreen() {
           <View style={styles.checkinButtonInner}>
             <Text style={[styles.checkinButtonTitle, { opacity: 0.6 }]}>{t("checkin_done")}</Text>
             <View style={[styles.checkinDivider, { opacity: 0.3 }]} />
-            <Ionicons name="finger-print" size={48} color={COLORS.white} style={{ opacity: 0.5 }} />
+            <Ionicons name="finger-print" size={44} color={COLORS.white} style={{ opacity: 0.5 }} />
             <Text style={[styles.checkinButtonSub, { opacity: 0.6 }]}>
               {nextCheckinTime ? `Pr\u00F3ximo \u00E0s ${nextCheckinTime}` : `Pr\u00F3ximo check-in`}
             </Text>
@@ -804,6 +804,7 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_SIZE / 2,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -823,11 +824,11 @@ const styles = StyleSheet.create({
   checkinButtonInner: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
-    width: BUTTON_SIZE * 0.62, // constrain to inscribed circle area
+    paddingVertical: 8,
+    width: BUTTON_SIZE * 0.68, // constrain to inscribed circle area
   },
   checkinButtonTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "700",
     color: COLORS.white,
     letterSpacing: 2,
