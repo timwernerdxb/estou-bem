@@ -2,50 +2,34 @@ import ExpoModulesCore
 import HealthKit
 
 public class ExpoHealthkitModule: Module {
-  // Lazy-initialize HKHealthStore to avoid crash on module load
-  // when HealthKit entitlement is missing or unavailable
-  private lazy var healthStore: HKHealthStore? = {
-    guard HKHealthStore.isHealthDataAvailable() else { return nil }
-    return HKHealthStore()
-  }()
+  // Always create HKHealthStore — every iPhone supports HealthKit
+  private lazy var healthStore: HKHealthStore = HKHealthStore()
 
   public func definition() -> ModuleDefinition {
     Name("ExpoHealthkit")
 
     AsyncFunction("requestAuthorization") { (promise: Promise) in
-      do {
-        guard #available(iOS 13.0, *) else {
-          promise.resolve(false)
-          return
-        }
+      let store = self.healthStore
 
-        guard HKHealthStore.isHealthDataAvailable(), let store = self.healthStore else {
-          promise.resolve(false)
-          return
-        }
+      var readTypes = Set<HKObjectType>()
+      if let hr = HKObjectType.quantityType(forIdentifier: .heartRate) { readTypes.insert(hr) }
+      if let sc = HKObjectType.quantityType(forIdentifier: .stepCount) { readTypes.insert(sc) }
+      if let ox = HKObjectType.quantityType(forIdentifier: .oxygenSaturation) { readTypes.insert(ox) }
+      if let sys = HKObjectType.quantityType(forIdentifier: .bloodPressureSystolic) { readTypes.insert(sys) }
+      if let dia = HKObjectType.quantityType(forIdentifier: .bloodPressureDiastolic) { readTypes.insert(dia) }
+      if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) { readTypes.insert(sleep) }
 
-        var readTypes = Set<HKObjectType>()
-        if let hr = HKObjectType.quantityType(forIdentifier: .heartRate) { readTypes.insert(hr) }
-        if let sc = HKObjectType.quantityType(forIdentifier: .stepCount) { readTypes.insert(sc) }
-        if let ox = HKObjectType.quantityType(forIdentifier: .oxygenSaturation) { readTypes.insert(ox) }
-        if let sys = HKObjectType.quantityType(forIdentifier: .bloodPressureSystolic) { readTypes.insert(sys) }
-        if let dia = HKObjectType.quantityType(forIdentifier: .bloodPressureDiastolic) { readTypes.insert(dia) }
-        if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) { readTypes.insert(sleep) }
-
-        guard !readTypes.isEmpty else {
-          promise.resolve(false)
-          return
-        }
-
-        store.requestAuthorization(toShare: nil, read: readTypes) { success, error in
-          if let error = error {
-            promise.reject("HEALTHKIT_AUTH_ERROR", error.localizedDescription)
-          } else {
-            promise.resolve(success)
-          }
-        }
-      } catch {
+      guard !readTypes.isEmpty else {
         promise.resolve(false)
+        return
+      }
+
+      store.requestAuthorization(toShare: nil, read: readTypes) { success, error in
+        if let error = error {
+          promise.reject("HEALTHKIT_AUTH_ERROR", error.localizedDescription)
+        } else {
+          promise.resolve(success)
+        }
       }
     }
 
@@ -81,8 +65,7 @@ public class ExpoHealthkitModule: Module {
     }
 
     AsyncFunction("isAvailable") { () -> Bool in
-      guard #available(iOS 13.0, *) else { return false }
-      return HKHealthStore.isHealthDataAvailable()
+      return true // Every iPhone supports HealthKit
     }
   }
 
@@ -95,15 +78,7 @@ public class ExpoHealthkitModule: Module {
     promise: Promise,
     multiplyBy100: Bool = false
   ) {
-    guard #available(iOS 13.0, *) else {
-      promise.resolve(nil)
-      return
-    }
-
-    guard let store = self.healthStore else {
-      promise.resolve(nil)
-      return
-    }
+    let store = self.healthStore
 
     guard let sampleType = HKSampleType.quantityType(forIdentifier: typeIdentifier) else {
       promise.resolve(nil)
@@ -145,15 +120,7 @@ public class ExpoHealthkitModule: Module {
   // MARK: - Query today's step count (cumulative)
 
   private func queryStepCount(promise: Promise) {
-    guard #available(iOS 13.0, *) else {
-      promise.resolve(0)
-      return
-    }
-
-    guard let store = self.healthStore else {
-      promise.resolve(0)
-      return
-    }
+    let store = self.healthStore
 
     guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else {
       promise.resolve(0)
@@ -183,15 +150,7 @@ public class ExpoHealthkitModule: Module {
   // MARK: - Query last night's sleep hours
 
   private func querySleepHours(promise: Promise) {
-    guard #available(iOS 13.0, *) else {
-      promise.resolve(nil)
-      return
-    }
-
-    guard let store = self.healthStore else {
-      promise.resolve(nil)
-      return
-    }
+    let store = self.healthStore
 
     guard let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else {
       promise.resolve(nil)
@@ -247,15 +206,7 @@ public class ExpoHealthkitModule: Module {
   // MARK: - Query latest blood pressure
 
   private func queryBloodPressure(promise: Promise) {
-    guard #available(iOS 13.0, *) else {
-      promise.resolve(nil)
-      return
-    }
-
-    guard let store = self.healthStore else {
-      promise.resolve(nil)
-      return
-    }
+    let store = self.healthStore
 
     guard let sysType = HKSampleType.quantityType(forIdentifier: .bloodPressureSystolic) else {
       promise.resolve(nil)
