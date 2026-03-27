@@ -324,12 +324,12 @@ export function FamilyDashboardScreen() {
           </Card>
         </View>
 
-        {/* Health Card */}
-        {hasHealthData && (
-          <Card style={styles.healthCard}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Saúde</Text>
-            </View>
+        {/* Health Card - always visible */}
+        <Card style={styles.healthCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Saúde</Text>
+          </View>
+          {hasHealthData ? (
             <View style={styles.healthGrid}>
               {latestHeartRate && (
                 <View style={styles.healthItem}>
@@ -362,8 +362,15 @@ export function FamilyDashboardScreen() {
                 </View>
               )}
             </View>
-          </Card>
-        )}
+          ) : (
+            <View style={{ alignItems: "center", paddingVertical: SPACING.lg }}>
+              <Ionicons name="heart-outline" size={32} color={COLORS.textLight} />
+              <Text style={{ ...FONTS.caption, color: COLORS.textLight, marginTop: SPACING.sm, textAlign: "center" }}>
+                Aguardando dados de saúde do Apple Watch
+              </Text>
+            </View>
+          )}
+        </Card>
 
         {/* Recent Check-ins */}
         <Card style={styles.sectionCard}>
