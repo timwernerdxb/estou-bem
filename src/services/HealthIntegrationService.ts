@@ -4,8 +4,13 @@ import { HealthEntry, HealthMetricType } from "../types";
 import { postHealth, postActivityUpdate } from "./ApiService";
 // expo-sensors Pedometer for iOS step count fallback
 import { Pedometer } from "expo-sensors";
-// Custom Expo module for HealthKit (Swift, no C++ interop issues)
-import * as ExpoHealthkit from "../../modules/expo-healthkit/src";
+// Custom Expo module for HealthKit — loaded dynamically to prevent app crash if module fails
+let ExpoHealthkit: any = null;
+try {
+  ExpoHealthkit = require("../../modules/expo-healthkit/src");
+} catch (e) {
+  console.warn("[HealthKit] Module not available, using pedometer fallback:", (e as Error).message);
+}
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
@@ -224,6 +229,11 @@ class HealthIntegrationService {
   // ─── iOS: Apple HealthKit (via custom expo-healthkit module) ──────
   private async initAppleHealth(): Promise<boolean> {
     try {
+      if (!ExpoHealthkit) {
+        console.log("[AppleHealth] Module not loaded, using pedometer only");
+        this.initialized = true;
+        return true;
+      }
       const available = await ExpoHealthkit.isAvailable();
       if (!available) {
         console.log("[AppleHealth] HealthKit not available on this device");
