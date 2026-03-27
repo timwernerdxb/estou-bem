@@ -86,11 +86,15 @@ if (WebSocket) {
     const userId = url.searchParams.get('userId');
     const role = url.searchParams.get('role');
 
+    ws.isAlive = true;
+
     if (userId) {
       if (!wsClients.has(userId)) wsClients.set(userId, new Set());
       wsClients.get(userId).add(ws);
       console.log(`[WS] Client connected: userId=${userId} role=${role}`);
     }
+
+    ws.on('pong', () => { ws.isAlive = true; });
 
     ws.on('close', () => {
       if (userId && wsClients.has(userId)) {
@@ -110,6 +114,30 @@ if (WebSocket) {
         if (msg.type === 'ping') ws.send(JSON.stringify({ type: 'pong' }));
       } catch (e) { /* ignore malformed */ }
     });
+  });
+
+  // Heartbeat: detect and terminate stale WebSocket connections every 30s
+  const wsHeartbeatInterval = setInterval(() => {
+    if (!wss) return;
+    wss.clients.forEach((ws) => {
+      if (ws.isAlive === false) {
+        // Remove from wsClients map before terminating
+        for (const [uid, clients] of wsClients) {
+          if (clients.has(ws)) {
+            clients.delete(ws);
+            if (clients.size === 0) wsClients.delete(uid);
+            break;
+          }
+        }
+        return ws.terminate();
+      }
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, 30000);
+
+  wss.on('close', () => {
+    clearInterval(wsHeartbeatInterval);
   });
 
   console.log('[WS] WebSocket server initialized on /ws');
@@ -618,6 +646,7 @@ async function initDB() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_escalation_elder ON escalation_alerts(elder_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_escalation_checkin_active ON escalation_alerts(checkin_id) WHERE status = 'active';
 
       CREATE TABLE IF NOT EXISTS push_tokens (
         id SERIAL PRIMARY KEY,
@@ -960,13 +989,32 @@ function rateLimiter(req, res, next) {
   next();
 }
 
-// Clean up rate limit map every 5 minutes
+// Clean up rate limit map every 5 minutes (with size cap to prevent memory leak)
 setInterval(() => {
   const now = Date.now();
   for (const [ip, entry] of rateLimitMap) {
     if (now > entry.resetAt) rateLimitMap.delete(ip);
   }
+  // Hard cap: if map grows beyond 10000 entries, clear oldest
+  if (rateLimitMap.size > 10000) {
+    const toDelete = rateLimitMap.size - 5000;
+    let deleted = 0;
+    for (const key of rateLimitMap.keys()) {
+      if (deleted >= toDelete) break;
+      rateLimitMap.delete(key);
+      deleted++;
+    }
+    console.log(`[RateLimit] Pruned ${deleted} entries (was ${rateLimitMap.size + deleted})`);
+  }
 }, 5 * 60 * 1000);
+
+// Clean up stale pendingEscalationTimers every 10 minutes (safety net for memory leak)
+setInterval(() => {
+  if (pendingEscalationTimers.size > 1000) {
+    console.log(`[Escalation] pendingEscalationTimers has ${pendingEscalationTimers.size} entries — clearing stale`);
+    pendingEscalationTimers.clear();
+  }
+}, 10 * 60 * 1000);
 
 // ── DB-based session tokens ──────────────────────────────
 // Legacy in-memory fallback removed — all tokens stored in sessions table
@@ -1045,7 +1093,7 @@ async function authMiddleware(req, res, next) {
 }
 
 // ── Auth Routes ───────────────────────────────────────────
-app.post('/api/register', rateLimiter, async (req, res) => {
+app.post('/api/register', rateLimiter, asyncHandler(async (req, res) => {
   const { email, password, name, phone, role, referral_code, utm_source, utm_medium, utm_campaign } = req.body;
   if (!email || !password || !name || !role) {
     return res.status(400).json({ error: 'email, password, name, and role are required' });
@@ -1140,9 +1188,9 @@ app.post('/api/register', rateLimiter, async (req, res) => {
     console.error('Register error:', err);
     res.status(500).json({ error: 'Registration failed' });
   }
-});
+}));
 
-app.post('/api/login', rateLimiter, async (req, res) => {
+app.post('/api/login', rateLimiter, asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
 
@@ -1176,20 +1224,20 @@ app.post('/api/login', rateLimiter, async (req, res) => {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
   }
-});
+}));
 
 // ── Logout ────────────────────────────────────────────────
-app.post('/api/logout', async (req, res) => {
+app.post('/api/logout', asyncHandler(async (req, res) => {
   const auth = req.headers.authorization;
   if (auth?.startsWith('Bearer ')) {
     const token = auth.slice(7);
     await deleteToken(token);
   }
   res.json({ ok: true });
-});
+}));
 
 // ── Password Reset Flow ──────────────────────────────────
-app.post('/api/forgot-password', rateLimiter, async (req, res) => {
+app.post('/api/forgot-password', rateLimiter, asyncHandler(async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email is required' });
 
@@ -1230,9 +1278,9 @@ app.post('/api/forgot-password', rateLimiter, async (req, res) => {
     console.error('Forgot password error:', err);
     res.status(500).json({ error: 'Failed to process request' });
   }
-});
+}));
 
-app.post('/api/reset-password', rateLimiter, async (req, res) => {
+app.post('/api/reset-password', rateLimiter, asyncHandler(async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
@@ -1260,7 +1308,7 @@ app.post('/api/reset-password', rateLimiter, async (req, res) => {
     console.error('Reset password error:', err);
     res.status(500).json({ error: 'Failed to reset password' });
   }
-});
+}));
 
 // ── Push Notification Helper ─────────────────────────────
 async function sendPushNotifications(tokens, title, body, data = {}, critical = false) {
@@ -1632,7 +1680,7 @@ app.post('/api/twilio/status', express.urlencoded({ extended: false }), twilioWe
 
 // ── Push Token Routes ────────────────────────────────────
 // Authenticated version (web app users)
-app.post('/api/push-token', authMiddleware, async (req, res) => {
+app.post('/api/push-token', authMiddleware, asyncHandler(async (req, res) => {
   const { token, platform } = req.body;
   if (!token) return res.status(400).json({ error: 'token is required' });
 
@@ -1642,10 +1690,10 @@ app.post('/api/push-token', authMiddleware, async (req, res) => {
     [req.userId, token, platform || 'unknown']
   );
   res.json({ ok: true });
-});
+}));
 
 // Public version for mobile app (accepts email to identify user)
-app.post('/api/push-token/register', async (req, res) => {
+app.post('/api/push-token/register', asyncHandler(async (req, res) => {
   const { token, platform, email, user_id } = req.body;
   if (!token) return res.status(400).json({ error: 'token is required' });
 
@@ -1670,15 +1718,15 @@ app.post('/api/push-token/register', async (req, res) => {
     ).catch(() => {});
   }
   res.json({ ok: true });
-});
+}));
 
-app.delete('/api/push-token', authMiddleware, async (req, res) => {
+app.delete('/api/push-token', authMiddleware, asyncHandler(async (req, res) => {
   const { token } = req.body;
   if (token) {
     await pool.query('DELETE FROM push_tokens WHERE user_id = $1 AND token = $2', [req.userId, token]);
   }
   res.json({ ok: true });
-});
+}));
 
 // ── Twilio Webhooks ──────────────────────────────────────
 
@@ -1749,13 +1797,13 @@ app.post('/api/twilio/sms', express.urlencoded({ extended: false }), twilioWebho
 }));
 
 // Test endpoint: send a WhatsApp check-in reminder to any number
-app.post('/api/twilio/test-whatsapp', async (req, res) => {
+app.post('/api/twilio/test-whatsapp', asyncHandler(async (req, res) => {
   const { phone } = req.body;
   if (!phone) return res.status(400).json({ error: 'phone is required' });
   // Use approved template with buttons (works outside 24h window)
-  const sent = await sendWhatsAppTemplate(phone, WA_TEMPLATES.checkin_buttons, { '1': elderName || 'Amigo(a)' });
+  const sent = await sendWhatsAppTemplate(phone, WA_TEMPLATES.checkin_buttons, { '1': 'Amigo(a)' });
   res.json({ success: sent, channel: 'whatsapp', to: phone });
-});
+}));
 
 // Twilio WhatsApp incoming message webhook
 // Set this URL in Twilio Console -> WhatsApp Senders -> Webhook URL:
@@ -1829,17 +1877,17 @@ app.post('/api/twilio/whatsapp', express.urlencoded({ extended: false }), twilio
 }));
 
 // ── User Routes ───────────────────────────────────────────
-app.get('/api/me', authMiddleware, async (req, res) => {
+app.get('/api/me', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT id, email, name, phone, role, link_code, subscription, trial_start, linked_elder_id FROM users WHERE id = $1`,
     [req.userId]
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
   res.json(result.rows[0]);
-});
+}));
 
 // GET /api/profile — full user profile including gamification + linked elder name
-app.get('/api/profile', authMiddleware, async (req, res) => {
+app.get('/api/profile', authMiddleware, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, email, name, phone, role, link_code, subscription, trial_start, linked_elder_id, streak_days, total_points, badges FROM users WHERE id = $1`,
@@ -1870,9 +1918,9 @@ app.get('/api/profile', authMiddleware, async (req, res) => {
     console.error('[profile] Error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
-app.post('/api/link-elder', authMiddleware, async (req, res) => {
+app.post('/api/link-elder', authMiddleware, asyncHandler(async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Link code required' });
 
@@ -1899,10 +1947,10 @@ app.post('/api/link-elder', authMiddleware, async (req, res) => {
   }
 
   res.json({ ok: true, elderName: elder.rows[0].name, elderId: elder.rows[0].id });
-});
+}));
 
 // ── Family Elder Status ──────────────────────────────────
-app.get('/api/family/elder-status', authMiddleware, async (req, res) => {
+app.get('/api/family/elder-status', authMiddleware, asyncHandler(async (req, res) => {
   try {
     const user = await pool.query(`SELECT linked_elder_id FROM users WHERE id = $1`, [req.userId]);
     const elderId = user.rows[0]?.linked_elder_id;
@@ -1963,15 +2011,15 @@ app.get('/api/family/elder-status', authMiddleware, async (req, res) => {
     console.error('[elder-status] Error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // ── Settings Routes ───────────────────────────────────────
-app.get('/api/settings', authMiddleware, async (req, res) => {
+app.get('/api/settings', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(`SELECT * FROM settings WHERE user_id = $1`, [req.userId]);
   res.json(result.rows[0] || { checkin_times: ['09:00'], checkin_mode: 'scheduled', checkin_interval_hours: 2, checkin_window_start: '07:00', checkin_window_end: '22:00', language: 'pt-BR' });
-});
+}));
 
-app.put('/api/settings', authMiddleware, async (req, res) => {
+app.put('/api/settings', authMiddleware, asyncHandler(async (req, res) => {
   const { checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes, samu_auto_call, language } = req.body;
   await pool.query(
     `INSERT INTO settings (user_id, checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes, samu_auto_call, language)
@@ -1988,10 +2036,10 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
     [req.userId, checkin_times, checkin_mode, checkin_interval_hours, checkin_window_start, checkin_window_end, escalation_minutes ?? null, samu_auto_call ?? null, language ?? null]
   );
   res.json({ ok: true });
-});
+}));
 
 // ── Check-in Routes ───────────────────────────────────────
-app.get('/api/checkins', authMiddleware, async (req, res) => {
+app.get('/api/checkins', authMiddleware, asyncHandler(async (req, res) => {
   const { date, limit } = req.query;
   let query = `SELECT * FROM checkins WHERE user_id = $1`;
   const params = [req.userId];
@@ -2002,10 +2050,10 @@ app.get('/api/checkins', authMiddleware, async (req, res) => {
 
   const result = await pool.query(query, params);
   res.json(result.rows);
-});
+}));
 
 // Get checkins for linked elder (family view)
-app.get('/api/checkins/elder', authMiddleware, async (req, res) => {
+app.get('/api/checkins/elder', authMiddleware, asyncHandler(async (req, res) => {
   const user = await pool.query(`SELECT linked_elder_id FROM users WHERE id = $1`, [req.userId]);
   const elderId = user.rows[0]?.linked_elder_id;
   if (!elderId) return res.status(404).json({ error: 'No linked elder' });
@@ -2019,10 +2067,10 @@ app.get('/api/checkins/elder', authMiddleware, async (req, res) => {
 
   const result = await pool.query(query, params);
   res.json(result.rows);
-});
+}));
 
 // ── Client-triggered escalation endpoint ──
-app.post('/api/escalation/trigger', authMiddleware, async (req, res) => {
+app.post('/api/escalation/trigger', authMiddleware, asyncHandler(async (req, res) => {
   const { user_id, level, action } = req.body;
   const uid = user_id || req.userId;
   try {
@@ -2093,10 +2141,10 @@ app.post('/api/escalation/trigger', authMiddleware, async (req, res) => {
     console.error('[Escalation Trigger]', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // ── Check-in Status (3-state: pending / completed / waiting) ──
-app.get('/api/checkin-status/:userId', async (req, res) => {
+app.get('/api/checkin-status/:userId', asyncHandler(async (req, res) => {
   const userId = parseInt(req.params.userId);
   if (!userId) return res.status(400).json({ error: 'Invalid userId' });
 
@@ -2194,25 +2242,25 @@ app.get('/api/checkin-status/:userId', async (req, res) => {
     console.error('[Checkin Status]', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // ── Nap mode — pause escalations for up to 1 hour (DB-persisted) ──
 
-app.post('/api/nap', authMiddleware, async (req, res) => {
+app.post('/api/nap', authMiddleware, asyncHandler(async (req, res) => {
   const minutes = Math.min(parseInt(req.body.minutes) || 60, 60); // max 1 hour
   const until = new Date(Date.now() + minutes * 60 * 1000);
   await pool.query(`UPDATE users SET nap_until = $1 WHERE id = $2`, [until, req.userId]);
   console.log(`[Nap] User ${req.userId} napping until ${until.toISOString()} (${minutes} min)`);
   res.json({ success: true, nap_until: until.toISOString(), minutes });
-});
+}));
 
-app.delete('/api/nap', authMiddleware, async (req, res) => {
+app.delete('/api/nap', authMiddleware, asyncHandler(async (req, res) => {
   await pool.query(`UPDATE users SET nap_until = NULL WHERE id = $1`, [req.userId]);
   console.log(`[Nap] User ${req.userId} woke up (nap cancelled)`);
   res.json({ success: true });
-});
+}));
 
-app.get('/api/nap', authMiddleware, async (req, res) => {
+app.get('/api/nap', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(`SELECT nap_until FROM users WHERE id = $1`, [req.userId]);
   const napUntil = result.rows[0]?.nap_until;
   if (napUntil && new Date(napUntil) > new Date()) {
@@ -2221,18 +2269,18 @@ app.get('/api/nap', authMiddleware, async (req, res) => {
     if (napUntil) await pool.query(`UPDATE users SET nap_until = NULL WHERE id = $1`, [req.userId]);
     res.json({ napping: false });
   }
-});
+}));
 
-app.post('/api/checkins', authMiddleware, async (req, res) => {
+app.post('/api/checkins', authMiddleware, asyncHandler(async (req, res) => {
   const { time, status, date } = req.body;
   const result = await pool.query(
     `INSERT INTO checkins (user_id, time, status, date) VALUES ($1, $2, $3, $4) RETURNING *`,
     [req.userId, time, status || 'pending', date || new Date().toISOString().slice(0, 10)]
   );
   res.json(result.rows[0]);
-});
+}));
 
-app.put('/api/checkins/:id', authMiddleware, async (req, res) => {
+app.put('/api/checkins/:id', authMiddleware, asyncHandler(async (req, res) => {
   const { status, time } = req.body;
   const confirmedAt = (status === 'confirmed' || status === 'auto_confirmed') ? new Date().toISOString() : null;
   const result = await pool.query(
@@ -2241,15 +2289,15 @@ app.put('/api/checkins/:id', authMiddleware, async (req, res) => {
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'Check-in not found' });
   res.json(result.rows[0]);
-});
+}));
 
 // ── Contact Routes ────────────────────────────────────────
-app.get('/api/contacts', authMiddleware, async (req, res) => {
+app.get('/api/contacts', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(`SELECT * FROM contacts WHERE user_id = $1 ORDER BY priority`, [req.userId]);
   res.json(result.rows);
-});
+}));
 
-app.post('/api/contacts', authMiddleware, async (req, res) => {
+app.post('/api/contacts', authMiddleware, asyncHandler(async (req, res) => {
   // Check limit
   const sub = await getEffectiveSub(req.userId);
   const count = await pool.query(`SELECT COUNT(*) FROM contacts WHERE user_id = $1`, [req.userId]);
@@ -2266,9 +2314,9 @@ app.post('/api/contacts', authMiddleware, async (req, res) => {
     [req.userId, name, phone, relationship || '', priority || 1]
   );
   res.json(result.rows[0]);
-});
+}));
 
-app.delete('/api/contacts/:id', authMiddleware, async (req, res) => {
+app.delete('/api/contacts/:id', authMiddleware, asyncHandler(async (req, res) => {
   // Check if this contact is a linked family member — if so, unlink them too
   const contact = await pool.query(`SELECT phone FROM contacts WHERE id = $1 AND user_id = $2`, [req.params.id, req.userId]);
   if (contact.rows[0]) {
@@ -2279,15 +2327,15 @@ app.delete('/api/contacts/:id', authMiddleware, async (req, res) => {
   }
   await pool.query(`DELETE FROM contacts WHERE id = $1 AND user_id = $2`, [req.params.id, req.userId]);
   res.json({ ok: true });
-});
+}));
 
 // ── Medication Routes ─────────────────────────────────────
-app.get('/api/medications', authMiddleware, async (req, res) => {
+app.get('/api/medications', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(`SELECT * FROM medications WHERE user_id = $1`, [req.userId]);
   res.json(result.rows);
-});
+}));
 
-app.post('/api/medications', authMiddleware, async (req, res) => {
+app.post('/api/medications', authMiddleware, asyncHandler(async (req, res) => {
   const { name, dosage, frequency, time, stock, unit, low_threshold } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const result = await pool.query(
@@ -2296,33 +2344,33 @@ app.post('/api/medications', authMiddleware, async (req, res) => {
     [req.userId, name, dosage || '', frequency || '', time || '08:00', stock || 30, unit || 'comprimidos', low_threshold || 5]
   );
   res.json(result.rows[0]);
-});
+}));
 
-app.put('/api/medications/:id', authMiddleware, async (req, res) => {
+app.put('/api/medications/:id', authMiddleware, asyncHandler(async (req, res) => {
   const { stock } = req.body;
   const result = await pool.query(
     `UPDATE medications SET stock = $1 WHERE id = $2 AND user_id = $3 RETURNING *`,
     [stock, req.params.id, req.userId]
   );
   res.json(result.rows[0]);
-});
+}));
 
-app.delete('/api/medications/:id', authMiddleware, async (req, res) => {
+app.delete('/api/medications/:id', authMiddleware, asyncHandler(async (req, res) => {
   await pool.query(`DELETE FROM medications WHERE id = $1 AND user_id = $2`, [req.params.id, req.userId]);
   res.json({ ok: true });
-});
+}));
 
 // ── Health Entries Routes ─────────────────────────────────
-app.get('/api/health', authMiddleware, async (req, res) => {
+app.get('/api/health', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT * FROM health_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
     [req.userId, parseInt(req.query.limit) || 50]
   );
   res.json(result.rows);
-});
+}));
 
 // Get health entries for linked elder
-app.get('/api/health/elder', authMiddleware, async (req, res) => {
+app.get('/api/health/elder', authMiddleware, asyncHandler(async (req, res) => {
   const user = await pool.query(`SELECT linked_elder_id FROM users WHERE id = $1`, [req.userId]);
   const elderId = user.rows[0]?.linked_elder_id;
   if (!elderId) return res.status(404).json({ error: 'No linked elder' });
@@ -2332,9 +2380,9 @@ app.get('/api/health/elder', authMiddleware, async (req, res) => {
     [elderId, parseInt(req.query.limit) || 50]
   );
   res.json(result.rows);
-});
+}));
 
-app.post('/api/health', authMiddleware, async (req, res) => {
+app.post('/api/health', authMiddleware, asyncHandler(async (req, res) => {
   const { type, value, unit, time, date, notes } = req.body;
   const result = await pool.query(
     `INSERT INTO health_entries (user_id, type, value, unit, time, date, notes)
@@ -2342,12 +2390,12 @@ app.post('/api/health', authMiddleware, async (req, res) => {
     [req.userId, type, value, unit, time, date || new Date().toISOString().slice(0, 10), notes]
   );
   res.json(result.rows[0]);
-});
+}));
 
 // ── Activity & Health Readings from Watch ─────────────────
 
 // POST /api/activity-update — receives movement + health data from Apple Watch
-app.post('/api/activity-update', authMiddleware, async (req, res) => {
+app.post('/api/activity-update', authMiddleware, asyncHandler(async (req, res) => {
   const { user_id, movement_detected, heart_rate, spo2, sleep_hours } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
@@ -2514,13 +2562,13 @@ app.post('/api/activity-update', authMiddleware, async (req, res) => {
     console.error('[Activity Update] Error:', err);
     res.status(500).json({ error: 'Failed to update activity' });
   }
-});
+}));
 
 // ── Fall Detection ────────────────────────────────────────
 
 // POST /api/fall-detected — Apple Watch detected a fall
 // Immediately escalates: Level 2 (voice call to elder), then Level 3 (SAMU) if no response in 60s
-app.post('/api/fall-detected', authMiddleware, async (req, res) => {
+app.post('/api/fall-detected', authMiddleware, asyncHandler(async (req, res) => {
   const { user_id, timestamp, location, heart_rate } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
@@ -2676,10 +2724,10 @@ app.post('/api/fall-detected', authMiddleware, async (req, res) => {
     console.error('[Fall Detection] Error:', err);
     res.status(500).json({ error: 'Failed to process fall event' });
   }
-});
+}));
 
 // POST /api/fall-cancelled — Elder cancelled the fall alert (false alarm)
-app.post('/api/fall-cancelled', authMiddleware, async (req, res) => {
+app.post('/api/fall-cancelled', authMiddleware, asyncHandler(async (req, res) => {
   const { user_id } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
@@ -2723,10 +2771,10 @@ app.post('/api/fall-cancelled', authMiddleware, async (req, res) => {
     console.error('[Fall Cancelled] Error:', err);
     res.status(500).json({ error: 'Failed to cancel fall event' });
   }
-});
+}));
 
 // GET /api/activity-log/:userId — get activity log for an elder
-app.get('/api/activity-log/:userId', authMiddleware, async (req, res) => {
+app.get('/api/activity-log/:userId', authMiddleware, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM activity_logs WHERE user_id = $1`,
@@ -2737,10 +2785,10 @@ app.get('/api/activity-log/:userId', authMiddleware, async (req, res) => {
     console.error('[Activity Log] Error:', err);
     res.status(500).json({ error: 'Failed to fetch activity log' });
   }
-});
+}));
 
 // GET /api/health-readings/:userId — get recent health readings for an elder
-app.get('/api/health-readings/:userId', authMiddleware, async (req, res) => {
+app.get('/api/health-readings/:userId', authMiddleware, asyncHandler(async (req, res) => {
   try {
     const { type, limit } = req.query;
     let query = `SELECT * FROM health_readings WHERE user_id = $1`;
@@ -2758,18 +2806,18 @@ app.get('/api/health-readings/:userId', authMiddleware, async (req, res) => {
     console.error('[Health Readings] Error:', err);
     res.status(500).json({ error: 'Failed to fetch health readings' });
   }
-});
+}));
 
 // ── Subscription Routes ───────────────────────────────────
-app.put('/api/subscription', authMiddleware, async (req, res) => {
+app.put('/api/subscription', authMiddleware, asyncHandler(async (req, res) => {
   const { plan } = req.body;
   if (!['free', 'familia', 'central'].includes(plan)) return res.status(400).json({ error: 'Invalid plan' });
   await pool.query(`UPDATE users SET subscription = $1 WHERE id = $2`, [plan, req.userId]);
   res.json({ ok: true });
-});
+}));
 
 // ── Elder data for family ─────────────────────────────────
-app.get('/api/elder-dashboard', authMiddleware, async (req, res) => {
+app.get('/api/elder-dashboard', authMiddleware, asyncHandler(async (req, res) => {
   const user = await pool.query(`SELECT linked_elder_id FROM users WHERE id = $1`, [req.userId]);
   const elderId = user.rows[0]?.linked_elder_id;
   if (!elderId) return res.status(404).json({ error: 'No linked elder' });
@@ -2797,7 +2845,7 @@ app.get('/api/elder-dashboard', authMiddleware, async (req, res) => {
     latestSpo2: latestSpo2.rows[0] || null,
     latestSleep: latestSleep.rows[0] || null,
   });
-});
+}));
 
 // ── Helper ────────────────────────────────────────────────
 async function getEffectiveSub(userId) {
@@ -2850,7 +2898,7 @@ async function calculateCommission(pool, affiliate, event, revenue) {
 
 // ── Conversion Tracking Routes ────────────────────────────
 // Public conversion endpoint (for mobile app affiliate tracking without auth)
-app.post('/api/conversions/track', async (req, res) => {
+app.post('/api/conversions/track', asyncHandler(async (req, res) => {
   const { event, revenue, affiliate_code, affiliate_channel, partner_id, campaign_id, referrer_user_id, metadata } = req.body;
   if (!event) return res.status(400).json({ error: 'event is required' });
   if (!affiliate_code && !referrer_user_id) return res.status(400).json({ error: 'affiliate_code or referrer_user_id is required' });
@@ -2885,9 +2933,9 @@ app.post('/api/conversions/track', async (req, res) => {
     console.error('Public conversion track error:', err);
     res.status(500).json({ error: 'Failed to track conversion' });
   }
-});
+}));
 
-app.post('/api/conversions', authMiddleware, async (req, res) => {
+app.post('/api/conversions', authMiddleware, asyncHandler(async (req, res) => {
   const { event, revenue, affiliate_code, affiliate_channel, partner_id, campaign_id, referrer_user_id, metadata } = req.body;
   if (!event) return res.status(400).json({ error: 'event is required' });
 
@@ -2916,23 +2964,23 @@ app.post('/api/conversions', authMiddleware, async (req, res) => {
   }
 
   res.json(result.rows[0]);
-});
+}));
 
-app.get('/api/conversions', authMiddleware, async (req, res) => {
+app.get('/api/conversions', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT * FROM conversions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100`,
     [req.userId]
   );
   res.json(result.rows);
-});
+}));
 
 // ── Affiliate Routes ─────────────────────────────────────
-app.get('/api/affiliates', async (req, res) => {
+app.get('/api/affiliates', asyncHandler(async (req, res) => {
   const result = await pool.query(`SELECT id, code, channel, name, is_active FROM affiliates WHERE is_active = true`);
   res.json(result.rows);
-});
+}));
 
-app.post('/api/affiliates', async (req, res) => {
+app.post('/api/affiliates', asyncHandler(async (req, res) => {
   const { code, channel, name, email, phone, password, commission_rate } = req.body;
   if (!code || !channel || !name) return res.status(400).json({ error: 'code, channel, and name are required' });
 
@@ -2948,10 +2996,10 @@ app.post('/api/affiliates', async (req, res) => {
     if (err.code === '23505') return res.status(409).json({ error: 'Code already exists' });
     res.status(500).json({ error: 'Failed to create affiliate' });
   }
-});
+}));
 
 // Affiliate self-registration
-app.post('/api/affiliates/register', async (req, res) => {
+app.post('/api/affiliates/register', asyncHandler(async (req, res) => {
   const { name, email, password, phone, channel = 'influencer', company, website, social_media } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'name, email, and password are required' });
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
@@ -2992,10 +3040,10 @@ app.post('/api/affiliates/register', async (req, res) => {
     console.error('Affiliate registration error:', err);
     res.status(500).json({ error: 'Failed to register affiliate' });
   }
-});
+}));
 
 // Affiliate login with email + password
-app.post('/api/affiliates/login', rateLimiter, async (req, res) => {
+app.post('/api/affiliates/login', rateLimiter, asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
 
@@ -3024,10 +3072,10 @@ app.post('/api/affiliates/login', rateLimiter, async (req, res) => {
     console.error('Affiliate login error:', err);
     res.status(500).json({ error: 'Login failed' });
   }
-});
+}));
 
 // Authenticated affiliate dashboard
-app.get('/api/affiliates/me/dashboard', async (req, res) => {
+app.get('/api/affiliates/me/dashboard', asyncHandler(async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   const token = auth.slice(7);
@@ -3058,10 +3106,10 @@ app.get('/api/affiliates/me/dashboard', async (req, res) => {
     commissions: commissions.rows,
     stats: stats.rows[0],
   });
-});
+}));
 
 // Update affiliate profile (PIX key, phone, etc)
-app.put('/api/affiliates/me', async (req, res) => {
+app.put('/api/affiliates/me', asyncHandler(async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   const token = auth.slice(7);
@@ -3084,10 +3132,10 @@ app.put('/api/affiliates/me', async (req, res) => {
 
   if (result.rows.length === 0) return res.status(404).json({ error: 'Affiliate not found' });
   res.json(result.rows[0]);
-});
+}));
 
 // Request payout (affiliate-authenticated)
-app.post('/api/affiliates/me/payout', async (req, res) => {
+app.post('/api/affiliates/me/payout', asyncHandler(async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   const token = auth.slice(7);
@@ -3135,10 +3183,10 @@ app.post('/api/affiliates/me/payout', async (req, res) => {
     console.error('Payout request error:', err);
     res.status(500).json({ error: 'Failed to create payout request' });
   }
-});
+}));
 
 // Get payout history (affiliate-authenticated)
-app.get('/api/affiliates/me/payouts', async (req, res) => {
+app.get('/api/affiliates/me/payouts', asyncHandler(async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   const token = auth.slice(7);
@@ -3156,10 +3204,10 @@ app.get('/api/affiliates/me/payouts', async (req, res) => {
     console.error('Payout history error:', err);
     res.status(500).json({ error: 'Failed to fetch payout history' });
   }
-});
+}));
 
 // Keep public dashboard for backward compat (admin use only)
-app.get('/api/affiliates/:code/dashboard', async (req, res) => {
+app.get('/api/affiliates/:code/dashboard', asyncHandler(async (req, res) => {
   const affiliate = await pool.query(`SELECT * FROM affiliates WHERE code = $1`, [req.params.code]);
   if (affiliate.rows.length === 0) return res.status(404).json({ error: 'Affiliate not found' });
 
@@ -3183,10 +3231,10 @@ app.get('/api/affiliates/:code/dashboard', async (req, res) => {
     commissions: commissions.rows,
     stats: stats.rows[0],
   });
-});
+}));
 
 // ── Referral Routes ──────────────────────────────────────
-app.get('/api/referral-code', authMiddleware, async (req, res) => {
+app.get('/api/referral-code', authMiddleware, asyncHandler(async (req, res) => {
   let user = await pool.query(`SELECT referral_code, referral_reward_count, free_months_earned FROM users WHERE id = $1`, [req.userId]);
   if (!user.rows[0].referral_code) {
     const code = 'EB' + Math.random().toString(36).toUpperCase().slice(2, 6);
@@ -3200,9 +3248,9 @@ app.get('/api/referral-code', authMiddleware, async (req, res) => {
     referral_count: parseInt(referralCount.rows[0].count),
     free_months_earned: user.rows[0].free_months_earned || 0
   });
-});
+}));
 
-app.post('/api/referral/apply', authMiddleware, async (req, res) => {
+app.post('/api/referral/apply', authMiddleware, asyncHandler(async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Referral code required' });
 
@@ -3212,10 +3260,10 @@ app.post('/api/referral/apply', authMiddleware, async (req, res) => {
 
   await pool.query(`UPDATE users SET referred_by = $1 WHERE id = $2`, [referrer.rows[0].id, req.userId]);
   res.json({ ok: true, referrerName: referrer.rows[0].name });
-});
+}));
 
 // ── Service Provider / Marketplace Routes ────────────────
-app.get('/api/marketplace/providers', async (req, res) => {
+app.get('/api/marketplace/providers', asyncHandler(async (req, res) => {
   const { type } = req.query;
   let query = `SELECT * FROM service_providers WHERE is_active = true`;
   const params = [];
@@ -3223,9 +3271,9 @@ app.get('/api/marketplace/providers', async (req, res) => {
   query += ` ORDER BY name`;
   const result = await pool.query(query, params);
   res.json(result.rows);
-});
+}));
 
-app.post('/api/marketplace/bookings', authMiddleware, async (req, res) => {
+app.post('/api/marketplace/bookings', authMiddleware, asyncHandler(async (req, res) => {
   const { provider_id, type, amount, scheduled_at, notes } = req.body;
   if (!type) return res.status(400).json({ error: 'type is required' });
 
@@ -3241,9 +3289,9 @@ app.post('/api/marketplace/bookings', authMiddleware, async (req, res) => {
     [req.userId, provider_id, type, amount || 0, commission, scheduled_at, notes]
   );
   res.json(result.rows[0]);
-});
+}));
 
-app.get('/api/marketplace/bookings', authMiddleware, async (req, res) => {
+app.get('/api/marketplace/bookings', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT b.*, sp.name as provider_name FROM service_bookings b
      LEFT JOIN service_providers sp ON b.provider_id = sp.id
@@ -3251,15 +3299,15 @@ app.get('/api/marketplace/bookings', authMiddleware, async (req, res) => {
     [req.userId]
   );
   res.json(result.rows);
-});
+}));
 
 // ── B2B / Institutional Routes ───────────────────────────
-app.get('/api/institutions', async (req, res) => {
+app.get('/api/institutions', asyncHandler(async (req, res) => {
   const result = await pool.query(`SELECT * FROM institutions WHERE is_active = true ORDER BY name`);
   res.json(result.rows);
-});
+}));
 
-app.post('/api/institutions', async (req, res) => {
+app.post('/api/institutions', asyncHandler(async (req, res) => {
   const { name, type, contact_name, contact_email, contact_phone, contract_value, max_users } = req.body;
   if (!name || !type) return res.status(400).json({ error: 'name and type are required' });
 
@@ -3269,10 +3317,10 @@ app.post('/api/institutions', async (req, res) => {
     [name, type, contact_name, contact_email, contact_phone, contract_value, max_users]
   );
   res.json(result.rows[0]);
-});
+}));
 
 // ── LGPD Consent Routes ─────────────────────────────────
-app.post('/api/consent', authMiddleware, async (req, res) => {
+app.post('/api/consent', authMiddleware, asyncHandler(async (req, res) => {
   const { consent_type, granted } = req.body;
   if (!consent_type || granted === undefined) return res.status(400).json({ error: 'consent_type and granted are required' });
 
@@ -3284,19 +3332,19 @@ app.post('/api/consent', authMiddleware, async (req, res) => {
     [req.userId, consent_type, granted, ip, ua]
   );
   res.json({ ok: true });
-});
+}));
 
-app.get('/api/consent', authMiddleware, async (req, res) => {
+app.get('/api/consent', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT DISTINCT ON (consent_type) consent_type, granted, created_at
      FROM consent_records WHERE user_id = $1 ORDER BY consent_type, created_at DESC`,
     [req.userId]
   );
   res.json(result.rows);
-});
+}));
 
 // ── Medical Profile Routes ────────────────────────────────
-app.get('/api/medical-profile/:userId', authMiddleware, async (req, res) => {
+app.get('/api/medical-profile/:userId', authMiddleware, asyncHandler(async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     const result = await pool.query('SELECT * FROM medical_profiles WHERE user_id = $1', [userId]);
@@ -3308,9 +3356,9 @@ app.get('/api/medical-profile/:userId', authMiddleware, async (req, res) => {
     console.error('Medical profile fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch medical profile' });
   }
-});
+}));
 
-app.put('/api/medical-profile/:userId', authMiddleware, async (req, res) => {
+app.put('/api/medical-profile/:userId', authMiddleware, asyncHandler(async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     const { full_name, date_of_birth, blood_type, allergies, chronic_conditions, current_medications, emergency_notes, cpf, health_plan, health_plan_number, primary_doctor, doctor_phone, address } = req.body;
@@ -3340,9 +3388,9 @@ app.put('/api/medical-profile/:userId', authMiddleware, async (req, res) => {
     console.error('Medical profile update error:', err);
     res.status(500).json({ error: 'Failed to update medical profile' });
   }
-});
+}));
 
-app.get('/api/medical-profile/:userId/emergency-card', authMiddleware, async (req, res) => {
+app.get('/api/medical-profile/:userId/emergency-card', authMiddleware, asyncHandler(async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     const [profile, user] = await Promise.all([
@@ -3376,18 +3424,18 @@ app.get('/api/medical-profile/:userId/emergency-card', authMiddleware, async (re
     console.error('Emergency card fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch emergency card' });
   }
-});
+}));
 
 // ── Gamification Routes ──────────────────────────────────
-app.get('/api/gamification', authMiddleware, async (req, res) => {
+app.get('/api/gamification', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT streak_days, total_points, badges FROM users WHERE id = $1`,
     [req.userId]
   );
   res.json(result.rows[0] || { streak_days: 0, total_points: 0, badges: [] });
-});
+}));
 
-app.post('/api/gamification/checkin-reward', authMiddleware, async (req, res) => {
+app.post('/api/gamification/checkin-reward', authMiddleware, asyncHandler(async (req, res) => {
   // Award points for check-in, update streak
   const user = await pool.query(`SELECT streak_days, total_points, badges FROM users WHERE id = $1`, [req.userId]);
   const u = user.rows[0];
@@ -3415,10 +3463,10 @@ app.post('/api/gamification/checkin-reward', authMiddleware, async (req, res) =>
   );
 
   res.json({ streak: newStreak, pointsEarned: points, totalPoints: (u.total_points || 0) + points, badges });
-});
+}));
 
 // ── Postback endpoint for ad networks ────────────────────
-app.get('/api/postback/install', async (req, res) => {
+app.get('/api/postback/install', asyncHandler(async (req, res) => {
   const { clickid, af_siteid, af_sub1 } = req.query;
   console.log(`[Postback] Install: clickid=${clickid} siteid=${af_siteid} sub1=${af_sub1}`);
   // Log for attribution
@@ -3430,16 +3478,16 @@ app.get('/api/postback/install', async (req, res) => {
     ).catch(() => {});
   }
   res.status(200).send('OK');
-});
+}));
 
-app.get('/api/postback/event', async (req, res) => {
+app.get('/api/postback/event', asyncHandler(async (req, res) => {
   const { clickid, event_name, revenue } = req.query;
   console.log(`[Postback] Event: ${event_name} clickid=${clickid} revenue=${revenue}`);
   res.status(200).send('OK');
-});
+}));
 
 // ── Calendar Sync Routes (Premium) ───────────────────────
-app.get('/api/calendar', authMiddleware, async (req, res) => {
+app.get('/api/calendar', authMiddleware, asyncHandler(async (req, res) => {
   const sub = await getEffectiveSub(req.userId);
   if (sub === 'free') return res.status(403).json({ error: 'Premium feature — upgrade to Família or Central' });
 
@@ -3453,9 +3501,9 @@ app.get('/api/calendar', authMiddleware, async (req, res) => {
   query += ` ORDER BY start_time`;
   const result = await pool.query(query, params);
   res.json(result.rows);
-});
+}));
 
-app.post('/api/calendar', authMiddleware, async (req, res) => {
+app.post('/api/calendar', authMiddleware, asyncHandler(async (req, res) => {
   const sub = await getEffectiveSub(req.userId);
   if (sub === 'free') return res.status(403).json({ error: 'Premium feature' });
 
@@ -3468,15 +3516,15 @@ app.post('/api/calendar', authMiddleware, async (req, res) => {
     [req.userId, title, type || 'custom', start_time, end_time, recurring, notes]
   );
   res.json(result.rows[0]);
-});
+}));
 
-app.delete('/api/calendar/:id', authMiddleware, async (req, res) => {
+app.delete('/api/calendar/:id', authMiddleware, asyncHandler(async (req, res) => {
   await pool.query(`DELETE FROM calendar_events WHERE id = $1 AND user_id = $2`, [req.params.id, req.userId]);
   res.json({ ok: true });
-});
+}));
 
 // Auto-generate calendar events from medications + check-in schedule
-app.post('/api/calendar/sync', authMiddleware, async (req, res) => {
+app.post('/api/calendar/sync', authMiddleware, asyncHandler(async (req, res) => {
   const sub = await getEffectiveSub(req.userId);
   if (sub === 'free') return res.status(403).json({ error: 'Premium feature' });
 
@@ -3540,10 +3588,10 @@ app.post('/api/calendar/sync', authMiddleware, async (req, res) => {
   }
 
   res.json({ ok: true, created });
-});
+}));
 
 // ── Monthly Health Report (Central plan) ─────────────────
-app.get('/api/health-report/:month', authMiddleware, async (req, res) => {
+app.get('/api/health-report/:month', authMiddleware, asyncHandler(async (req, res) => {
   const sub = await getEffectiveSub(req.userId);
   if (sub !== 'central') return res.status(403).json({ error: 'Central plan feature' });
 
@@ -3622,10 +3670,10 @@ app.get('/api/health-report/:month', authMiddleware, async (req, res) => {
   });
 
   res.json({ id: null, user_id: req.userId, month, summary, generated_at: new Date().toISOString() });
-});
+}));
 
 // Get health report for elder (family view)
-app.get('/api/health-report/elder/:month', authMiddleware, async (req, res) => {
+app.get('/api/health-report/elder/:month', authMiddleware, asyncHandler(async (req, res) => {
   const user = await pool.query(`SELECT linked_elder_id FROM users WHERE id = $1`, [req.userId]);
   const elderId = user.rows[0]?.linked_elder_id;
   if (!elderId) return res.status(404).json({ error: 'No linked elder' });
@@ -3644,7 +3692,7 @@ app.get('/api/health-report/elder/:month', authMiddleware, async (req, res) => {
   if (existing.rows[0]) return res.json(existing.rows[0]);
 
   res.status(404).json({ error: 'Report not yet generated. Ask elder to generate it first.' });
-});
+}));
 
 // ── Admin Auth Middleware (JWT + legacy X-Admin-Key fallback) ──
 async function adminAuth(req, res, next) {
@@ -3906,7 +3954,7 @@ app.get('/api/admin/audit-log', adminAuth, requireRole('super_admin', 'admin'), 
 // ── Admin Data API Routes ─────────────────────────────────
 
 // GET /api/admin/stats - overview stats
-app.get('/api/admin/stats', adminAuth, async (req, res) => {
+app.get('/api/admin/stats', adminAuth, asyncHandler(async (req, res) => {
   try {
     const [
       usersByRole,
@@ -3939,10 +3987,10 @@ app.get('/api/admin/stats', adminAuth, async (req, res) => {
     console.error('Admin stats error:', err);
     res.status(500).json({ error: 'Failed to fetch stats' });
   }
-});
+}));
 
 // GET /api/admin/users - all users with gamification data + linked relationships
-app.get('/api/admin/users', adminAuth, async (req, res) => {
+app.get('/api/admin/users', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { search, role } = req.query;
     let query = `SELECT u.id, u.email, u.name, u.phone, u.role, u.subscription, u.trial_start, u.streak_days, u.total_points, u.badges, u.referral_code, u.referred_by, u.linked_elder_id, e.name as elder_name, u.created_at FROM users u LEFT JOIN users e ON u.linked_elder_id = e.id WHERE 1=1`;
@@ -3984,10 +4032,10 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
     console.error('Admin users error:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
-});
+}));
 
 // GET /api/admin/users/:id - full user detail
-app.get('/api/admin/users/:id', adminAuth, async (req, res) => {
+app.get('/api/admin/users/:id', adminAuth, asyncHandler(async (req, res) => {
   try {
     const userId = req.params.id;
     const [user, consent, conversions, referrals, linkedFamily] = await Promise.all([
@@ -4011,10 +4059,10 @@ app.get('/api/admin/users/:id', adminAuth, async (req, res) => {
     console.error('Admin user detail error:', err);
     res.status(500).json({ error: 'Failed to fetch user' });
   }
-});
+}));
 
 // PUT /api/admin/users/:id - edit regular user
-app.put('/api/admin/users/:id', adminAuth, async (req, res) => {
+app.put('/api/admin/users/:id', adminAuth, asyncHandler(async (req, res) => {
   try {
     if (!['super_admin', 'admin'].includes(req.adminUser.role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
@@ -4036,8 +4084,8 @@ app.put('/api/admin/users/:id', adminAuth, async (req, res) => {
 
     // Audit log (non-blocking - don't fail the update if audit fails)
     if (req.adminUser) {
-      pool.query(`INSERT INTO admin_audit_log (admin_user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)`,
-        [req.adminUser.id, 'update_user', 'user', req.params.id, JSON.stringify(req.body)])
+      pool.query(`INSERT INTO admin_audit_log (admin_user_id, action, details, ip_address) VALUES ($1, $2, $3, $4)`,
+        [req.adminUser.id, 'update_user', JSON.stringify({ target_type: 'user', target_id: req.params.id, ...req.body }), getAdminIp(req)])
         .catch(e => console.warn('Audit log failed:', e.message));
     }
 
@@ -4046,10 +4094,10 @@ app.put('/api/admin/users/:id', adminAuth, async (req, res) => {
     console.error('Admin update user error:', err);
     res.status(500).json({ error: 'Failed to update user' });
   }
-});
+}));
 
 // POST /api/admin/users/:id/reset-password - admin resets user password
-app.post('/api/admin/users/:id/reset-password', adminAuth, async (req, res) => {
+app.post('/api/admin/users/:id/reset-password', adminAuth, asyncHandler(async (req, res) => {
   try {
     if (!['super_admin', 'admin'].includes(req.adminUser.role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
@@ -4058,8 +4106,7 @@ app.post('/api/admin/users/:id/reset-password', adminAuth, async (req, res) => {
     if (!new_password || new_password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
-    const bcrypt = require('bcryptjs');
-    const hashed = await bcrypt.hash(new_password, 12);
+    const hashed = await hashPassword(new_password);
     const result = await pool.query(
       `UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id, name, email`,
       [hashed, req.params.id]
@@ -4068,8 +4115,8 @@ app.post('/api/admin/users/:id/reset-password', adminAuth, async (req, res) => {
 
     // Audit log
     if (req.adminUser) {
-      await pool.query(`INSERT INTO admin_audit_log (admin_user_id, action, target_type, target_id, details) VALUES ($1, $2, $3, $4, $5)`,
-        [req.adminUser.id, 'reset_user_password', 'user', req.params.id, JSON.stringify({ user_email: result.rows[0].email })]);
+      await pool.query(`INSERT INTO admin_audit_log (admin_user_id, action, details, ip_address) VALUES ($1, $2, $3, $4)`,
+        [req.adminUser.id, 'reset_user_password', JSON.stringify({ target_type: 'user', target_id: req.params.id, user_email: result.rows[0].email }), getAdminIp(req)]);
     }
 
     res.json({ success: true, message: 'Password reset successfully' });
@@ -4077,10 +4124,10 @@ app.post('/api/admin/users/:id/reset-password', adminAuth, async (req, res) => {
     console.error('Admin reset user password error:', err);
     res.status(500).json({ error: 'Failed to reset password' });
   }
-});
+}));
 
 // GET /api/admin/affiliates - all affiliates
-app.get('/api/admin/affiliates', adminAuth, async (req, res) => {
+app.get('/api/admin/affiliates', adminAuth, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query(`SELECT * FROM affiliates ORDER BY created_at DESC`);
     res.json(result.rows);
@@ -4088,10 +4135,10 @@ app.get('/api/admin/affiliates', adminAuth, async (req, res) => {
     console.error('Admin affiliates error:', err);
     res.status(500).json({ error: 'Failed to fetch affiliates' });
   }
-});
+}));
 
 // PUT /api/admin/affiliates/:id - update affiliate
-app.put('/api/admin/affiliates/:id', adminAuth, async (req, res) => {
+app.put('/api/admin/affiliates/:id', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { is_active, name, email, phone, channel, commission_rate, pix_key, commission_model, fixed_fee, ramp_up_tiers } = req.body;
     const result = await pool.query(
@@ -4115,10 +4162,10 @@ app.put('/api/admin/affiliates/:id', adminAuth, async (req, res) => {
     console.error('Admin update affiliate error:', err);
     res.status(500).json({ error: 'Failed to update affiliate' });
   }
-});
+}));
 
 // PUT /api/admin/affiliates/:id/commission-model - update commission model
-app.put('/api/admin/affiliates/:id/commission-model', adminAuth, async (req, res) => {
+app.put('/api/admin/affiliates/:id/commission-model', adminAuth, asyncHandler(async (req, res) => {
   const { commission_model, fixed_fee, commission_rate, ramp_up_tiers } = req.body;
   try {
     const result = await pool.query(
@@ -4136,10 +4183,10 @@ app.put('/api/admin/affiliates/:id/commission-model', adminAuth, async (req, res
     console.error('Admin update commission model error:', err);
     res.status(500).json({ error: 'Failed to update commission model' });
   }
-});
+}));
 
 // GET /api/admin/referral-rewards - see users who earned free months
-app.get('/api/admin/referral-rewards', adminAuth, async (req, res) => {
+app.get('/api/admin/referral-rewards', adminAuth, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT rr.*, u.name, u.email, u.free_months_earned
@@ -4152,10 +4199,10 @@ app.get('/api/admin/referral-rewards', adminAuth, async (req, res) => {
     console.error('Admin referral rewards error:', err);
     res.status(500).json({ error: 'Failed to fetch referral rewards' });
   }
-});
+}));
 
 // GET /api/admin/settings - get app-wide settings
-app.get('/api/admin/settings', adminAuth, async (req, res) => {
+app.get('/api/admin/settings', adminAuth, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM app_settings');
     const settings = {};
@@ -4165,10 +4212,10 @@ app.get('/api/admin/settings', adminAuth, async (req, res) => {
     console.error('Admin settings error:', err);
     res.status(500).json({ error: 'Failed to fetch settings' });
   }
-});
+}));
 
 // PUT /api/admin/settings - update app-wide settings
-app.put('/api/admin/settings', adminAuth, async (req, res) => {
+app.put('/api/admin/settings', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { key, value } = req.body;
     await pool.query(
@@ -4180,10 +4227,10 @@ app.put('/api/admin/settings', adminAuth, async (req, res) => {
     console.error('Admin update settings error:', err);
     res.status(500).json({ error: 'Failed to update settings' });
   }
-});
+}));
 
 // POST /api/admin/affiliates/bulk - bulk action on affiliates
-app.post('/api/admin/affiliates/bulk', adminAuth, async (req, res) => {
+app.post('/api/admin/affiliates/bulk', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { ids, action, commission_rate } = req.body;
     if (!ids || !Array.isArray(ids) || !action) return res.status(400).json({ error: 'ids array and action required' });
@@ -4206,10 +4253,10 @@ app.post('/api/admin/affiliates/bulk', adminAuth, async (req, res) => {
     console.error('Admin bulk affiliates error:', err);
     res.status(500).json({ error: 'Failed to perform bulk action' });
   }
-});
+}));
 
 // GET /api/admin/commissions - all commissions with affiliate and conversion details
-app.get('/api/admin/commissions', adminAuth, async (req, res) => {
+app.get('/api/admin/commissions', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { status } = req.query;
     let query = `SELECT c.*, a.name as affiliate_name, a.code as affiliate_code, cv.event, cv.revenue as conversion_revenue, cv.user_id as conversion_user_id
@@ -4231,10 +4278,10 @@ app.get('/api/admin/commissions', adminAuth, async (req, res) => {
     console.error('Admin commissions error:', err);
     res.status(500).json({ error: 'Failed to fetch commissions' });
   }
-});
+}));
 
 // PUT /api/admin/commissions/:id - update commission status
-app.put('/api/admin/commissions/:id', adminAuth, async (req, res) => {
+app.put('/api/admin/commissions/:id', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { status } = req.body;
     if (!status || !['pending', 'approved', 'paid', 'rejected'].includes(status)) {
@@ -4255,10 +4302,10 @@ app.put('/api/admin/commissions/:id', adminAuth, async (req, res) => {
     console.error('Admin update commission error:', err);
     res.status(500).json({ error: 'Failed to update commission' });
   }
-});
+}));
 
 // GET /api/admin/providers - all service providers
-app.get('/api/admin/providers', adminAuth, async (req, res) => {
+app.get('/api/admin/providers', adminAuth, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query(`SELECT * FROM service_providers ORDER BY created_at DESC`);
     res.json(result.rows);
@@ -4266,10 +4313,10 @@ app.get('/api/admin/providers', adminAuth, async (req, res) => {
     console.error('Admin providers error:', err);
     res.status(500).json({ error: 'Failed to fetch providers' });
   }
-});
+}));
 
 // POST /api/admin/providers - create provider
-app.post('/api/admin/providers', adminAuth, async (req, res) => {
+app.post('/api/admin/providers', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { type, name, description, api_endpoint, commission_rate, is_active, metadata } = req.body;
     if (!type || !name) return res.status(400).json({ error: 'type and name are required' });
@@ -4284,10 +4331,10 @@ app.post('/api/admin/providers', adminAuth, async (req, res) => {
     console.error('Admin create provider error:', err);
     res.status(500).json({ error: 'Failed to create provider' });
   }
-});
+}));
 
 // PUT /api/admin/providers/:id - update provider
-app.put('/api/admin/providers/:id', adminAuth, async (req, res) => {
+app.put('/api/admin/providers/:id', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { type, name, description, api_endpoint, commission_rate, is_active, metadata } = req.body;
     const result = await pool.query(
@@ -4308,10 +4355,10 @@ app.put('/api/admin/providers/:id', adminAuth, async (req, res) => {
     console.error('Admin update provider error:', err);
     res.status(500).json({ error: 'Failed to update provider' });
   }
-});
+}));
 
 // DELETE /api/admin/providers/:id - delete provider
-app.delete('/api/admin/providers/:id', adminAuth, async (req, res) => {
+app.delete('/api/admin/providers/:id', adminAuth, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query(`DELETE FROM service_providers WHERE id = $1 RETURNING id`, [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Provider not found' });
@@ -4320,10 +4367,10 @@ app.delete('/api/admin/providers/:id', adminAuth, async (req, res) => {
     console.error('Admin delete provider error:', err);
     res.status(500).json({ error: 'Failed to delete provider' });
   }
-});
+}));
 
 // GET /api/admin/bookings - all bookings with user and provider names
-app.get('/api/admin/bookings', adminAuth, async (req, res) => {
+app.get('/api/admin/bookings', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { status } = req.query;
     let query = `SELECT b.*, u.name as user_name, u.email as user_email, sp.name as provider_name
@@ -4345,10 +4392,10 @@ app.get('/api/admin/bookings', adminAuth, async (req, res) => {
     console.error('Admin bookings error:', err);
     res.status(500).json({ error: 'Failed to fetch bookings' });
   }
-});
+}));
 
 // GET /api/admin/institutions - all institutions
-app.get('/api/admin/institutions', adminAuth, async (req, res) => {
+app.get('/api/admin/institutions', adminAuth, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query(`SELECT * FROM institutions ORDER BY created_at DESC`);
     res.json(result.rows);
@@ -4356,10 +4403,10 @@ app.get('/api/admin/institutions', adminAuth, async (req, res) => {
     console.error('Admin institutions error:', err);
     res.status(500).json({ error: 'Failed to fetch institutions' });
   }
-});
+}));
 
 // PUT /api/admin/institutions/:id - update institution
-app.put('/api/admin/institutions/:id', adminAuth, async (req, res) => {
+app.put('/api/admin/institutions/:id', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { name, type, contact_name, contact_email, contact_phone, contract_value, max_users, is_active } = req.body;
     const result = await pool.query(
@@ -4381,10 +4428,10 @@ app.put('/api/admin/institutions/:id', adminAuth, async (req, res) => {
     console.error('Admin update institution error:', err);
     res.status(500).json({ error: 'Failed to update institution' });
   }
-});
+}));
 
 // DELETE /api/admin/institutions/:id - delete institution
-app.delete('/api/admin/institutions/:id', adminAuth, async (req, res) => {
+app.delete('/api/admin/institutions/:id', adminAuth, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query(`DELETE FROM institutions WHERE id = $1 RETURNING id`, [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Institution not found' });
@@ -4393,10 +4440,10 @@ app.delete('/api/admin/institutions/:id', adminAuth, async (req, res) => {
     console.error('Admin delete institution error:', err);
     res.status(500).json({ error: 'Failed to delete institution' });
   }
-});
+}));
 
 // GET /api/admin/conversions - all conversions with user name
-app.get('/api/admin/conversions', adminAuth, async (req, res) => {
+app.get('/api/admin/conversions', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { event } = req.query;
     let query = `SELECT cv.*, u.name as user_name, u.email as user_email
@@ -4417,10 +4464,10 @@ app.get('/api/admin/conversions', adminAuth, async (req, res) => {
     console.error('Admin conversions error:', err);
     res.status(500).json({ error: 'Failed to fetch conversions' });
   }
-});
+}));
 
 // GET /api/admin/consent - all consent records with user name
-app.get('/api/admin/consent', adminAuth, async (req, res) => {
+app.get('/api/admin/consent', adminAuth, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT cr.*, u.name as user_name, u.email as user_email
@@ -4433,10 +4480,10 @@ app.get('/api/admin/consent', adminAuth, async (req, res) => {
     console.error('Admin consent error:', err);
     res.status(500).json({ error: 'Failed to fetch consent records' });
   }
-});
+}));
 
 // GET /api/admin/gamification/leaderboard - top users by points
-app.get('/api/admin/gamification/leaderboard', adminAuth, async (req, res) => {
+app.get('/api/admin/gamification/leaderboard', adminAuth, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, name, email, role, streak_days, total_points, badges
@@ -4450,10 +4497,10 @@ app.get('/api/admin/gamification/leaderboard', adminAuth, async (req, res) => {
     console.error('Admin leaderboard error:', err);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });
   }
-});
+}));
 
 // ── Escalation Admin Endpoints ────────────────────────────
-app.get('/api/admin/escalations', adminAuth, async (req, res) => {
+app.get('/api/admin/escalations', adminAuth, asyncHandler(async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT ea.*, u.name as elder_name, u.phone as elder_phone
@@ -4466,9 +4513,9 @@ app.get('/api/admin/escalations', adminAuth, async (req, res) => {
     console.error('Admin escalations error:', err);
     res.status(500).json({ error: 'Failed to fetch escalations' });
   }
-});
+}));
 
-app.put('/api/admin/escalations/:id/resolve', adminAuth, async (req, res) => {
+app.put('/api/admin/escalations/:id/resolve', adminAuth, asyncHandler(async (req, res) => {
   try {
     await pool.query(`UPDATE escalation_alerts SET status = 'resolved' WHERE id = $1`, [req.params.id]);
     res.json({ ok: true });
@@ -4476,10 +4523,10 @@ app.put('/api/admin/escalations/:id/resolve', adminAuth, async (req, res) => {
     console.error('Resolve escalation error:', err);
     res.status(500).json({ error: 'Failed to resolve escalation' });
   }
-});
+}));
 
 // ── Admin Payout Endpoints ────────────────────────────────
-app.get('/api/admin/payouts', adminAuth, async (req, res) => {
+app.get('/api/admin/payouts', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { status } = req.query;
     let query = `SELECT pr.*, a.name as affiliate_name, a.code as affiliate_code, a.email as affiliate_email, a.pix_key as current_pix_key
@@ -4494,9 +4541,9 @@ app.get('/api/admin/payouts', adminAuth, async (req, res) => {
     console.error('Admin payouts error:', err);
     res.status(500).json({ error: 'Failed to fetch payouts' });
   }
-});
+}));
 
-app.put('/api/admin/payouts/:id', adminAuth, async (req, res) => {
+app.put('/api/admin/payouts/:id', adminAuth, asyncHandler(async (req, res) => {
   try {
     const { status, admin_notes } = req.body;
     if (!['pending', 'processing', 'completed', 'rejected'].includes(status)) {
@@ -4527,7 +4574,7 @@ app.put('/api/admin/payouts/:id', adminAuth, async (req, res) => {
     console.error('Admin payout update error:', err);
     res.status(500).json({ error: 'Failed to update payout' });
   }
-});
+}));
 
 // ── Admin Analytics / BI Endpoints ────────────────────────
 
@@ -5154,7 +5201,7 @@ async function start() {
   }
 
   // ── WhatsApp Test Endpoint ──
-  app.post('/api/whatsapp/test', async (req, res) => {
+  app.post('/api/whatsapp/test', asyncHandler(async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ error: 'phone required' });
     try {
@@ -5172,7 +5219,7 @@ async function start() {
       console.error('[WhatsApp Test]', err.message);
       res.status(500).json({ error: err.message });
     }
-  });
+  }));
 
   server.listen(PORT, () => console.log(`Estou Bem server running on port ${PORT}`));
 }
@@ -5299,9 +5346,11 @@ async function checkMissedCheckins() {
             console.log(`[Escalation] UPGRADED to level ${targetLevel} for elder ${elder.name} (ID: ${elder.id}) scheduled at ${checkin.time}`);
           } else {
             // Create new alert at level 1 (or higher if already very overdue)
+            // ON CONFLICT handles race condition if another process inserted simultaneously
             await pool.query(
               `INSERT INTO escalation_alerts (elder_id, checkin_id, level, status, notified_contacts)
-               VALUES ($1, $2, $3, 'active', $4)`,
+               VALUES ($1, $2, $3, 'active', $4)
+               ON CONFLICT (checkin_id) WHERE status = 'active' DO NOTHING`,
               [elder.id, checkin.id, targetLevel, JSON.stringify(notifiedContacts)]
             );
             console.log(`[Escalation] MISSED check-in for elder ${elder.name} (ID: ${elder.id}) scheduled at ${checkin.time} — level ${targetLevel}`);
@@ -5494,9 +5543,11 @@ async function checkMissedCheckins() {
               );
               console.log(`[Escalation] UPGRADED to level ${targetLevel} for elder ${elder.name} (ID: ${elder.id}) — interval mode`);
             } else {
+              // ON CONFLICT handles race condition if another process inserted simultaneously
               await pool.query(
                 `INSERT INTO escalation_alerts (elder_id, checkin_id, level, status, notified_contacts)
-                 VALUES ($1, $2, $3, 'active', $4)`,
+                 VALUES ($1, $2, $3, 'active', $4)
+                 ON CONFLICT (checkin_id) WHERE status = 'active' DO NOTHING`,
                 [elder.id, checkinId, targetLevel, JSON.stringify(notifiedContacts)]
               );
               console.log(`[Escalation] MISSED check-in for elder ${elder.name} (ID: ${elder.id}) — interval mode, last confirmed: ${lastTime ? lastTime.toISOString() : 'never'} — level ${targetLevel}`);
