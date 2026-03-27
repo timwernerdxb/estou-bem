@@ -76,9 +76,8 @@ export default ({ config }) => ({
     ],
     ["expo-background-fetch"],
     ["expo-task-manager"],
-    // HealthKit library disabled - incompatible with Xcode 26/Swift 6.2
-    // Using pedometer + watch relay instead
-    // ["@kingstinct/react-native-healthkit", {...}],
+    // Custom HealthKit module (pure Swift, no C++ interop — works with Xcode 26/Swift 6.2)
+    "./modules/expo-healthkit",
     ["@bacons/apple-targets"],
     ["./plugins/withAsyncStorageRepo"],
     // ["./plugins/withWearOS"], // Wear OS built separately via GitHub Actions

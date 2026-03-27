@@ -44,7 +44,6 @@ interface HealthConnectRecord {
 class HealthIntegrationService {
   private initialized = false;
   private healthConnect: any = null;
-  private healthKit: any = null;
   private healthKitAvailable = false;
   private syncIntervalId: ReturnType<typeof setInterval> | null = null;
 
