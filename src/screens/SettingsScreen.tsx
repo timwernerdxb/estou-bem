@@ -27,7 +27,7 @@ import { RootStackParamList, SensorSnapshot } from "../types";
 import { affiliateService } from "../services/AffiliateService";
 import { fallDetectionService } from "../services/FallDetectionService";
 import { notificationService } from "../services/NotificationService";
-import { putSettings, fetchSettings, postFallDetected } from "../services/ApiService";
+import { putSettings, fetchSettings, postFallDetected, fetchProfile } from "../services/ApiService";
 import Constants from "expo-constants";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
@@ -86,6 +86,43 @@ export function SettingsScreen() {
         }
       } catch (e) {
         console.warn("[Settings] Failed to fetch settings from server:", e);
+      }
+    })();
+
+    // Fetch full profile from server to sync subscription, linked elder, etc.
+    (async () => {
+      try {
+        const profile = await fetchProfile(state.currentUser);
+        if (!profile) return;
+
+        // Sync subscription from server (single source of truth)
+        const serverSub = profile.subscription || "free";
+        dispatch({
+          type: "SET_SUBSCRIPTION",
+          payload: {
+            tier: serverSub === "pro" ? "pro" : "free",
+            isActive: true,
+          },
+        });
+
+        // Update linked elder info
+        if (profile.linked_elder_id && state.currentUser) {
+          dispatch({
+            type: "SET_USER",
+            payload: {
+              ...state.currentUser,
+              linked_elder_id: String(profile.linked_elder_id),
+              link_code: profile.link_code || state.currentUser.link_code,
+            },
+          });
+        }
+
+        // Set linked elder name for family/caregiver users
+        if (profile.linked_elder_name) {
+          setLinkedElderName(profile.linked_elder_name);
+        }
+      } catch (e) {
+        console.warn("[Settings] Failed to fetch profile from server:", e);
       }
     })();
   }, []);

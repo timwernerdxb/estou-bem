@@ -1833,6 +1833,30 @@ app.get('/api/me', authMiddleware, async (req, res) => {
   res.json(result.rows[0]);
 });
 
+// GET /api/profile — full user profile including gamification + linked elder name
+app.get('/api/profile', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, name, phone, role, link_code, subscription, trial_start, linked_elder_id, streak_days, total_points, badges FROM users WHERE id = $1`,
+      [req.userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    const user = result.rows[0];
+
+    // If family/caregiver with linked elder, fetch elder name
+    let linked_elder_name = null;
+    if (user.linked_elder_id) {
+      const elder = await pool.query(`SELECT name FROM users WHERE id = $1`, [user.linked_elder_id]);
+      if (elder.rows.length > 0) linked_elder_name = elder.rows[0].name;
+    }
+
+    res.json({ ...user, linked_elder_name });
+  } catch (err) {
+    console.error('[profile] Error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.post('/api/link-elder', authMiddleware, async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Link code required' });

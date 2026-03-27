@@ -17,7 +17,7 @@ import { useApp, useSubscription } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { StatusBadge } from "../components/StatusBadge";
 import { CheckIn } from "../types";
-import { fetchElderStatus } from "../services/ApiService";
+import { fetchElderStatus, fetchProfile } from "../services/ApiService";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -57,7 +57,7 @@ interface ElderStatusData {
 }
 
 export function FamilyDashboardScreen() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const { isFamilia, isCentral, tier } = useSubscription();
   const navigation = useNavigation<any>();
   const [refreshing, setRefreshing] = React.useState(false);
@@ -81,6 +81,28 @@ export function FamilyDashboardScreen() {
       setLoading(false);
     })();
   }, [loadElderData]);
+
+  // Sync subscription from server on mount
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const profile = await fetchProfile(state.currentUser);
+        if (!profile) return;
+
+        // Update subscription from server (single source of truth)
+        const serverSub = profile.subscription || "free";
+        dispatch({
+          type: "SET_SUBSCRIPTION",
+          payload: {
+            tier: serverSub === "pro" ? "pro" : "free",
+            isActive: true,
+          },
+        });
+      } catch (e) {
+        console.warn("[FamilyDashboard] Failed to fetch profile:", e);
+      }
+    })();
+  }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -181,10 +181,15 @@ export function OnboardingScreen() {
         dispatch({ type: "ADD_FAMILY_PROFILE", payload: profile });
       }
 
-      // Sync subscription from server
-      if (user.subscription) {
-        dispatch({ type: "SET_SUBSCRIPTION", payload: user.subscription });
-      }
+      // Sync subscription from server — convert string to SubscriptionInfo object
+      const regServerSub = user.subscription || "free";
+      dispatch({
+        type: "SET_SUBSCRIPTION",
+        payload: {
+          tier: regServerSub === "pro" ? "pro" : "free",
+          isActive: true,
+        },
+      });
 
       // Sync LGPD consent to server
       const userForApi = { apiUrl: API_URL, token };
@@ -246,7 +251,8 @@ export function OnboardingScreen() {
             link_code: user.link_code,
             apiUrl: API_URL,
             token,
-          };
+            trial_start: user.trial_start,
+          } as any;
           dispatch({ type: "SET_USER", payload: profile });
           dispatch({ type: "SET_ELDER_PROFILE", payload: profile });
         } else {
@@ -266,15 +272,21 @@ export function OnboardingScreen() {
             link_code: user.link_code,
             apiUrl: API_URL,
             token,
+            trial_start: user.trial_start,
           } as any;
           dispatch({ type: "SET_USER", payload: profile });
           dispatch({ type: "ADD_FAMILY_PROFILE", payload: profile });
         }
 
-        // Sync subscription from server
-        if (user.subscription) {
-          dispatch({ type: "SET_SUBSCRIPTION", payload: user.subscription });
-        }
+        // Sync subscription from server — convert string to SubscriptionInfo object
+        const serverSub = user.subscription || "free";
+        dispatch({
+          type: "SET_SUBSCRIPTION",
+          payload: {
+            tier: serverSub === "pro" ? "pro" : "free",
+            isActive: true,
+          },
+        });
 
         // Track login
         analyticsService.trackEvent("login");
