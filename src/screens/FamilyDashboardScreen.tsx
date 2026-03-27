@@ -66,9 +66,25 @@ export function FamilyDashboardScreen() {
 
   const loadElderData = React.useCallback(async () => {
     try {
+      // First try fetchElderStatus
       const data = await fetchElderStatus(state.currentUser);
-      if (data) {
+      if (data && data.elderName) {
         setElderData(data);
+        return;
+      }
+      // Fallback: get elder name from profile endpoint
+      const profile = await fetchProfile(state.currentUser);
+      if (profile?.linked_elder_name) {
+        setElderData({
+          linked: true,
+          elderId: profile.linked_elder_id,
+          elderName: profile.linked_elder_name,
+          checkins: [],
+          medications: [],
+          health: [],
+          contacts: [],
+          lastActivity: null,
+        } as any);
       }
     } catch (e) {
       console.warn("[FamilyDashboard] Failed to fetch elder status:", e);
@@ -81,6 +97,14 @@ export function FamilyDashboardScreen() {
       setLoading(false);
     })();
   }, [loadElderData]);
+
+  // Retry after 3 seconds if elderData is still null (token might not have been ready)
+  React.useEffect(() => {
+    if (!elderData && state.currentUser?.token) {
+      const timer = setTimeout(() => loadElderData(), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [elderData, state.currentUser?.token, loadElderData]);
 
   // Sync subscription from server on mount
   React.useEffect(() => {
