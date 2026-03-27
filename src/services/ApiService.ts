@@ -25,10 +25,13 @@ async function safeFetch(
   opts: RequestInit
 ): Promise<Response | null> {
   try {
-    const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(10000) });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(url, { ...opts, signal: controller.signal });
+    clearTimeout(timeoutId);
     return res;
   } catch (err) {
-    console.warn("[ApiService] Network error:", (err as Error).message);
+    console.warn("[ApiService] Network error for", url, ":", (err as Error).message);
     return null;
   }
 }
