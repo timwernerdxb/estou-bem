@@ -239,14 +239,30 @@ export function FamilyDashboardScreen() {
     (m) => m.stock <= m.low_threshold
   );
 
-  // Health data from server — group by type and take the most recent reading
+  // Health data from server — group by type, preferring HealthKit-sourced readings
+  // over manual health_entries for automatic types (steps, HR, SpO2, etc.)
   const healthEntries = elderData?.health || [];
   const latestByType = React.useMemo(() => {
     const map: Record<string, { type: string; value: number; unit: string; created_at?: string; date?: string; time?: string; notes?: string }> = {};
     healthEntries.forEach((h) => {
       const key = h.type;
-      if (!map[key] || new Date(h.created_at || h.date || 0) > new Date(map[key].created_at || map[key].date || 0)) {
+      const existing = map[key];
+      if (!existing) {
         map[key] = h;
+        return;
+      }
+      const isNewFromKit = h.notes === "healthkit";
+      const isExistingFromKit = existing.notes === "healthkit";
+      // Prefer HealthKit over manual for the same type
+      if (isNewFromKit && !isExistingFromKit) {
+        map[key] = h;
+      } else if (!isNewFromKit && isExistingFromKit) {
+        // Keep existing HealthKit entry
+      } else {
+        // Both from same source — take the more recent one
+        if (new Date(h.created_at || h.date || 0) > new Date(existing.created_at || existing.date || 0)) {
+          map[key] = h;
+        }
       }
     });
     return map;
