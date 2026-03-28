@@ -30,6 +30,9 @@ const METRIC_CONFIG: Record<
   weight: { label: "Peso", unit: "kg", icon: "scale" },
   temperature: { label: "Temperatura", unit: "°C", icon: "thermometer" },
   oxygen_saturation: { label: "Saturação O₂", unit: "%", icon: "cloud" },
+  steps: { label: "Passos", unit: "steps", icon: "footsteps" },
+  sleep: { label: "Sono", unit: "h", icon: "moon" },
+  active_calories: { label: "Calorias ativas", unit: "kcal", icon: "flame" },
 };
 
 export function HealthLogScreen() {

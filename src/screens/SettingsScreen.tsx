@@ -55,7 +55,7 @@ export function SettingsScreen() {
   const [linkCode, setLinkCode] = useState("");
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkedElderName, setLinkedElderName] = useState<string | null>(null);
-  const [linkedFamily, setLinkedFamily] = useState<Array<{ id: number; name: string; phone: string }>>([]);
+  const [linkedFamily, setLinkedFamily] = useState<Array<{ name: string; phone: string }>>([]);
   const [escalationMinutes, setEscalationMinutes] = useState("30");
   const [samuAutoCall, setSamuAutoCall] = useState(true);
   const [fallDetectionEnabled, setFallDetectionEnabled] = useState(fallDetectionService.isActive());
@@ -791,8 +791,8 @@ export function SettingsScreen() {
                   <Text style={{ ...FONTS.caption, color: COLORS.textSecondary, marginBottom: SPACING.xs }}>
                     {t("settings_linked_family_label").replace("{count}", String(linkedFamily.length))}
                   </Text>
-                  {linkedFamily.map((f) => (
-                    <View key={f.id} style={{ flexDirection: "row", alignItems: "center", paddingVertical: SPACING.xs, gap: SPACING.sm }}>
+                  {linkedFamily.map((f, idx) => (
+                    <View key={f.phone || f.name || idx} style={{ flexDirection: "row", alignItems: "center", paddingVertical: SPACING.xs, gap: SPACING.sm }}>
                       <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.primary, justifyContent: "center", alignItems: "center" }}>
                         <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>{f.name?.charAt(0)?.toUpperCase() || "?"}</Text>
                       </View>
