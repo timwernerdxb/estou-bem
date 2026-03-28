@@ -10,6 +10,7 @@ import {
   Modal,
   Platform,
 } from "react-native";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
@@ -46,14 +47,44 @@ export function MedicationsScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMed, setEditingMed] = useState<Medication | null>(null);
   const [elderMedications, setElderMedications] = useState<Medication[]>([]);
-  const [newMed, setNewMed] = useState({
+  const BLANK_MED = {
     name: "",
     dosage: "",
     frequency: "daily" as MedicationFrequency,
     time: "08:00",
     stockQuantity: "30",
     stockUnit: "comprimidos",
-  });
+  };
+
+  const [newMed, setNewMed] = useState(BLANK_MED);
+
+  // Android time picker visibility
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
+  /** Parse "HH:MM" string into a Date object (today's date, local time). */
+  function timeStringToDate(t: string): Date {
+    const [hStr, mStr] = t.split(":");
+    const d = new Date();
+    d.setHours(parseInt(hStr, 10) || 8, parseInt(mStr, 10) || 0, 0, 0);
+    return d;
+  }
+
+  /** Format a Date into "HH:MM". */
+  function dateToTimeString(d: Date): string {
+    const h = String(d.getHours()).padStart(2, "0");
+    const m = String(d.getMinutes()).padStart(2, "0");
+    return `${h}:${m}`;
+  }
+
+  function handleTimeChange(_event: DateTimePickerEvent, selected?: Date) {
+    // On Android, hide the picker after selection
+    if (Platform.OS === "android") {
+      setShowTimePicker(false);
+    }
+    if (selected) {
+      setNewMed((prev) => ({ ...prev, time: dateToTimeString(selected) }));
+    }
+  }
 
   // Fetch medications from server on mount
   useEffect(() => {
@@ -160,14 +191,7 @@ export function MedicationsScreen() {
     );
 
     setShowAddModal(false);
-    setNewMed({
-      name: "",
-      dosage: "",
-      frequency: "daily",
-      time: "08:00",
-      stockQuantity: "30",
-      stockUnit: "comprimidos",
-    });
+    setNewMed(BLANK_MED);
   };
 
   const handleTakeMedication = (med: Medication) => {
@@ -250,7 +274,7 @@ export function MedicationsScreen() {
     }).catch(() => {});
     setShowAddModal(false);
     setEditingMed(null);
-    setNewMed({ name: "", dosage: "", frequency: "daily", time: "08:00", stockQuantity: "30", stockUnit: "comprimidos" });
+    setNewMed(BLANK_MED);
   };
 
   const handleDeleteMedication = (med: Medication) => {
@@ -352,7 +376,7 @@ export function MedicationsScreen() {
         {!isFamily && (
           <Button
             title={t("meds_add")}
-            onPress={() => setShowAddModal(true)}
+            onPress={() => { setEditingMed(null); setNewMed(BLANK_MED); setShowAddModal(true); }}
             size="large"
             style={{ marginTop: SPACING.md, width: "100%" }}
           />
@@ -364,7 +388,7 @@ export function MedicationsScreen() {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{editingMed ? "Editar Medicamento" : t("meds_new")}</Text>
-            <TouchableOpacity onPress={() => { setShowAddModal(false); setEditingMed(null); }}>
+            <TouchableOpacity onPress={() => { setShowAddModal(false); setEditingMed(null); setNewMed(BLANK_MED); }}>
               <Ionicons name="close" size={28} color={COLORS.textPrimary} />
             </TouchableOpacity>
           </View>
@@ -414,14 +438,32 @@ export function MedicationsScreen() {
             </View>
 
             <Text style={styles.inputLabel}>{t("meds_time")}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="08:00"
-              value={newMed.time}
-              onChangeText={(v) => setNewMed({ ...newMed, time: v })}
-              placeholderTextColor={COLORS.textLight}
-              keyboardType="numbers-and-punctuation"
-            />
+            {Platform.OS === "ios" ? (
+              <DateTimePicker
+                value={timeStringToDate(newMed.time)}
+                mode="time"
+                display="spinner"
+                onChange={handleTimeChange}
+                style={styles.timePicker}
+              />
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.input}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Text style={{ fontSize: 18, color: COLORS.textPrimary }}>{newMed.time}</Text>
+                </TouchableOpacity>
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={timeStringToDate(newMed.time)}
+                    mode="time"
+                    display="clock"
+                    onChange={handleTimeChange}
+                  />
+                )}
+              </>
+            )}
 
             <Text style={styles.inputLabel}>{t("meds_stock")}</Text>
             <View style={styles.stockInputRow}>
@@ -536,4 +578,8 @@ const styles = StyleSheet.create({
   freqChipText: { ...FONTS.caption },
   freqChipTextActive: { color: COLORS.white, fontWeight: "500" },
   stockInputRow: { flexDirection: "row" },
+  timePicker: {
+    alignSelf: "flex-start",
+    marginTop: SPACING.xs,
+  },
 });
