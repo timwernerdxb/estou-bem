@@ -288,25 +288,16 @@ class HealthIntegrationService {
   }
 
   /**
-   * Request HealthKit authorization. Should be called once on first launch
-   * for elder users only. Checks AsyncStorage so we don't prompt repeatedly.
+   * Request HealthKit authorization.
+   * Safe to call on every launch — HealthKit only shows the dialog for types
+   * not yet authorized, so users who connect an Apple Watch after first install
+   * will get properly prompted for HR and active calories on next open.
    */
   async requestAppleHealthPermissions(): Promise<boolean> {
     if (Platform.OS !== "ios" || !this.healthKitAvailable) return false;
 
     try {
-      // Check if we already asked
-      const alreadyAsked = await AsyncStorage.getItem(HEALTHKIT_AUTHORIZED_KEY);
-      if (alreadyAsked === "true") {
-        console.log("[AppleHealth] Already requested authorization, skipping prompt");
-        return true;
-      }
-
       const granted = await ExpoHealthkit.requestAuthorization();
-
-      // Mark that we've asked (even if user denied, we don't ask again)
-      await AsyncStorage.setItem(HEALTHKIT_AUTHORIZED_KEY, "true");
-
       console.log("[AppleHealth] Authorization result:", granted);
       return granted;
     } catch (err) {
