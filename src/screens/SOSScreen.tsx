@@ -9,6 +9,7 @@ import {
   Vibration,
   Linking,
   Platform,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -130,7 +131,11 @@ export function SOSScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.title}>Emergencia</Text>
         <Text style={styles.subtitle}>
           {sosActivated
@@ -231,7 +236,7 @@ export function SOSScreen() {
               ))}
           </View>
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -240,7 +245,7 @@ const SOS_SIZE = Math.min(SCREEN.width * 0.55, 220);
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  content: { flex: 1, padding: SPACING.lg, alignItems: "center" },
+  content: { flexGrow: 1, padding: SPACING.lg, alignItems: "center", paddingBottom: SPACING.xl * 2 },
   title: {
     ...FONTS.elderTitle,
     marginBottom: SPACING.xs,

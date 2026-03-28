@@ -8,6 +8,8 @@ import {
   Vibration,
   ScrollView,
   Platform,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -327,6 +329,27 @@ export function ElderHomeScreen() {
       healthIntegrationService.stopPeriodicSync();
     };
   }, [state.currentUser?.id]);
+
+  // Sync health data when app comes to foreground (covers re-open from background)
+  useEffect(() => {
+    if (state.currentUser?.role !== "elder") return;
+    if (Platform.OS !== "ios") return;
+
+    const handleAppStateChange = async (nextState: AppStateStatus) => {
+      if (nextState === "active") {
+        try {
+          const elderId = state.elderProfile?.id || state.currentUser?.id || "elder";
+          // Immediate re-sync on foreground — startPeriodicSync always calls doSync() first
+          healthIntegrationService.startPeriodicSync(state.currentUser, elderId);
+          const summary = await healthIntegrationService.readAppleHealthSummary(24);
+          if (summary.lastUpdated) setHealthSummary(summary);
+        } catch {}
+      }
+    };
+
+    const sub = AppState.addEventListener("change", handleAppStateChange);
+    return () => sub.remove();
+  }, [state.currentUser?.id, state.elderProfile?.id]);
 
   // Refresh health summary every 5 minutes (UI update)
   useEffect(() => {

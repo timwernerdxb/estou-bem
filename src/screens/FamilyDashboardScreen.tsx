@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Platform,
   ActivityIndicator,
+  AppState,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -141,6 +142,20 @@ export function FamilyDashboardScreen() {
       return () => clearTimeout(timer);
     }
   }, [elderData, state.currentUser?.token, loadElderData]);
+
+  // Auto-refresh every 60 seconds so Tim always sees Arla's latest data
+  React.useEffect(() => {
+    const interval = setInterval(loadElderData, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [loadElderData]);
+
+  // Re-fetch immediately when app comes back to foreground
+  React.useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") loadElderData();
+    });
+    return () => sub.remove();
+  }, [loadElderData]);
 
   // Sync subscription from server on mount
   React.useEffect(() => {

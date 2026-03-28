@@ -1,11 +1,3 @@
-/**
- * MapScreen — Shows elder's last known location and manages geofences.
- *
- * Note: react-native-maps is not currently installed. This screen shows
- * coordinates as text and provides full geofence CRUD. To add a visual map,
- * install react-native-maps and replace the placeholder section.
- */
-
 import React from "react";
 import {
   View,
@@ -19,6 +11,7 @@ import {
   RefreshControl,
   Platform,
 } from "react-native";
+import MapView, { Marker, Circle } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -220,14 +213,48 @@ export function MapScreen() {
             <Text style={styles.sectionTitle}>Última Localização Conhecida</Text>
           </View>
 
-          {/* Map placeholder */}
-          <View style={styles.mapPlaceholder}>
-            <Ionicons name="map-outline" size={48} color={COLORS.textLight} />
-            <Text style={styles.mapPlaceholderTitle}>Visualização de Mapa</Text>
-            <Text style={styles.mapPlaceholderNote}>
-              Instale react-native-maps para exibir o mapa visual.
-            </Text>
-          </View>
+          {/* Map view */}
+          {location ? (
+            <MapView
+              style={styles.map}
+              initialRegion={{
+                latitude: Number(location.latitude),
+                longitude: Number(location.longitude),
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+              }}
+              scrollEnabled
+              zoomEnabled
+              showsUserLocation={false}
+            >
+              <Marker
+                coordinate={{
+                  latitude: Number(location.latitude),
+                  longitude: Number(location.longitude),
+                }}
+                title="Última localização"
+                description={`Atualizado ${formatRelativeTime(location.recorded_at)}`}
+                pinColor={COLORS.primary}
+              />
+              {geofences.filter(gf => gf.is_active).map(gf => (
+                <Circle
+                  key={gf.id}
+                  center={{ latitude: Number(gf.latitude), longitude: Number(gf.longitude) }}
+                  radius={gf.radius_meters}
+                  strokeColor={COLORS.primary}
+                  fillColor="rgba(45,74,62,0.12)"
+                  strokeWidth={2}
+                />
+              ))}
+            </MapView>
+          ) : (
+            <View style={styles.mapPlaceholder}>
+              <Ionicons name="location-outline" size={48} color={COLORS.textLight} />
+              <Text style={styles.mapPlaceholderNote}>
+                Sem localização disponível.{"\n"}O idoso precisa abrir o app.
+              </Text>
+            </View>
+          )}
 
           {location ? (
             <View style={styles.coordBox}>
@@ -410,10 +437,6 @@ export function MapScreen() {
           )}
         </Card>
 
-        <Text style={styles.installNote}>
-          Para visualizar o mapa interativo, instale:{"\n"}
-          npx expo install react-native-maps
-        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -457,6 +480,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { ...FONTS.subtitle, fontWeight: "500" },
 
+  map: {
+    height: 220,
+    borderRadius: RADIUS.sm,
+    marginBottom: SPACING.md,
+    overflow: "hidden",
+  },
   mapPlaceholder: {
     height: 180,
     backgroundColor: COLORS.border,
@@ -466,16 +495,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     gap: 8,
   },
-  mapPlaceholderTitle: {
-    ...FONTS.body,
-    fontWeight: "500",
-    color: COLORS.textLight,
-  },
   mapPlaceholderNote: {
     ...FONTS.small,
     color: COLORS.textLight,
     textAlign: "center",
     paddingHorizontal: SPACING.lg,
+    lineHeight: 18,
   },
 
   coordBox: {
@@ -574,11 +599,4 @@ const styles = StyleSheet.create({
   },
   actionButton: { padding: 4 },
 
-  installNote: {
-    ...FONTS.small,
-    color: COLORS.textLight,
-    textAlign: "center",
-    marginTop: SPACING.sm,
-    lineHeight: 18,
-  },
 });

@@ -594,14 +594,12 @@ class HealthIntegrationService {
     user: { apiUrl?: string; token?: string; id?: string } | null,
     elderId: string
   ): void {
-    if (this.syncIntervalId) return; // already running
-
     const doSync = async () => {
       try {
         if (Platform.OS === "ios") {
           // Always try to read health data — HealthKit module or pedometer fallback
           const summary = await this.readAppleHealthSummary(24);
-          if (summary.steps || summary.heartRate || summary.spo2 || summary.sleepHours) {
+          if (summary.steps || summary.heartRate || summary.spo2 || summary.sleepHours || summary.activeCalories) {
             this.syncHealthSummaryToServer(user, summary).catch(() => {});
           }
           const entries = await this.readAppleHealthEntries(elderId, 1);
@@ -612,11 +610,13 @@ class HealthIntegrationService {
       } catch {}
     };
 
-    // Initial sync
+    // Always do an immediate sync (e.g. when app comes to foreground)
     doSync();
 
-    // Repeat every 5 minutes
-    this.syncIntervalId = setInterval(doSync, 5 * 60 * 1000);
+    // Set up repeating interval only if not already running
+    if (!this.syncIntervalId) {
+      this.syncIntervalId = setInterval(doSync, 5 * 60 * 1000);
+    }
   }
 
   stopPeriodicSync(): void {
