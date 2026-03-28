@@ -1,0 +1,14 @@
+{
+  "name": "expo-healthkit",
+  "version": "1.0.0",
+  "description": "Local Expo module for Apple HealthKit — heart rate, SpO2, steps, sleep, BP, calories",
+  "main": "src/index.ts",
+  "files": [
+    "src",
+    "ios",
+    "expo-module.config.json"
+  ],
+  "peerDependencies": {
+    "expo-modules-core": "*"
+  }
+}

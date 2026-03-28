@@ -10,6 +10,7 @@
     "precheck": "bash scripts/pre-build-check.sh"
   },
   "dependencies": {
+    "expo-healthkit": "file:./modules/expo-healthkit",
     "@bacons/apple-targets": "^4.0.6",
     "@expo/prebuild-config": "^55.0.10",
     "@expo/vector-icons": "^15.1.1",

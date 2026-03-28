@@ -7,7 +7,7 @@ import { Pedometer } from "expo-sensors";
 // Custom Expo module for HealthKit — loaded dynamically to prevent app crash if module fails
 let ExpoHealthkit: any = null;
 try {
-  ExpoHealthkit = require("../../modules/expo-healthkit/src");
+  ExpoHealthkit = require("expo-healthkit");
 } catch (e) {
   console.warn("[HealthKit] Module not available, using pedometer fallback:", (e as Error).message);
 }
