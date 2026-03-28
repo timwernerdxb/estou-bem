@@ -10,10 +10,12 @@ import {
   Modal,
   Linking,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import * as Contacts from "expo-contacts";
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import { useApp } from "../store/AppContext";
 import { Card } from "../components/Card";
@@ -179,6 +181,81 @@ export function EmergencyContactsScreen() {
     ]);
   };
 
+  const handleChooseFromContacts = async () => {
+    const { status } = await Contacts.requestPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permissão Negada",
+        "Para escolher um contato, permita o acesso aos contatos nas configurações.",
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Abrir Configurações", onPress: () => Linking.openSettings() },
+        ]
+      );
+      return;
+    }
+
+    if (Platform.OS === "ios") {
+      // iOS supports the native contact picker
+      const result = await Contacts.presentContactPickerAsync();
+      if (result) {
+        const fullName = [result.firstName, result.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+        const phone =
+          result.phoneNumbers && result.phoneNumbers.length > 0
+            ? result.phoneNumbers[0].number ?? ""
+            : "";
+        setNewContact((prev) => ({
+          ...prev,
+          name: fullName || prev.name,
+          phone: phone || prev.phone,
+        }));
+      }
+    } else {
+      // Android: fetch all contacts and show an Alert list (basic picker)
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+        sort: Contacts.SortTypes.FirstName,
+      });
+      const withPhone = data.filter(
+        (c) => c.phoneNumbers && c.phoneNumbers.length > 0
+      );
+      if (withPhone.length === 0) {
+        Alert.alert("Sem contatos", "Nenhum contato com telefone encontrado.");
+        return;
+      }
+      // Show up to 20 contacts in an Alert list as a lightweight picker
+      const slice = withPhone.slice(0, 20);
+      Alert.alert(
+        "Escolher Contato",
+        "Selecione um contato:",
+        [
+          ...slice.map((c) => ({
+            text: [c.firstName, c.lastName].filter(Boolean).join(" ") || "Sem nome",
+            onPress: () => {
+              const fullName = [c.firstName, c.lastName]
+                .filter(Boolean)
+                .join(" ")
+                .trim();
+              const phone =
+                c.phoneNumbers && c.phoneNumbers.length > 0
+                  ? c.phoneNumbers[0].number ?? ""
+                  : "";
+              setNewContact((prev) => ({
+                ...prev,
+                name: fullName || prev.name,
+                phone: phone || prev.phone,
+              }));
+            },
+          })),
+          { text: "Cancelar", style: "cancel" },
+        ]
+      );
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerRow}>
@@ -298,6 +375,20 @@ export function EmergencyContactsScreen() {
             </TouchableOpacity>
           </View>
           <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.chooseContactBtn}
+              onPress={handleChooseFromContacts}
+            >
+              <Ionicons name="people" size={20} color={COLORS.white} />
+              <Text style={styles.chooseContactBtnText}>Escolher dos Contatos</Text>
+            </TouchableOpacity>
+
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerLabel}>ou preencha manualmente</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
             <Text style={styles.inputLabel}>Nome *</Text>
             <TextInput
               style={styles.input}
@@ -441,5 +532,37 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: COLORS.border,
     marginVertical: SPACING.md,
+  },
+  chooseContactBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.sm,
+  },
+  chooseContactBtnText: {
+    color: COLORS.white,
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  dividerLabel: {
+    ...FONTS.caption,
+    color: COLORS.textSecondary,
+    flexShrink: 1,
   },
 });
