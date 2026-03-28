@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -43,6 +43,9 @@ export function SettingsScreen() {
   const isElder = state.currentUser?.role === "elder";
 
   const [checkinTimes, setCheckinTimes] = useState(state.checkinTimes);
+  // Tracks whether the user has locally modified check-in times since mount.
+  // When true, we skip overwriting with server data to avoid race conditions.
+  const checkinTimesModified = useRef(false);
   const [newTime, setNewTime] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pickerDate, setPickerDate] = useState(new Date());
@@ -93,7 +96,10 @@ export function SettingsScreen() {
             } catch {}
             return t;
           });
-          if (serverTimes.length > 0) {
+          // Only apply server times on initial load — skip if user has already
+          // modified times locally (prevents race condition where server returns
+          // stale data after a deletion)
+          if (!checkinTimesModified.current) {
             setCheckinTimes(serverTimes);
             dispatch({ type: "SET_CHECKIN_TIMES", payload: serverTimes });
           }
@@ -273,6 +279,7 @@ export function SettingsScreen() {
     }
 
     const updated = [...checkinTimes, cleanTime].sort();
+    checkinTimesModified.current = true;
     setCheckinTimes(updated);
     dispatch({ type: "SET_CHECKIN_TIMES", payload: updated });
     await checkInService.scheduleCheckinAlarms(updated);
@@ -283,6 +290,7 @@ export function SettingsScreen() {
 
   const handleRemoveTime = async (time: string) => {
     const updated = checkinTimes.filter((t) => t !== time);
+    checkinTimesModified.current = true;
     setCheckinTimes(updated);
     dispatch({ type: "SET_CHECKIN_TIMES", payload: updated });
     await checkInService.scheduleCheckinAlarms(updated);
