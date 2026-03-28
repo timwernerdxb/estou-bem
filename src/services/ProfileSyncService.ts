@@ -18,13 +18,16 @@ async function syncProfile(user: User, dispatch: Dispatch): Promise<void> {
     if (!profile) return;
 
     // Update subscription from server (single source of truth)
+    // serverTier preserves the raw value ("free"|"familia"|"central") so
+    // SettingsScreen can correctly apply plan-specific limits (e.g. central=10 check-ins)
     const serverSub = profile.subscription || "free";
     dispatch({
       type: "SET_SUBSCRIPTION",
       payload: {
         tier: serverSub !== "free" ? "pro" : "free",
         isActive: true,
-      },
+        serverTier: serverSub,
+      } as any,
     });
   } catch (e) {
     console.warn("[ProfileSync] Failed to sync profile:", e);

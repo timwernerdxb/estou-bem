@@ -2233,10 +2233,10 @@ app.get('/api/profile', authMiddleware, asyncHandler(async (req, res) => {
     let linked_family = [];
     if (user.role === 'elder') {
       const family = await pool.query(
-        `SELECT id, name, phone FROM users WHERE linked_elder_id = $1`,
+        `SELECT name, phone FROM users WHERE linked_elder_id = $1`,
         [user.id]
       );
-      linked_family = family.rows;
+      linked_family = family.rows; // id intentionally omitted — never expose internal DB IDs to clients
     }
 
     res.json({ ...user, linked_elder_name, linked_family });
