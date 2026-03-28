@@ -26,6 +26,7 @@ import { checkInService } from "../services/CheckInService";
 import { affiliateService } from "../services/AffiliateService";
 import { fetchSettings, postConsent, fetchMedications, fetchContacts, fetchHealth } from "../services/ApiService";
 import { analyticsService } from "../services/AnalyticsService";
+import { useI18n } from "../i18n";
 
 const API_URL = "https://estou-bem-web-production.up.railway.app";
 
@@ -63,6 +64,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export function OnboardingScreen() {
   const navigation = useNavigation<Nav>();
   const { dispatch } = useApp();
+  const { t } = useI18n();
   const flatListRef = useRef<FlatList>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showSetup, setShowSetup] = useState(false);
@@ -90,7 +92,7 @@ export function OnboardingScreen() {
 
   const handleComplete = async () => {
     if (!name.trim()) {
-      Alert.alert("Erro", "Digite seu nome");
+      Alert.alert("Erro", t("error_enter_name"));
       return;
     }
     if (!role) {
@@ -132,7 +134,7 @@ export function OnboardingScreen() {
         // Handle specific server errors
         const errorMsg =
           data.error === "Email already registered"
-            ? "Este e-mail ja esta cadastrado. Use a opcao Entrar."
+            ? t("error_email_exists")
             : data.error === "phone_exists"
             ? data.message || "Este numero ja esta cadastrado."
             : data.error || "Erro ao criar conta. Tente novamente.";
@@ -337,7 +339,7 @@ export function OnboardingScreen() {
         Alert.alert("Erro", data.error || "E-mail ou senha incorretos");
       }
     } catch (e) {
-      Alert.alert("Erro", "Nao foi possivel conectar ao servidor");
+      Alert.alert("Erro", t("error_server"));
     } finally {
       setIsLoggingIn(false);
     }
@@ -351,12 +353,10 @@ export function OnboardingScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.setupTitle}>Entrar</Text>
-          <Text style={styles.setupSubtitle}>
-            Acesse sua conta Estou Bem
-          </Text>
+          <Text style={styles.setupTitle}>{t("login_title")}</Text>
+          <Text style={styles.setupSubtitle}>{t("login_subtitle")}</Text>
 
-          <Text style={styles.label}>E-mail</Text>
+          <Text style={styles.label}>{t("login_email")}</Text>
           <TextInput
             style={styles.input}
             placeholder="seu@email.com"
@@ -367,10 +367,10 @@ export function OnboardingScreen() {
             placeholderTextColor={COLORS.textLight}
           />
 
-          <Text style={styles.label}>Senha</Text>
+          <Text style={styles.label}>{t("login_password")}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Sua senha"
+            placeholder={t("login_password_placeholder")}
             value={loginPassword}
             onChangeText={setLoginPassword}
             secureTextEntry
@@ -378,7 +378,7 @@ export function OnboardingScreen() {
           />
 
           <Button
-            title={isLoggingIn ? "Entrando..." : "Entrar"}
+            title={isLoggingIn ? t("login_loading") : t("login_button")}
             onPress={handleLogin}
             size="elder"
             disabled={isLoggingIn}
@@ -393,8 +393,8 @@ export function OnboardingScreen() {
             style={{ marginTop: SPACING.lg, alignItems: "center" }}
           >
             <Text style={{ color: COLORS.textSecondary, fontSize: 14 }}>
-              Nao tem conta?{" "}
-              <Text style={{ color: COLORS.accent, fontWeight: "500" }}>Criar conta</Text>
+              {t("login_no_account")}{" "}
+              <Text style={{ color: COLORS.accent, fontWeight: "500" }}>{t("login_create_account")}</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -415,13 +415,11 @@ export function OnboardingScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-          <Text style={styles.setupTitle}>Vamos começar</Text>
-          <Text style={styles.setupSubtitle}>
-            Configure seu perfil para usar o Estou Bem
-          </Text>
+          <Text style={styles.setupTitle}>{t("register_title")}</Text>
+          <Text style={styles.setupSubtitle}>{t("register_subtitle")}</Text>
 
           {/* Role Selection */}
-          <Text style={styles.label}>Quem é você?</Text>
+          <Text style={styles.label}>{t("register_who")}</Text>
           <View style={styles.roleRow}>
             <TouchableOpacity
               style={[styles.roleCard, role === "elder" && styles.roleCardActive]}
@@ -438,7 +436,7 @@ export function OnboardingScreen() {
                   role === "elder" && styles.roleTextActive,
                 ]}
               >
-                Sou o Idoso
+                {t("register_role_elder")}
               </Text>
             </TouchableOpacity>
 
@@ -457,7 +455,7 @@ export function OnboardingScreen() {
                   role === "family" && styles.roleTextActive,
                 ]}
               >
-                Sou Familiar
+                {t("register_role_family")}
               </Text>
             </TouchableOpacity>
 
@@ -479,16 +477,16 @@ export function OnboardingScreen() {
                   role === "caregiver" && styles.roleTextActive,
                 ]}
               >
-                Sou Cuidador
+                {t("register_role_caregiver")}
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* Name */}
-          <Text style={styles.label}>Seu nome</Text>
+          <Text style={styles.label}>{t("register_name")}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Como devemos te chamar?"
+            placeholder={t("register_name_placeholder")}
             value={name}
             onChangeText={setName}
             placeholderTextColor={COLORS.textLight}
@@ -496,7 +494,7 @@ export function OnboardingScreen() {
           />
 
           {/* Phone */}
-          <Text style={styles.label}>Telefone (opcional)</Text>
+          <Text style={styles.label}>{t("register_phone")}</Text>
           <TextInput
             style={styles.input}
             placeholder="(11) 99999-9999"
@@ -507,7 +505,7 @@ export function OnboardingScreen() {
           />
 
           {/* Email */}
-          <Text style={styles.label}>E-mail</Text>
+          <Text style={styles.label}>{t("register_email")}</Text>
           <TextInput
             style={styles.input}
             placeholder="seu@email.com"
@@ -519,10 +517,10 @@ export function OnboardingScreen() {
           />
 
           {/* Password */}
-          <Text style={styles.label}>Senha</Text>
+          <Text style={styles.label}>{t("register_password")}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Minimo 8 caracteres"
+            placeholder={t("register_password_placeholder")}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -530,12 +528,12 @@ export function OnboardingScreen() {
           />
 
           {/* Referral Code */}
-          <Text style={styles.label}>Codigo de indicacao (opcional)</Text>
+          <Text style={styles.label}>{t("register_referral")}</Text>
           <TextInput
             style={styles.input}
             placeholder="Ex: EB4K2A"
             value={referralCode}
-            onChangeText={(t) => setReferralCode(t.toUpperCase())}
+            onChangeText={(v) => setReferralCode(v.toUpperCase())}
             autoCapitalize="characters"
             maxLength={10}
             placeholderTextColor={COLORS.textLight}
@@ -552,13 +550,11 @@ export function OnboardingScreen() {
               size={24}
               color={lgpdConsent ? COLORS.primary : COLORS.textLight}
             />
-            <Text style={styles.lgpdText}>
-              Autorizo o compartilhamento dos meus dados de saude conforme a LGPD para fins de monitoramento e alertas de emergencia.
-            </Text>
+            <Text style={styles.lgpdText}>{t("register_lgpd")}</Text>
           </TouchableOpacity>
 
           <Button
-            title={isRegistering ? "Criando conta..." : "Criar conta"}
+            title={isRegistering ? t("register_loading") : t("register_button")}
             onPress={handleComplete}
             size="elder"
             disabled={isRegistering}
@@ -573,8 +569,8 @@ export function OnboardingScreen() {
             style={{ marginTop: SPACING.lg, alignItems: "center" }}
           >
             <Text style={{ color: COLORS.textSecondary, fontSize: 14 }}>
-              Ja tem conta?{" "}
-              <Text style={{ color: COLORS.accent, fontWeight: "500" }}>Entrar</Text>
+              {t("register_has_account")}{" "}
+              <Text style={{ color: COLORS.accent, fontWeight: "500" }}>{t("login_button")}</Text>
             </Text>
           </TouchableOpacity>
           </ScrollView>
