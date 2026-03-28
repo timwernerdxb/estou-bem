@@ -6902,6 +6902,21 @@ async function checkMissedCheckins() {
               checkinId: checkin.id,
               timestamp: new Date().toISOString(),
             });
+
+            // Push notification to family — lets them know the check-in was auto-confirmed
+            // (not manually confirmed by the elder) so they can choose to follow up
+            const { tokens: familyTokens, userIds: familyUserIds } = await getFamilyPushTokens(elder.id);
+            if (familyTokens.length > 0) {
+              await sendPushNotifications(
+                familyTokens,
+                `Check-in automático — ${elder.name}`,
+                `O check-in das ${checkin.time} foi confirmado automaticamente. ${elder.name} não respondeu manualmente.`,
+                { type: 'auto_confirmed', elderId: elder.id, checkinId: checkin.id },
+                false,
+                familyUserIds
+              );
+              console.log(`[Auto Check-in] Sent auto-confirmed push to ${familyTokens.length} family member(s) for ${elder.name}`);
+            }
           }
         }
       }

@@ -214,6 +214,8 @@ export function FamilyDashboardScreen() {
   const confirmed = todayCheckins.filter(
     (c) => c.status === "confirmed" || c.status === "auto_confirmed"
   );
+  const manuallyConfirmed = todayCheckins.filter((c) => c.status === "confirmed");
+  const autoConfirmed = todayCheckins.filter((c) => c.status === "auto_confirmed");
   const missed = todayCheckins.filter((c) => c.status === "missed");
   const pending = todayCheckins.filter((c) => c.status === "pending");
 
@@ -346,7 +348,11 @@ export function FamilyDashboardScreen() {
   const getStatusText = () => {
     if (missed.length > 0) return t("dashboard_missed_checkins", { count: missed.length });
     if (pending.length > 0) return `${pending.length} check-in(s) pendente(s)`;
-    if (confirmed.length > 0) return "Todos os check-ins confirmados";
+    if (confirmed.length > 0) {
+      if (manuallyConfirmed.length === confirmed.length) return "Todos os check-ins confirmados";
+      if (autoConfirmed.length === confirmed.length) return "Check-ins confirmados automaticamente";
+      return `${manuallyConfirmed.length} manual · ${autoConfirmed.length} automático`;
+    }
     return "Nenhum check-in hoje ainda";
   };
 
