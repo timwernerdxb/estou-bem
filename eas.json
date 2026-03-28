@@ -25,8 +25,7 @@
     },
     "production": {
       "ios": {
-        "buildConfiguration": "Release",
-        "autoIncrement": true
+        "buildConfiguration": "Release"
       },
       "android": {
         "buildType": "app-bundle"

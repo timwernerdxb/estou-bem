@@ -16,9 +16,9 @@
       "bundleIdentifier": "com.twerner.estoubem",
       "buildNumber": "100",
       "infoPlist": {
-        "NSHealthShareUsageDescription": "Estou Bem usa dados de sa\u00fade para monitorar o bem-estar do idoso e alertar familiares.",
-        "NSHealthUpdateUsageDescription": "Estou Bem registra check-ins de sa\u00fade para acompanhamento familiar.",
-        "NSMotionUsageDescription": "Estou Bem detecta movimento para verificar automaticamente se o idoso est\u00e1 ativo.",
+        "NSHealthShareUsageDescription": "Estou Bem usa dados de saúde para monitorar o bem-estar do idoso e alertar familiares.",
+        "NSHealthUpdateUsageDescription": "Estou Bem registra check-ins de saúde para acompanhamento familiar.",
+        "NSMotionUsageDescription": "Estou Bem detecta movimento para verificar automaticamente se o idoso está ativo.",
         "UIBackgroundModes": [
           "remote-notification",
           "fetch"
