@@ -194,11 +194,17 @@ public class ExpoHealthkitModule: Module {
       var totalSleepSeconds: TimeInterval = 0
       for sample in categorySamples {
         let value = sample.value
-        if value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue
-          || value == HKCategoryValueSleepAnalysis.asleepCore.rawValue
-          || value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue
-          || value == HKCategoryValueSleepAnalysis.asleepREM.rawValue
-        {
+        var isSleeping = false
+        if #available(iOS 16.0, *) {
+          isSleeping = value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue
+            || value == HKCategoryValueSleepAnalysis.asleepCore.rawValue
+            || value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue
+            || value == HKCategoryValueSleepAnalysis.asleepREM.rawValue
+        } else {
+          // iOS 15: only .asleep is available
+          isSleeping = value == HKCategoryValueSleepAnalysis.asleep.rawValue
+        }
+        if isSleeping {
           totalSleepSeconds += sample.endDate.timeIntervalSince(sample.startDate)
         }
       }
