@@ -220,5 +220,12 @@
   "settings_fall_detection": "Sturzerkennung",
   "settings_fall_detection_desc": "Ueberwacht den Beschleunigungssensor um Stuerze automatisch zu erkennen",
   "settings_fall_detection_active": "Aktiv",
-  "settings_fall_detection_inactive": "Inaktiv"
+  "settings_fall_detection_inactive": "Inaktiv",
+  "elder_detail_manage_section": "Verwalten",
+  "elder_detail_confirm_checkin": "Check-in bestaetigen",
+  "elder_detail_view_location": "Standort anzeigen",
+  "elder_detail_checkin_override_title": "Check-in",
+  "elder_detail_checkin_override_success": "Check-in erfolgreich bestaetigt.",
+  "elder_detail_checkin_override_already_done": "Ein bestaedigter Check-in existiert bereits fuer diese Zeit.",
+  "elder_detail_checkin_override_error": "Check-in konnte nicht bestaetigt werden. Bitte erneut versuchen."
 }

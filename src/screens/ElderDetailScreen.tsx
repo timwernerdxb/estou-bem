@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Linking,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,7 +18,7 @@ import { COLORS, FONTS, SPACING, RADIUS } from "../constants/theme";
 import { useApp } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { StatusBadge } from "../components/StatusBadge";
-import { fetchElderStatus, fetchContacts } from "../services/ApiService";
+import { fetchElderStatus, fetchContacts, postFamilyCheckinOverride } from "../services/ApiService";
 import { useI18n } from "../i18n";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
@@ -72,6 +73,7 @@ export function ElderDetailScreen() {
   const [loading, setLoading] = React.useState(true);
   const [elderData, setElderData] = React.useState<ElderStatusData | null>(null);
   const [elderContacts, setElderContacts] = React.useState<any[]>([]);
+  const [checkinOverrideLoading, setCheckinOverrideLoading] = React.useState(false);
 
   const loadData = React.useCallback(async () => {
     try {
@@ -97,6 +99,48 @@ export function ElderDetailScreen() {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
+  };
+
+  const handleCheckinOverride = async () => {
+    if (checkinOverrideLoading) return;
+    setCheckinOverrideLoading(true);
+    try {
+      const now = new Date();
+      const time = now.toTimeString().slice(0, 5);
+      const date = now.toISOString().slice(0, 10);
+      const result = await postFamilyCheckinOverride(state.currentUser, {
+        time,
+        date,
+        notes: "Confirmed by family",
+      });
+      if (result?.ok) {
+        if (result.duplicate) {
+          Alert.alert(
+            t("elder_detail_checkin_override_title"),
+            t("elder_detail_checkin_override_already_done")
+          );
+        } else {
+          Alert.alert(
+            t("elder_detail_checkin_override_title"),
+            t("elder_detail_checkin_override_success")
+          );
+          await loadData();
+        }
+      } else {
+        Alert.alert(
+          t("elder_detail_checkin_override_title"),
+          t("elder_detail_checkin_override_error")
+        );
+      }
+    } catch (e) {
+      console.warn("[ElderDetail] check-in override failed:", e);
+      Alert.alert(
+        t("elder_detail_checkin_override_title"),
+        t("elder_detail_checkin_override_error")
+      );
+    } finally {
+      setCheckinOverrideLoading(false);
+    }
   };
 
   const elderName = elderData?.elderName || state.elderProfile?.name || t("role_elder");
@@ -405,6 +449,39 @@ export function ElderDetailScreen() {
           <Ionicons name="document-text" size={20} color={COLORS.white} />
           <Text style={styles.medProfileButtonText}>{t("elder_detail_view_medical_profile")}</Text>
         </TouchableOpacity>
+
+        {/* Gerenciar section */}
+        <View style={styles.manageSection}>
+          <Text style={styles.manageSectionTitle}>{t("elder_detail_manage_section")}</Text>
+          <View style={styles.manageButtonRow}>
+            {/* Confirmar Check-in */}
+            <TouchableOpacity
+              style={[styles.manageButton, styles.manageButtonCheckin]}
+              onPress={handleCheckinOverride}
+              disabled={checkinOverrideLoading}
+            >
+              {checkinOverrideLoading ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+              ) : (
+                <Ionicons name="checkmark-circle" size={22} color={COLORS.white} />
+              )}
+              <Text style={styles.manageButtonText}>
+                {t("elder_detail_confirm_checkin")}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Ver Localização */}
+            <TouchableOpacity
+              style={[styles.manageButton, styles.manageButtonLocation]}
+              onPress={() => navigation.navigate("MapScreen")}
+            >
+              <Ionicons name="location" size={22} color={COLORS.white} />
+              <Text style={styles.manageButtonText}>
+                {t("elder_detail_view_location")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -549,11 +626,46 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.md,
     marginTop: SPACING.sm,
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.md,
   },
   medProfileButtonText: {
     color: COLORS.white,
     fontWeight: "600",
     fontSize: 16,
+  },
+  manageSection: {
+    marginTop: SPACING.md,
+    marginBottom: SPACING.xl,
+  },
+  manageSectionTitle: {
+    ...FONTS.caption,
+    color: COLORS.textLight,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: SPACING.sm,
+  },
+  manageButtonRow: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+  },
+  manageButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+  },
+  manageButtonCheckin: {
+    backgroundColor: COLORS.success,
+  },
+  manageButtonLocation: {
+    backgroundColor: COLORS.accent,
+  },
+  manageButtonText: {
+    color: COLORS.white,
+    fontWeight: "600",
+    fontSize: 14,
   },
 });

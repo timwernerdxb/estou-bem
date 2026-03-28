@@ -246,6 +246,20 @@ export async function postFallCancelled(
 
 // ─── Family Elder Status ──────────────────────────────────────
 
+export async function postFamilyCheckinOverride(
+  user: { apiUrl?: string; token?: string } | null,
+  body: { time: string; date: string; notes?: string }
+): Promise<{ ok: boolean; checkin: any; duplicate?: boolean } | null> {
+  if (!user?.token) return null;
+  const res = await safeFetch(`${getApiUrl(user)}/api/family/checkin-override`, {
+    method: "POST",
+    headers: getHeaders(user.token),
+    body: JSON.stringify(body),
+  });
+  if (!res || !res.ok) return null;
+  return res.json();
+}
+
 export async function fetchElderStatus(
   user: { apiUrl?: string; token?: string } | null
 ): Promise<any | null> {

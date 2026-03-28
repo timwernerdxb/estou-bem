@@ -237,6 +237,13 @@
   "elder_detail_sleep_unit": "sono",
   "elder_detail_no_checkins_today": "Nenhum check-in hoje ainda",
   "elder_detail_view_medical_profile": "Ver Perfil Medico Completo",
+  "elder_detail_manage_section": "Gerenciar",
+  "elder_detail_confirm_checkin": "Confirmar Check-in",
+  "elder_detail_view_location": "Ver Localizacao",
+  "elder_detail_checkin_override_title": "Check-in",
+  "elder_detail_checkin_override_success": "Check-in confirmado com sucesso.",
+  "elder_detail_checkin_override_already_done": "Ja existe um check-in confirmado neste horario.",
+  "elder_detail_checkin_override_error": "Nao foi possivel confirmar o check-in. Tente novamente.",
 
   "settings_health_connect_success": "{platform} conectado.",
   "settings_checkin_hour_invalid": "Hora invalida",

@@ -220,5 +220,12 @@
   "settings_fall_detection": "Deteccion de Caidas",
   "settings_fall_detection_desc": "Monitorea el acelerometro para detectar caidas automaticamente",
   "settings_fall_detection_active": "Activa",
-  "settings_fall_detection_inactive": "Inactiva"
+  "settings_fall_detection_inactive": "Inactiva",
+  "elder_detail_manage_section": "Gestionar",
+  "elder_detail_confirm_checkin": "Confirmar Check-in",
+  "elder_detail_view_location": "Ver Ubicacion",
+  "elder_detail_checkin_override_title": "Check-in",
+  "elder_detail_checkin_override_success": "Check-in confirmado con exito.",
+  "elder_detail_checkin_override_already_done": "Ya existe un check-in confirmado en este horario.",
+  "elder_detail_checkin_override_error": "No se pudo confirmar el check-in. Intente de nuevo."
 }

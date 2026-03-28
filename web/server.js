@@ -2365,6 +2365,58 @@ app.get('/api/family/elder-status', authMiddleware, asyncHandler(async (req, res
   }
 }));
 
+// POST /api/family/checkin-override — family member confirms a check-in on behalf of the linked elder
+app.post('/api/family/checkin-override', authMiddleware, asyncHandler(async (req, res) => {
+  // Only family/caregiver users may call this
+  const callerRow = await pool.query(`SELECT role, linked_elder_id FROM users WHERE id = $1`, [req.userId]);
+  const caller = callerRow.rows[0];
+  if (!caller || caller.role === 'elder') {
+    return res.status(403).json({ error: 'Only family or caregiver accounts can perform a check-in override' });
+  }
+  const elderId = caller.linked_elder_id;
+  if (!elderId) {
+    return res.status(400).json({ error: 'No linked elder found for this account' });
+  }
+  const elderIdInt = parseInt(elderId, 10);
+
+  const now = new Date();
+  const time = req.body.time || now.toTimeString().slice(0, 5);
+  const date = req.body.date || now.toISOString().slice(0, 10);
+  const notes = req.body.notes || 'Confirmed by family';
+
+  // Deduplicate: suppress if a confirmed check-in already exists within a 30-min window today
+  const [h, m] = time.split(':').map(Number);
+  const slotMinutes = h * 60 + m;
+  const existing = await pool.query(
+    `SELECT id FROM checkins
+     WHERE user_id = $1
+       AND date = $2
+       AND status = 'confirmed'
+       AND ABS(
+         (EXTRACT(HOUR FROM time::time)::int * 60 + EXTRACT(MINUTE FROM time::time)::int) - $3
+       ) <= 30`,
+    [elderIdInt, date, slotMinutes]
+  );
+  if (existing.rows.length > 0) {
+    return res.json({ ok: true, checkin: existing.rows[0], duplicate: true });
+  }
+
+  const result = await pool.query(
+    `INSERT INTO checkins (user_id, time, status, date, notes) VALUES ($1, $2, 'confirmed', $3, $4) RETURNING *`,
+    [elderIdInt, time, date, notes]
+  ).catch(async () => {
+    // notes column may not exist on older schemas — fall back without it
+    return pool.query(
+      `INSERT INTO checkins (user_id, time, status, date) VALUES ($1, $2, 'confirmed', $3) RETURNING *`,
+      [elderIdInt, time, date]
+    );
+  });
+
+  const checkin = result.rows[0];
+  console.log(`[family/checkin-override] Family user ${req.userId} confirmed check-in for elder ${elderIdInt}:`, checkin.id);
+  res.json({ ok: true, checkin });
+}));
+
 // ── Settings Routes ───────────────────────────────────────
 app.get('/api/settings', authMiddleware, asyncHandler(async (req, res) => {
   const result = await pool.query(`SELECT * FROM settings WHERE user_id = $1`, [req.userId]);
