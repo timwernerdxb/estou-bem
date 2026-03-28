@@ -37,7 +37,7 @@ public class ExpoHealthkitModule: Module {
       self.queryLatestQuantity(
         typeIdentifier: .heartRate,
         unit: HKUnit(from: "count/min"),
-        hoursBack: 24,
+        hoursBack: 720, // last 30 days — show most recent reading ever available
         promise: promise
       )
     }
@@ -50,7 +50,7 @@ public class ExpoHealthkitModule: Module {
       self.queryLatestQuantity(
         typeIdentifier: .oxygenSaturation,
         unit: HKUnit.percent(),
-        hoursBack: 24,
+        hoursBack: 720, // last 30 days — show most recent reading ever available
         promise: promise,
         multiplyBy100: true
       )
@@ -172,7 +172,8 @@ public class ExpoHealthkitModule: Module {
     }
 
     let now = Date()
-    guard let startDate = Calendar.current.date(byAdding: .hour, value: -24, to: now) else {
+    // Look back 36 hours to always catch last night's sleep
+    guard let startDate = Calendar.current.date(byAdding: .hour, value: -36, to: now) else {
       promise.resolve(Optional<Double>.none as Any)
       return
     }
@@ -222,7 +223,8 @@ public class ExpoHealthkitModule: Module {
     }
 
     let now = Date()
-    guard let startDate = Calendar.current.date(byAdding: .hour, value: -24, to: now) else {
+    // Look back 30 days — show most recent BP reading available
+    guard let startDate = Calendar.current.date(byAdding: .hour, value: -720, to: now) else {
       promise.resolve(Optional<[String: Int]>.none as Any)
       return
     }
