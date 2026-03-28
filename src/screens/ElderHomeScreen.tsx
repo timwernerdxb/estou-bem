@@ -462,9 +462,17 @@ export function ElderHomeScreen() {
       dispatch({ type: "ADD_CHECKIN", payload: confirmed });
       setLastCheckin(confirmed);
       const now = new Date();
-      const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+      // Use the nearest scheduled time instead of clock time so the server
+      // recognises this as confirming that slot (prevents duplicate check-ins)
+      const nearestScheduledTime = scheduleTimes.reduce((best, t) => {
+        const [h, m] = t.split(":").map(Number);
+        const diff = Math.abs(h * 60 + m - nowMins);
+        const [bh, bm] = best.split(":").map(Number);
+        return diff < Math.abs(bh * 60 + bm - nowMins) ? t : best;
+      }, scheduleTimes[0] || now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false }));
       postCheckin(state.currentUser, {
-        time: timeStr,
+        time: nearestScheduledTime,
         status: "confirmed",
         date: now.toISOString().slice(0, 10),
       }).catch(() => {});

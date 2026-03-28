@@ -12,6 +12,7 @@ import {
   FamilyTabParamList,
 } from "../types";
 import { startProfileSync, stopProfileSync } from "../services/ProfileSyncService";
+import { notificationService } from "../services/NotificationService";
 
 // Screens
 import { OnboardingScreen } from "../screens/OnboardingScreen";
@@ -189,6 +190,14 @@ export function AppNavigator() {
       stopProfileSync();
     };
   }, [state.isOnboarded, state.currentUser?.token]);
+
+  // Register push token every time the user is logged in
+  // This ensures family/caretaker users (who skip onboarding) also register their token
+  useEffect(() => {
+    if (state.isOnboarded && state.currentUser?.token) {
+      notificationService.initialize(state.currentUser).catch(() => {});
+    }
+  }, [state.currentUser?.token]);
 
   if (state.isLoading) {
     return (
