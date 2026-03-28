@@ -1,48 +1,49 @@
 {
-  "cli": {
-    "version": ">= 12.0.0",
-    "appVersionSource": "local"
-  },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "ios": {
-        "simulator": true
-      },
-      "android": {
-        "buildType": "apk"
-      }
+    "cli": {
+        "version": ">= 12.0.0",
+        "appVersionSource": "remote"
     },
-    "preview": {
-      "distribution": "internal",
-      "ios": {
-        "buildConfiguration": "Release"
-      },
-      "android": {
-        "buildType": "apk"
-      }
+    "build": {
+        "development": {
+            "developmentClient": true,
+            "distribution": "internal",
+            "ios": {
+                "simulator": true
+            },
+            "android": {
+                "buildType": "apk"
+            }
+        },
+        "preview": {
+            "distribution": "internal",
+            "ios": {
+                "buildConfiguration": "Release"
+            },
+            "android": {
+                "buildType": "apk"
+            }
+        },
+        "production": {
+            "ios": {
+                "buildConfiguration": "Release",
+                "autoIncrement": true
+            },
+            "android": {
+                "buildType": "app-bundle"
+            }
+        }
     },
-    "production": {
-      "ios": {
-        "buildConfiguration": "Release"
-      },
-      "android": {
-        "buildType": "app-bundle"
-      }
+    "submit": {
+        "production": {
+            "ios": {
+                "appleId": "t@paired-minds.com",
+                "appleTeamId": "7Q97Z7U42U",
+                "ascAppId": "6761190539"
+            },
+            "android": {
+                "serviceAccountKeyPath": "./play-store-service-account.json",
+                "track": "internal"
+            }
+        }
     }
-  },
-  "submit": {
-    "production": {
-      "ios": {
-        "appleId": "t@paired-minds.com",
-        "appleTeamId": "7Q97Z7U42U",
-        "ascAppId": "6761190539"
-      },
-      "android": {
-        "serviceAccountKeyPath": "./play-store-service-account.json",
-        "track": "internal"
-      }
-    }
-  }
 }
