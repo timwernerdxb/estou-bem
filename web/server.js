@@ -943,6 +943,11 @@ async function initDB() {
     await client.query(`ALTER TABLE escalation_alerts ADD COLUMN IF NOT EXISTS type TEXT`).catch(() => {});
     // WhatsApp reminder deduplication: track when outgoing WhatsApp was sent for each check-in
     await client.query(`ALTER TABLE checkins ADD COLUMN IF NOT EXISTS whatsapp_reminded_at TIMESTAMPTZ`).catch(() => {});
+    // Escalation tracking columns (were missing from original CREATE TABLE — added here so restores don't break)
+    await client.query(`ALTER TABLE checkins ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ`).catch(() => {});
+    await client.query(`ALTER TABLE checkins ADD COLUMN IF NOT EXISTS escalation_level INTEGER DEFAULT 0`).catch(() => {});
+    // Backfill confirmed_at for any already-confirmed check-ins that predate this column
+    await client.query(`UPDATE checkins SET confirmed_at = created_at WHERE status IN ('confirmed', 'auto_confirmed') AND confirmed_at IS NULL`).catch(() => {});
 
     // Migrate legacy blood_glucose → steps where unit is 'passos'
     await client.query(`UPDATE health_entries SET type = 'steps' WHERE type = 'blood_glucose' AND (unit = 'passos' OR notes = 'steps')`).catch(() => {});
@@ -2295,7 +2300,7 @@ app.get('/api/family/elder-status', authMiddleware, asyncHandler(async (req, res
     // Today's check-ins
     const today = new Date().toISOString().slice(0, 10);
     const checkins = await pool.query(
-      `SELECT id, time, status, date, created_at FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
+      `SELECT id, time, status, date, confirmed_at, created_at FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
       [elderIdInt]
     );
     console.log('[elder-status] Checkins found:', checkins.rows.length);
@@ -2548,9 +2553,18 @@ app.post('/api/escalation/trigger', authMiddleware, asyncHandler(async (req, res
 }));
 
 // ── Check-in Status (3-state: pending / completed / waiting) ──
-app.get('/api/checkin-status/:userId', asyncHandler(async (req, res) => {
+app.get('/api/checkin-status/:userId', authMiddleware, asyncHandler(async (req, res) => {
   const userId = parseInt(req.params.userId);
   if (!userId) return res.status(400).json({ error: 'Invalid userId' });
+  // Security: only allow requesting own status or linked elder's status
+  const callerRow = await pool.query(`SELECT role, linked_elder_id FROM users WHERE id = $1`, [req.userId]);
+  const caller = callerRow.rows[0];
+  const isOwnStatus = req.userId === userId;
+  const isLinkedElder = caller && caller.linked_elder_id === userId;
+  const isSuperAdmin = caller && caller.role === 'caregiver'; // caregivers can see any
+  if (!isOwnStatus && !isLinkedElder && !isSuperAdmin) {
+    return res.status(403).json({ error: 'Not authorized to view this user status' });
+  }
 
   try {
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -2968,9 +2982,10 @@ app.get('/api/watch/schedule', asyncHandler(async (req, res) => {
 
 // ── Health Entries Routes ─────────────────────────────────
 app.get('/api/health', authMiddleware, asyncHandler(async (req, res) => {
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 500);
   const result = await pool.query(
     `SELECT * FROM health_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
-    [req.userId, parseInt(req.query.limit) || 50]
+    [req.userId, limit]
   );
   res.json(result.rows);
 }));
@@ -2981,9 +2996,10 @@ app.get('/api/health/elder', authMiddleware, asyncHandler(async (req, res) => {
   const elderId = user.rows[0]?.linked_elder_id;
   if (!elderId) return res.status(404).json({ error: 'No linked elder' });
 
+  const elderLimit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 500);
   const result = await pool.query(
     `SELECT * FROM health_entries WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
-    [elderId, parseInt(req.query.limit) || 50]
+    [elderId, elderLimit]
   );
   res.json(result.rows);
 }));

@@ -439,6 +439,7 @@ class HealthIntegrationService {
         type: "heart_rate",
         value: summary.heartRate,
         unit: "bpm",
+        notes: "healthkit",
       });
     }
 
@@ -450,6 +451,7 @@ class HealthIntegrationService {
         type: "steps",
         value: summary.steps,
         unit: "passos",
+        notes: "healthkit",
       });
     }
 
@@ -461,6 +463,7 @@ class HealthIntegrationService {
         type: "sleep",
         value: summary.sleepHours,
         unit: "hours",
+        notes: "healthkit",
       });
     }
 
@@ -472,6 +475,7 @@ class HealthIntegrationService {
         type: "blood_pressure_systolic",
         value: summary.bloodPressureSystolic,
         unit: "mmHg",
+        notes: "healthkit",
       });
     }
 
@@ -483,6 +487,7 @@ class HealthIntegrationService {
         type: "blood_pressure_diastolic",
         value: summary.bloodPressureDiastolic,
         unit: "mmHg",
+        notes: "healthkit",
       });
     }
 
@@ -494,6 +499,7 @@ class HealthIntegrationService {
         type: "oxygen_saturation",
         value: summary.spo2,
         unit: "%",
+        notes: "healthkit",
       });
     }
 
@@ -505,6 +511,7 @@ class HealthIntegrationService {
         type: "active_calories",
         value: summary.activeCalories,
         unit: "kcal",
+        notes: "healthkit",
       });
     }
 

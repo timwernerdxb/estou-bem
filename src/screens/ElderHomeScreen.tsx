@@ -54,6 +54,7 @@ export function ElderHomeScreen() {
 
   const [streakDays, setStreakDays] = useState(0);
   const [healthSummary, setHealthSummary] = useState<HealthSummary>({});
+  const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
   const elderName = state.elderProfile?.name || state.currentUser?.name || "Voce";
 
   // Read check-in times directly from state (set by SettingsScreen dispatch)
@@ -259,9 +260,17 @@ export function ElderHomeScreen() {
   // Start GPS tracking when elder is logged in
   useEffect(() => {
     if (!state.currentUser?.token) return;
-    locationService.startTracking(state.currentUser).catch((err) =>
-      console.warn("[ElderHome] Location tracking failed to start:", err)
-    );
+    locationService.startTracking(state.currentUser).then((success) => {
+      // If tracking returned false, foreground permission was denied
+      if (!success) {
+        setLocationPermissionDenied(true);
+      } else {
+        setLocationPermissionDenied(false);
+      }
+    }).catch((err) => {
+      console.warn("[ElderHome] Location tracking failed to start:", err);
+      setLocationPermissionDenied(true);
+    });
     return () => {
       locationService.stopTracking().catch(() => {});
     };
@@ -676,6 +685,33 @@ export function ElderHomeScreen() {
             <Text style={{ color: SH_GREEN, fontFamily: serifFont, fontSize: 15 }}>
               Vou cochilar (pausar 1 hora)
             </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Location permission warning — shown when foreground permission is denied */}
+        {locationPermissionDenied && (
+          <TouchableOpacity
+            onPress={() => {
+              // Re-try permission request
+              locationService.startTracking(state.currentUser).then((success) => {
+                if (success) setLocationPermissionDenied(false);
+              }).catch(() => {});
+            }}
+            style={{
+              flexDirection: "row", alignItems: "center",
+              backgroundColor: "#FFF3CD", borderRadius: 12, padding: 14, marginBottom: 16,
+              borderWidth: 1, borderColor: "#F0A500",
+            }}
+          >
+            <Ionicons name="location-outline" size={20} color="#856404" style={{ marginRight: 8 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: "#856404", fontWeight: "600", fontSize: 14 }}>
+                Localização desativada
+              </Text>
+              <Text style={{ color: "#856404", fontSize: 12, marginTop: 2 }}>
+                Para que sua família possa ver onde você está, permita o acesso à localização nas Configurações do iPhone. Toque aqui para tentar novamente.
+              </Text>
+            </View>
           </TouchableOpacity>
         )}
 
