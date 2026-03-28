@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.twerner.estoubem",
-      "buildNumber": "1",
+      "buildNumber": "100",
       "infoPlist": {
         "NSHealthShareUsageDescription": "Estou Bem usa dados de sa\u00fade para monitorar o bem-estar do idoso e alertar familiares.",
         "NSHealthUpdateUsageDescription": "Estou Bem registra check-ins de sa\u00fade para acompanhamento familiar.",

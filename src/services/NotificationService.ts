@@ -4,11 +4,14 @@ import { Platform } from "react-native";
 
 class NotificationService {
   private isInitialized = false;
+  private tokenRegisteredWithServer = false;
+  pushToken: string | null = null;
 
   async initialize(
     user?: { id?: string | number; token?: string; apiUrl?: string } | null
   ): Promise<string | null> {
-    if (this.isInitialized) return null;
+    // Allow re-registration if token was never successfully sent to server
+    if (this.isInitialized && this.tokenRegisteredWithServer) return this.pushToken;
 
     // Set notification handler for foreground
     Notifications.setNotificationHandler({
@@ -127,9 +130,10 @@ class NotificationService {
         projectId: "2c5b816f-19cf-46ec-bc64-33fc65b47033",
       });
       const pushToken = tokenData.data;
+      this.pushToken = pushToken;
 
-      // Register token with the server
-      this.registerTokenWithServer(pushToken, user);
+      // Register token with the server (await to know if it succeeded)
+      await this.registerTokenWithServer(pushToken, user);
 
       return pushToken;
     } catch (err) {
@@ -148,7 +152,7 @@ class NotificationService {
       if (user?.token) {
         headers["Authorization"] = `Bearer ${user.token}`;
       }
-      await fetch(
+      const resp = await fetch(
         `${baseUrl}/api/push-token`,
         {
           method: "POST",
@@ -160,9 +164,15 @@ class NotificationService {
           }),
         }
       );
-      console.log("[Notifications] Push token registered with server");
+      if (resp.ok) {
+        this.tokenRegisteredWithServer = true;
+        console.log("[Notifications] Push token registered with server");
+      } else {
+        console.warn("[Notifications] Server rejected push token registration:", resp.status);
+      }
     } catch (err) {
       console.warn("[Notifications] Failed to register token:", err);
+      // tokenRegisteredWithServer stays false — next initialize() call will retry
     }
   }
 
