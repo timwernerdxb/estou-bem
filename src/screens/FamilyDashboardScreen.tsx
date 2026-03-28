@@ -621,16 +621,16 @@ export function FamilyDashboardScreen() {
                   <Text style={styles.healthUnit}>sono</Text>
                 </View>
               </View>
-              {myHealth.activeCalories != null && (
-                <View style={styles.healthGridRow}>
-                  <View style={styles.healthGridCell}>
-                    <Ionicons name="flame" size={20} color="#FF6B00" />
-                    <Text style={styles.healthValue}>{myHealth.activeCalories}</Text>
-                    <Text style={styles.healthUnit}>kcal</Text>
-                  </View>
-                  <View style={styles.healthGridCell} />
+              <View style={styles.healthGridRow}>
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="flame" size={20} color="#FF6B00" />
+                  <Text style={myHealth.activeCalories != null ? styles.healthValue : styles.healthValueEmpty}>
+                    {myHealth.activeCalories != null ? myHealth.activeCalories : "\u2014"}
+                  </Text>
+                  <Text style={styles.healthUnit}>kcal</Text>
                 </View>
-              )}
+                <View style={styles.healthGridCell} />
+              </View>
             </View>
             {myHealth.lastUpdated && (
               <Text style={{ fontSize: 11, color: COLORS.textLight, textAlign: "center", marginTop: 4 }}>
