@@ -21,8 +21,11 @@ struct EstouBemWatchApp: App {
                 .onAppear {
                     // Activate WatchConnectivity after UI is ready
                     connectivity.activateSession()
-                    // Request HealthKit authorization after the app UI is ready
-                    healthManager.requestAuthorization()
+                    // DO NOT request HealthKit auth from the Watch app.
+                    // The iPhone companion app (ExpoHealthkitModule) owns the permission dialog.
+                    // HealthKit permissions granted on iPhone are automatically shared with the
+                    // paired Watch extension — no second prompt needed.
+                    healthManager.startDataReadingIfAuthorized()
                     // Defer motion & fall detection - CoreMotion crashes if started too early on watchOS
                     // Do NOT start automatically - let user enable from settings
                 }

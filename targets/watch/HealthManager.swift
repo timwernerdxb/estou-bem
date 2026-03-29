@@ -42,6 +42,33 @@ class HealthManager: NSObject, ObservableObject {
         super.init()
     }
 
+    // MARK: - Silent Start (used by Watch app — iPhone handles the permission prompt)
+    /// Starts all data-reading queries WITHOUT showing any HealthKit permission dialog.
+    /// Call this from the Watch app instead of requestAuthorization().
+    /// If the user has already granted permissions on the paired iPhone, readings will work.
+    /// If not yet granted, queries will simply return no data until the iPhone app is opened.
+    func startDataReadingIfAuthorized() {
+        guard let healthStore = healthStore else {
+            print("[Health] HealthKit not available on this device")
+            return
+        }
+        // Check if we already have at least heart-rate read permission before starting queries.
+        // This avoids executing queries that will produce nothing and log confusing errors.
+        guard let heartRateType = heartRateType else { return }
+        let status = healthStore.authorizationStatus(for: heartRateType)
+        guard status == .sharingAuthorized else {
+            print("[Health] HealthKit not yet authorized — iPhone app must be opened first. status=\(status.rawValue)")
+            return
+        }
+        print("[Health] HealthKit authorized — starting data reading (no prompt)")
+        startHeartRateObserver()
+        fetchTodaySteps()
+        startSpO2Observer()
+        fetchTodaySleep()
+        fetchTodayActiveCalories()
+        startServerSync()
+    }
+
     // MARK: - Authorization
     func requestAuthorization() {
         guard !hasRequestedAuth else { return }
