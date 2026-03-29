@@ -291,6 +291,7 @@ export function FamilyDashboardScreen() {
   const latestBpDiastolic = latestByType["blood_pressure_diastolic"] || null;
   const latestSpo2 = latestByType["oxygen_saturation"] || null;
   const latestSleep = latestByType["sleep"] || null;
+  const latestCalories = latestByType["active_calories"] || null;
 
   // Relative time formatter for health readings
   const formatRelativeTime = (entry: { created_at?: string; date?: string; time?: string } | null): string => {
@@ -599,9 +600,9 @@ export function FamilyDashboardScreen() {
                 )}
               </View>
             </View>
-            {/* Row 3: Blood pressure (only if available) */}
-            {(latestBpSystolic || latestBpDiastolic) && (
-              <View style={styles.healthGridRow}>
+            {/* Row 3: Blood pressure + Calories */}
+            <View style={styles.healthGridRow}>
+              {(latestBpSystolic || latestBpDiastolic) ? (
                 <View style={styles.healthGridCell}>
                   <Ionicons name="pulse" size={20} color={COLORS.accent} />
                   <Text style={styles.healthValue}>
@@ -614,67 +615,36 @@ export function FamilyDashboardScreen() {
                     <Text style={styles.healthStaleLabel}>(último registro)</Text>
                   )}
                 </View>
-                <View style={styles.healthGridCell} />
+              ) : (
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="pulse" size={20} color={COLORS.textLight} />
+                  <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
+                  <Text style={styles.healthUnit}>mmHg</Text>
+                </View>
+              )}
+              <View style={styles.healthGridCell}>
+                <Ionicons name="flame" size={20} color="#F97316" />
+                {latestCalories ? (
+                  <>
+                    <Text style={styles.healthValue}>{Math.round(latestCalories.value)}</Text>
+                    <Text style={styles.healthUnit}>kcal</Text>
+                    <Text style={styles.healthTimestamp}>{formatRelativeTime(latestCalories)}</Text>
+                    {isOlderThanOneHour(latestCalories) && (
+                      <Text style={styles.healthStaleLabel}>(último registro)</Text>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.healthValueEmpty}>{"\u2014"}</Text>
+                    <Text style={styles.healthUnit}>kcal</Text>
+                  </>
+                )}
               </View>
-            )}
+            </View>
           </View>
         </Card>
 
-        {/* My Health — debug card reading THIS device's HealthKit */}
-        <Card style={styles.healthCard}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Minha Saúde (este dispositivo)</Text>
-            </View>
-            <View style={styles.healthGridWrap}>
-              <View style={styles.healthGridRow}>
-                <View style={styles.healthGridCell}>
-                  <Ionicons name="heart" size={20} color={COLORS.danger} />
-                  <Text style={myHealth.heartRate != null ? styles.healthValue : styles.healthValueEmpty}>
-                    {myHealth.heartRate != null ? Math.round(myHealth.heartRate) : "\u2014"}
-                  </Text>
-                  <Text style={styles.healthUnit}>bpm</Text>
-                </View>
-                <View style={styles.healthGridCell}>
-                  <Ionicons name="water" size={20} color="#3498DB" />
-                  <Text style={myHealth.spo2 != null ? styles.healthValue : styles.healthValueEmpty}>
-                    {myHealth.spo2 != null ? `${Math.round(myHealth.spo2)}%` : "\u2014"}
-                  </Text>
-                  <Text style={styles.healthUnit}>SpO2</Text>
-                </View>
-              </View>
-              <View style={styles.healthGridRow}>
-                <View style={styles.healthGridCell}>
-                  <Ionicons name="footsteps" size={20} color={COLORS.primary} />
-                  <Text style={myHealth.steps != null ? styles.healthValue : styles.healthValueEmpty}>
-                    {myHealth.steps != null ? myHealth.steps.toLocaleString() : "\u2014"}
-                  </Text>
-                  <Text style={styles.healthUnit}>passos</Text>
-                </View>
-                <View style={styles.healthGridCell}>
-                  <Ionicons name="moon" size={20} color="#8E44AD" />
-                  <Text style={myHealth.sleepHours != null ? styles.healthValue : styles.healthValueEmpty}>
-                    {myHealth.sleepHours != null ? `${myHealth.sleepHours}h` : "\u2014"}
-                  </Text>
-                  <Text style={styles.healthUnit}>sono</Text>
-                </View>
-              </View>
-              <View style={styles.healthGridRow}>
-                <View style={styles.healthGridCell}>
-                  <Ionicons name="flame" size={20} color="#FF6B00" />
-                  <Text style={myHealth.activeCalories != null ? styles.healthValue : styles.healthValueEmpty}>
-                    {myHealth.activeCalories != null ? myHealth.activeCalories : "\u2014"}
-                  </Text>
-                  <Text style={styles.healthUnit}>kcal</Text>
-                </View>
-                <View style={styles.healthGridCell} />
-              </View>
-            </View>
-            {myHealth.lastUpdated && (
-              <Text style={{ fontSize: 11, color: COLORS.textLight, textAlign: "center", marginTop: 4 }}>
-                Atualizado: {new Date(myHealth.lastUpdated).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-              </Text>
-            )}
-          </Card>
+        {/* "My Health" debug card removed — was prompting family users for HealthKit unnecessarily */}
 
         {/* Recent Check-ins */}
         <Card style={styles.sectionCard}>

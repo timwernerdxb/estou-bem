@@ -3018,7 +3018,7 @@ app.post('/api/health', authMiddleware, asyncHandler(async (req, res) => {
 
 // POST /api/activity-update — receives movement + health data from Apple Watch
 app.post('/api/activity-update', authMiddleware, asyncHandler(async (req, res) => {
-  const { user_id: body_user_id, movement_detected, heart_rate, steps, spo2, sleep_hours, active_calories } = req.body;
+  const { user_id: body_user_id, movement_detected, heart_rate, steps, spo2, sleep_hours, active_calories, blood_pressure_systolic, blood_pressure_diastolic } = req.body;
   // Prefer the authenticated user's ID from the token (req.userId set by authMiddleware);
   // fall back to req.body.user_id for backward-compat with watch clients that embed it in the body
   const user_id = req.userId || body_user_id;
@@ -3185,6 +3185,19 @@ app.post('/api/activity-update', authMiddleware, asyncHandler(async (req, res) =
       await pool.query(
         `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'active_calories', $2)`,
         [user_id, active_calories]
+      );
+    }
+
+    if (blood_pressure_systolic != null && blood_pressure_systolic > 0) {
+      await pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'blood_pressure_systolic', $2)`,
+        [user_id, blood_pressure_systolic]
+      );
+    }
+    if (blood_pressure_diastolic != null && blood_pressure_diastolic > 0) {
+      await pool.query(
+        `INSERT INTO health_readings (user_id, reading_type, value) VALUES ($1, 'blood_pressure_diastolic', $2)`,
+        [user_id, blood_pressure_diastolic]
       );
     }
 
