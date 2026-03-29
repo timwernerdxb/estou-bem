@@ -582,8 +582,8 @@ class HealthIntegrationService {
         spo2: summary.spo2,
         sleep_hours: summary.sleepHours,
         active_calories: summary.activeCalories,
-        blood_pressure_systolic: summary.bloodPressure?.systolic,
-        blood_pressure_diastolic: summary.bloodPressure?.diastolic,
+        blood_pressure_systolic: summary.bloodPressureSystolic,
+        blood_pressure_diastolic: summary.bloodPressureDiastolic,
       }).catch(() => {});
     } catch {}
   }
