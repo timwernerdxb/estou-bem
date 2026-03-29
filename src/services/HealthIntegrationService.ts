@@ -1,15 +1,15 @@
-import { Platform } from "react-native";
+import { Platform, NativeModules } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { HealthEntry, HealthMetricType } from "../types";
 import { postHealth, postActivityUpdate } from "./ApiService";
 // expo-sensors Pedometer for iOS step count fallback
 import { Pedometer } from "expo-sensors";
-// Custom Expo module for HealthKit — loaded dynamically to prevent app crash if module fails
-let ExpoHealthkit: any = null;
-try {
-  ExpoHealthkit = require("expo-healthkit");
-} catch (e) {
-  console.warn("[HealthKit] Module not available, using pedometer fallback:", (e as Error).message);
+// EstouBemHealthKit — standard RCT NativeModule compiled directly into the app target.
+// Registered via HealthKitBridge.m (RCT_EXTERN_MODULE), so it works on every build
+// without depending on ExpoModulesProvider.swift autolinking.
+const ExpoHealthkit: any = Platform.OS === "ios" ? (NativeModules.EstouBemHealthKit ?? null) : null;
+if (Platform.OS === "ios" && !ExpoHealthkit) {
+  console.warn("[HealthKit] EstouBemHealthKit NativeModule not found — HealthKit data unavailable");
 }
 
 function generateId(): string {

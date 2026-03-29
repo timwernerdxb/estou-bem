@@ -20,7 +20,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { CheckIn } from "../types";
 import { fetchElderStatus, fetchProfile, getElderLatestLocation, fetchUserHealthReadings } from "../services/ApiService";
 import { useI18n } from "../i18n";
-import { HealthSummary } from "../services/HealthIntegrationService";
+import { healthIntegrationService, HealthSummary } from "../services/HealthIntegrationService";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -74,16 +74,27 @@ export function FamilyDashboardScreen() {
     recorded_at: string;
   } | null>(null);
 
-  // Load MY health data from server — the Watch app posts readings to /api/watch/health
-  // which saves them to health_readings. This bypasses the native HealthKit module entirely.
+  // Load MY health data — tries local HealthKit first (real-time), falls back to server data
+  // posted by the Watch. This way it works both with and without an Apple Watch.
   React.useEffect(() => {
+    if (Platform.OS !== "ios") return;
     const myUserId = (state.currentUser as any)?.id;
-    if (!myUserId) return;
+
     (async () => {
+      // 1. Try direct HealthKit via the new NativeModule (works without Watch too)
+      try {
+        await healthIntegrationService.initialize();
+        await healthIntegrationService.requestAppleHealthPermissions();
+        const summary = await healthIntegrationService.readAppleHealthSummary(24);
+        const hasData = summary.heartRate != null || summary.steps != null || summary.spo2 != null;
+        if (hasData) { setMyHealth(summary); return; }
+      } catch {}
+
+      // 2. Fallback: server data posted by Watch (if HealthKit module still unavailable)
+      if (!myUserId) return;
       try {
         const readings = await fetchUserHealthReadings(state.currentUser, myUserId);
         if (!readings?.length) return;
-        // Extract the latest value for each reading type
         const latest: Record<string, any> = {};
         for (const r of readings) {
           if (!latest[r.reading_type] || r.recorded_at > latest[r.reading_type].recorded_at) {

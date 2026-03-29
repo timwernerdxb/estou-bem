@@ -77,7 +77,9 @@ export default ({ config }) => ({
     ["expo-background-fetch"],
     ["expo-task-manager"],
     ["./plugins/withHealthKit"],
-    // Custom HealthKit module autolinked via expo-module.config.json (not a plugin)
+    // Injects HealthKitBridge.swift + HealthKitBridge.m as a standard RCT NativeModule
+    // so NativeModules.EstouBemHealthKit is always available, no autolinking needed
+    ["./plugins/withHealthKitBridge"],
     ["@bacons/apple-targets"],
     ["./plugins/withAsyncStorageRepo"],
     // ["./plugins/withWearOS"], // Wear OS built separately via GitHub Actions
