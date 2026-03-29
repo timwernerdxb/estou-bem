@@ -57,6 +57,9 @@
         "@bacons/apple-targets"
       ]
     ],
-    "owner": "timwernerdxb"
+    "owner": "timwernerdxb",
+    "autolinking": {
+      "nativeModulesDir": "./modules"
+    }
   }
 }

@@ -1,3 +1,5 @@
+// ExpoHealthkitModule — registered via expo-module.config.json + nativeModulesDir autolinking
+// Build 213: force cache-bust to ensure fresh ExpoModulesProvider.swift registration
 import ExpoModulesCore
 import HealthKit
 

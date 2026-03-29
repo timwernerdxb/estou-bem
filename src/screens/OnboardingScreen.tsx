@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -26,46 +26,33 @@ import { checkInService } from "../services/CheckInService";
 import { affiliateService } from "../services/AffiliateService";
 import { fetchSettings, postConsent, fetchMedications, fetchContacts, fetchHealth } from "../services/ApiService";
 import { analyticsService } from "../services/AnalyticsService";
-import { useI18n } from "../i18n";
+import { useI18n, SUPPORTED_LANGUAGES, SupportedLang } from "../i18n";
 
 const API_URL = "https://estou-bem-web-production.up.railway.app";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
-const ONBOARDING_SLIDES = [
-  {
-    icon: "shield-checkmark",
-    title: "Bem-vindo",
-    description:
-      "Cuide de quem você ama. Check-ins diários via WhatsApp para garantir que seu familiar está seguro.",
-  },
-  {
-    icon: "notifications",
-    title: "Check-in Simples",
-    description:
-      "O idoso recebe uma mensagem e responde SIM. Sem app, sem relógio. Se não responder, SAMU é acionado.",
-  },
-  {
-    icon: "medical",
-    title: "Saúde Completa",
-    description:
-      "Medicamentos, SpO2, frequência cardíaca e sono. Tudo em um só lugar.",
-  },
-  {
-    icon: "people",
-    title: "Proteção Familiar",
-    description:
-      "Conecte toda a família. Alertas via WhatsApp, push, SMS e e-mail.",
-  },
-];
+const LANG_FLAGS: Record<SupportedLang, string> = {
+  "pt-BR": "🇧🇷",
+  en: "🇺🇸",
+  es: "🇪🇸",
+  de: "🇩🇪",
+};
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function OnboardingScreen() {
   const navigation = useNavigation<Nav>();
   const { dispatch } = useApp();
-  const { t } = useI18n();
+  const { t, lang, setLang } = useI18n();
   const flatListRef = useRef<FlatList>(null);
+
+  const ONBOARDING_SLIDES = useMemo(() => [
+    { icon: "shield-checkmark", title: t("onboarding_welcome"), description: t("onboarding_welcome_desc") },
+    { icon: "notifications",    title: t("onboarding_checkin"), description: t("onboarding_checkin_desc") },
+    { icon: "medical",          title: t("onboarding_meds"),    description: t("onboarding_meds_desc") },
+    { icon: "people",           title: t("onboarding_family"),  description: t("onboarding_family_desc") },
+  ], [t]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showSetup, setShowSetup] = useState(false);
   const [role, setRole] = useState<UserRole | null>(null);
@@ -348,6 +335,14 @@ export function OnboardingScreen() {
   if (showLogin) {
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.langBar}>
+          {SUPPORTED_LANGUAGES.map(({ code }) => (
+            <TouchableOpacity key={code} onPress={() => setLang(code)} style={[styles.langBtn, lang === code && styles.langBtnActive]}>
+              <Text style={styles.langBtnText}>{LANG_FLAGS[code]}</Text>
+              <Text style={[styles.langBtnLabel, lang === code && styles.langBtnLabelActive]}>{code === "pt-BR" ? "PT" : code.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         <ScrollView
           style={styles.setupContainer}
           contentContainerStyle={{ paddingBottom: 40 }}
@@ -405,6 +400,14 @@ export function OnboardingScreen() {
   if (showSetup) {
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.langBar}>
+          {SUPPORTED_LANGUAGES.map(({ code }) => (
+            <TouchableOpacity key={code} onPress={() => setLang(code)} style={[styles.langBtn, lang === code && styles.langBtnActive]}>
+              <Text style={styles.langBtnText}>{LANG_FLAGS[code]}</Text>
+              <Text style={[styles.langBtnLabel, lang === code && styles.langBtnLabelActive]}>{code === "pt-BR" ? "PT" : code.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={{ flex: 1 }}
@@ -623,13 +626,13 @@ export function OnboardingScreen() {
         {currentSlide < ONBOARDING_SLIDES.length - 1 ? (
           <>
             <TouchableOpacity onPress={() => setShowSetup(true)}>
-              <Text style={styles.skipText}>Pular</Text>
+              <Text style={styles.skipText}>{t("onboarding_skip")}</Text>
             </TouchableOpacity>
-            <Button title="Próximo" onPress={handleNext} size="large" />
+            <Button title={t("onboarding_next")} onPress={handleNext} size="large" />
           </>
         ) : (
           <Button
-            title="Começar"
+            title={t("onboarding_start")}
             onPress={handleNext}
             size="elder"
             style={{ width: "100%" }}
@@ -759,4 +762,31 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: COLORS.textSecondary,
   },
+  // Language picker bar shown at top of login / register screens
+  langBar: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xs,
+  },
+  langBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  langBtnActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: "#EEF6F0",
+  },
+  langBtnText: { fontSize: 16 },
+  langBtnLabel: { fontSize: 12, color: COLORS.textSecondary, fontWeight: "500" },
+  langBtnLabelActive: { color: COLORS.primary },
 });
