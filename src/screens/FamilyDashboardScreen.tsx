@@ -644,7 +644,63 @@ export function FamilyDashboardScreen() {
           </View>
         </Card>
 
-        {/* "My Health" debug card removed — was prompting family users for HealthKit unnecessarily */}
+        {/* My Health — reads THIS device's HealthKit (family member's own data) */}
+        {Platform.OS === "ios" && (
+          <Card style={styles.healthCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Minha Saúde</Text>
+              {myHealth.lastUpdated && (
+                <Text style={{ fontSize: 11, color: COLORS.textLight }}>
+                  {new Date(myHealth.lastUpdated).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </Text>
+              )}
+            </View>
+            <View style={styles.healthGridWrap}>
+              <View style={styles.healthGridRow}>
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="heart" size={20} color={COLORS.danger} />
+                  <Text style={myHealth.heartRate != null ? styles.healthValue : styles.healthValueEmpty}>
+                    {myHealth.heartRate != null ? Math.round(myHealth.heartRate) : "\u2014"}
+                  </Text>
+                  <Text style={styles.healthUnit}>bpm</Text>
+                </View>
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="water" size={20} color="#3498DB" />
+                  <Text style={myHealth.spo2 != null ? styles.healthValue : styles.healthValueEmpty}>
+                    {myHealth.spo2 != null ? `${Math.round(myHealth.spo2)}%` : "\u2014"}
+                  </Text>
+                  <Text style={styles.healthUnit}>SpO2</Text>
+                </View>
+              </View>
+              <View style={styles.healthGridRow}>
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="footsteps" size={20} color={COLORS.primary} />
+                  <Text style={myHealth.steps != null ? styles.healthValue : styles.healthValueEmpty}>
+                    {myHealth.steps != null ? myHealth.steps.toLocaleString() : "\u2014"}
+                  </Text>
+                  <Text style={styles.healthUnit}>passos</Text>
+                </View>
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="moon" size={20} color="#8E44AD" />
+                  <Text style={myHealth.sleepHours != null ? styles.healthValue : styles.healthValueEmpty}>
+                    {myHealth.sleepHours != null ? `${myHealth.sleepHours}h` : "\u2014"}
+                  </Text>
+                  <Text style={styles.healthUnit}>sono</Text>
+                </View>
+              </View>
+              <View style={styles.healthGridRow}>
+                <View style={styles.healthGridCell}>
+                  <Ionicons name="flame" size={20} color="#F97316" />
+                  <Text style={myHealth.activeCalories != null ? styles.healthValue : styles.healthValueEmpty}>
+                    {myHealth.activeCalories != null ? Math.round(myHealth.activeCalories) : "\u2014"}
+                  </Text>
+                  <Text style={styles.healthUnit}>kcal</Text>
+                </View>
+                <View style={styles.healthGridCell} />
+              </View>
+            </View>
+          </Card>
+        )}
 
         {/* Recent Check-ins */}
         <Card style={styles.sectionCard}>

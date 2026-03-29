@@ -13,6 +13,7 @@ class HealthManager: NSObject, ObservableObject {
     @Published var todaySteps: Int = 0
     @Published var bloodOxygen: Double = 0
     @Published var sleepHours: Double = 0
+    @Published var activeCalories: Double = 0
     @Published var isAuthorized: Bool = false
 
     // MARK: - Private
@@ -29,6 +30,7 @@ class HealthManager: NSObject, ObservableObject {
     private lazy var stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount)
     private lazy var spo2Type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation)
     private lazy var sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)
+    private lazy var activeEnergyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)
 
     // MARK: - Init
     override init() {
@@ -56,7 +58,8 @@ class HealthManager: NSObject, ObservableObject {
         }
 
         hasRequestedAuth = true
-        let readTypes: Set<HKObjectType> = [heartRateType, stepsType, spo2Type, sleepType]
+        var readTypes: Set<HKObjectType> = [heartRateType, stepsType, spo2Type, sleepType]
+        if let activeEnergy = activeEnergyType { readTypes.insert(activeEnergy) }
 
         healthStore.requestAuthorization(toShare: nil, read: readTypes) { [weak self] success, error in
             DispatchQueue.main.async {
@@ -66,6 +69,7 @@ class HealthManager: NSObject, ObservableObject {
                     self?.fetchTodaySteps()
                     self?.startSpO2Observer()
                     self?.fetchTodaySleep()
+                    self?.fetchTodayActiveCalories()
                     self?.startServerSync()
                 }
             }
@@ -251,6 +255,33 @@ class HealthManager: NSObject, ObservableObject {
         healthStore.execute(query)
     }
 
+    private func fetchTodayActiveCalories() {
+        guard let healthStore = healthStore, let energyType = activeEnergyType else { return }
+
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: Date())
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: startOfDay,
+            end: Date(),
+            options: .strictStartDate
+        )
+
+        let query = HKStatisticsQuery(
+            quantityType: energyType,
+            quantitySamplePredicate: predicate,
+            options: .cumulativeSum
+        ) { [weak self] _, result, error in
+            guard let sum = result?.sumQuantity() else { return }
+            let kcal = sum.doubleValue(for: .kilocalorie())
+            DispatchQueue.main.async {
+                self?.activeCalories = kcal
+            }
+        }
+
+        healthStore.execute(query)
+    }
+
     // MARK: - Server Sync (Option C: watch posts directly to server)
 
     /// Start posting health data to the server every 5 minutes.
@@ -308,9 +339,12 @@ class HealthManager: NSObject, ObservableObject {
         if sleepHours > 0 {
             body["sleep_hours"] = sleepHours
         }
+        if activeCalories > 0 {
+            body["active_calories"] = activeCalories
+        }
 
         // Don't POST if we have no health data at all
-        if latestHeartRate <= 0 && todaySteps <= 0 && bloodOxygen <= 0 && sleepHours <= 0 {
+        if latestHeartRate <= 0 && todaySteps <= 0 && bloodOxygen <= 0 && sleepHours <= 0 && activeCalories <= 0 {
             print("[Health] No health data to send, skipping server sync")
             return
         }
