@@ -11,7 +11,7 @@
  *  - NativeModules.EstouBemHealthKit is always available in JS on iOS
  */
 
-const { withXcodeProject, withDangerousMods } = require("@expo/config-plugins");
+const { withXcodeProject, withDangerousMod, IOSConfig } = require("@expo/config-plugins");
 const path = require("path");
 const fs = require("fs");
 
@@ -190,7 +190,7 @@ RCT_EXTERN_METHOD(getActiveCalories:(RCTPromiseResolveBlock)resolve rejecter:(RC
 
 function withHealthKitBridge(config) {
   // 1. Write the source files into ios/EstouBem/ during prebuild
-  config = withDangerousMods(config, [
+  config = withDangerousMod(config, [
     "ios",
     (config) => {
       const iosRoot = config.modRequest.platformProjectRoot;
@@ -219,18 +219,22 @@ function withHealthKitBridge(config) {
   // 2. Add both files to the Xcode project Sources build phase
   config = withXcodeProject(config, (config) => {
     const project = config.modResults;
+    const opts = { isBuildFile: true, targetName: "EstouBem" };
 
-    // addSourceFile(filePath, opts, groupName) — adds to default target
-    const swiftFile = project.addSourceFile(
-      "EstouBem/HealthKitBridge.swift",
-      { target: project.getFirstTarget().uuid },
-    );
-    const objcFile = project.addSourceFile(
-      "EstouBem/HealthKitBridge.m",
-      { target: project.getFirstTarget().uuid },
-    );
+    IOSConfig.XcodeUtils.addBuildSourceFileToGroup({
+      filepath: "EstouBem/HealthKitBridge.swift",
+      groupName: "EstouBem",
+      project,
+      ...opts,
+    });
+    IOSConfig.XcodeUtils.addBuildSourceFileToGroup({
+      filepath: "EstouBem/HealthKitBridge.m",
+      groupName: "EstouBem",
+      project,
+      ...opts,
+    });
 
-    console.log("[withHealthKitBridge] Added to Xcode project:", swiftFile, objcFile);
+    console.log("[withHealthKitBridge] Added HealthKitBridge files to Xcode project Sources");
     return config;
   });
 
