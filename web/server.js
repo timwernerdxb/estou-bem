@@ -6916,20 +6916,10 @@ async function checkMissedCheckins() {
               timestamp: new Date().toISOString(),
             });
 
-            // Push notification to family — lets them know the check-in was auto-confirmed
-            // (not manually confirmed by the elder) so they can choose to follow up
-            const { tokens: familyTokens, userIds: familyUserIds } = await getFamilyPushTokens(elder.id);
-            if (familyTokens.length > 0) {
-              await sendPushNotifications(
-                familyTokens,
-                `Check-in automático — ${elder.name}`,
-                `O check-in das ${checkin.time} foi confirmado automaticamente. ${elder.name} não respondeu manualmente.`,
-                { type: 'auto_confirmed', elderId: elder.id, checkinId: checkin.id },
-                false,
-                familyUserIds
-              );
-              console.log(`[Auto Check-in] Sent auto-confirmed push to ${familyTokens.length} family member(s) for ${elder.name}`);
-            }
+            // NO push notification for auto-confirmed check-ins.
+            // Family only wants alerts for MISSED check-ins, SOS, or health emergencies —
+            // not for routine OK confirmations. The WebSocket event above updates the live
+            // dashboard silently without waking anyone up.
           }
         }
       }

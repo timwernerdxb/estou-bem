@@ -18,9 +18,9 @@ import { useApp, useSubscription } from "../store/AppContext";
 import { Card } from "../components/Card";
 import { StatusBadge } from "../components/StatusBadge";
 import { CheckIn } from "../types";
-import { fetchElderStatus, fetchProfile, getElderLatestLocation } from "../services/ApiService";
+import { fetchElderStatus, fetchProfile, getElderLatestLocation, fetchUserHealthReadings } from "../services/ApiService";
 import { useI18n } from "../i18n";
-import { healthIntegrationService, HealthSummary } from "../services/HealthIntegrationService";
+import { HealthSummary } from "../services/HealthIntegrationService";
 
 const serifFont = Platform.OS === "ios" ? "Georgia" : "serif";
 
@@ -74,22 +74,34 @@ export function FamilyDashboardScreen() {
     recorded_at: string;
   } | null>(null);
 
-  // Read MY health data from this device's HealthKit (for debugging)
+  // Load MY health data from server — the Watch app posts readings to /api/watch/health
+  // which saves them to health_readings. This bypasses the native HealthKit module entirely.
   React.useEffect(() => {
-    if (Platform.OS !== "ios") return;
-    // Load cached data immediately so the card shows right away
-    healthIntegrationService.getCachedHealthSummary().then((cached) => {
-      if (cached && Object.keys(cached).length > 0) setMyHealth(cached);
-    });
+    const myUserId = (state.currentUser as any)?.id;
+    if (!myUserId) return;
     (async () => {
       try {
-        await healthIntegrationService.initialize();
-        await healthIntegrationService.requestAppleHealthPermissions();
-        const summary = await healthIntegrationService.readAppleHealthSummary(24);
-        setMyHealth(summary); // always update, even if all values are null
+        const readings = await fetchUserHealthReadings(state.currentUser, myUserId);
+        if (!readings?.length) return;
+        // Extract the latest value for each reading type
+        const latest: Record<string, any> = {};
+        for (const r of readings) {
+          if (!latest[r.reading_type] || r.recorded_at > latest[r.reading_type].recorded_at) {
+            latest[r.reading_type] = r;
+          }
+        }
+        const timestamps = Object.values(latest).map((r: any) => r.recorded_at).sort().reverse();
+        setMyHealth({
+          heartRate: latest["heart_rate"]?.value ?? undefined,
+          spo2: latest["spo2"]?.value ?? undefined,
+          steps: latest["steps"]?.value ?? undefined,
+          sleepHours: latest["sleep"]?.value ?? undefined,
+          activeCalories: latest["active_calories"]?.value ?? undefined,
+          lastUpdated: timestamps[0] ?? undefined,
+        });
       } catch {}
     })();
-  }, []);
+  }, [(state.currentUser as any)?.id]);
 
   const loadElderData = React.useCallback(async () => {
     try {

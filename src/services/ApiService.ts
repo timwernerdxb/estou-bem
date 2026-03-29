@@ -484,3 +484,25 @@ export async function putSettings(
   });
   return !!res && res.ok;
 }
+
+// ─── Health Readings (Watch-posted data) ─────────────────────
+/**
+ * Fetch recent health readings for a user from the server.
+ * The Watch app posts readings here via /api/watch/health.
+ * Used by FamilyDashboard to show "Minha Saúde" from Watch data,
+ * bypassing the expo-healthkit native module entirely.
+ */
+export async function fetchUserHealthReadings(
+  user: { apiUrl?: string; token?: string } | null,
+  userId: number | string
+): Promise<any[] | null> {
+  if (!user?.token) return null;
+  const url = `${getApiUrl(user)}/api/health-readings/${userId}?limit=30`;
+  const res = await safeFetch(url, { method: "GET", headers: getHeaders(user.token) });
+  if (!res?.ok) return null;
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
